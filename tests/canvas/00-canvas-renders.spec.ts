@@ -31,11 +31,11 @@ test.describe('00 - Canvas Renders (REQ-CANVAS-001)', () => {
 
     // Canvas container with Konva canvas element
     await expect(page.locator('[data-testid="canvas-container"]')).toBeVisible();
-    await expect(page.locator('[data-testid="canvas-container"] canvas')).toBeVisible();
+    await expect(page.locator('[data-testid="canvas-container"] canvas').last()).toBeVisible();
   });
 
   test('canvas has non-zero dimensions', async ({ page }) => {
-    const canvas = page.locator('[data-testid="canvas-container"] canvas');
+    const canvas = page.locator('[data-testid="canvas-container"] canvas').last();
     const box = await canvas.boundingBox();
     expect(box).not.toBeNull();
     expect(box!.width).toBeGreaterThan(100);

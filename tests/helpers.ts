@@ -53,7 +53,7 @@ export async function getToolStore(page: Page) {
  * Click on the Konva canvas at specific viewport coordinates
  */
 export async function clickCanvas(page: Page, x: number, y: number) {
-  const canvas = page.locator('[data-testid="canvas-container"] canvas');
+  const canvas = page.locator('[data-testid="canvas-container"] canvas').last();
   await canvas.click({ position: { x, y } });
 }
 
@@ -61,7 +61,7 @@ export async function clickCanvas(page: Page, x: number, y: number) {
  * Double-click on the Konva canvas at specific viewport coordinates
  */
 export async function dblClickCanvas(page: Page, x: number, y: number) {
-  const canvas = page.locator('[data-testid="canvas-container"] canvas');
+  const canvas = page.locator('[data-testid="canvas-container"] canvas').last();
   await canvas.dblclick({ position: { x, y } });
 }
 
@@ -69,7 +69,7 @@ export async function dblClickCanvas(page: Page, x: number, y: number) {
  * Wait for the canvas to be ready (Stage rendered)
  */
 export async function waitForCanvasReady(page: Page) {
-  await page.locator('[data-testid="canvas-container"] canvas').waitFor({ state: 'visible' });
+  await page.locator('[data-testid="canvas-container"] canvas').first().waitFor({ state: 'visible' });
 }
 
 /**

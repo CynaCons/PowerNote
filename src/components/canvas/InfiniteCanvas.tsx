@@ -6,6 +6,7 @@ import { useToolStore } from '../../stores/useToolStore';
 import { CanvasNode } from './CanvasNode';
 import { SelectionTransformer } from './SelectionTransformer';
 import { SnapGuides, type SnapLine } from './SnapGuides';
+import { PageGuides } from './PageGuides';
 import { TrashButton } from './TrashButton';
 import { generateId } from '../../utils/ids';
 import type { CanvasNode as CanvasNodeType } from '../../types/data';
@@ -208,8 +209,19 @@ export function InfiniteCanvas() {
         e.preventDefault();
         const store = useCanvasStore.getState();
         const allIds = store.nodes.map((n) => n.id);
-        // Select all by setting selectedNodeIds directly
         useCanvasStore.setState({ selectedNodeIds: allIds });
+      }
+
+      // Ctrl+Z: undo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        useCanvasStore.getState().undo();
+      }
+
+      // Ctrl+Shift+Z / Ctrl+Y: redo
+      if ((e.ctrlKey || e.metaKey) && ((e.key === 'z' && e.shiftKey) || e.key === 'y')) {
+        e.preventDefault();
+        useCanvasStore.getState().redo();
       }
     };
 
@@ -237,6 +249,9 @@ export function InfiniteCanvas() {
           onClick={handleStageClick}
           onTap={handleStageClick}
         >
+          <Layer>
+            <PageGuides visible={true} />
+          </Layer>
           <Layer>
             {nodes.map((node) => {
               const isAutoEdit = autoEditNodeId === node.id;

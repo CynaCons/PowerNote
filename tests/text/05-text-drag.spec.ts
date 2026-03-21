@@ -34,7 +34,7 @@ test.describe('05 - Text Drag (REQ-TEXT-006)', () => {
     const initialY = store.nodes[0].y;
 
     // Get the canvas bounding box to compute viewport coordinates
-    const canvas = page.locator('[data-testid="canvas-container"] canvas');
+    const canvas = page.locator('[data-testid="canvas-container"] canvas').last();
     const box = await canvas.boundingBox();
     expect(box).not.toBeNull();
 

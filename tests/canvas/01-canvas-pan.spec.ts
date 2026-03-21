@@ -20,7 +20,7 @@ test.describe('01 - Canvas Pan (REQ-CANVAS-002)', () => {
     const initialY = storeBefore.viewport.y;
 
     // Drag the canvas background from (400, 300) to (500, 400)
-    const canvas = page.locator('[data-testid="canvas-container"] canvas');
+    const canvas = page.locator('[data-testid="canvas-container"] canvas').last();
     const box = await canvas.boundingBox();
     expect(box).not.toBeNull();
 
@@ -45,7 +45,7 @@ test.describe('01 - Canvas Pan (REQ-CANVAS-002)', () => {
   test('viewport position reflects drag direction', async ({ page }) => {
     const storeBefore = await getCanvasStore(page);
 
-    const canvas = page.locator('[data-testid="canvas-container"] canvas');
+    const canvas = page.locator('[data-testid="canvas-container"] canvas').last();
     const box = await canvas.boundingBox();
     expect(box).not.toBeNull();
 

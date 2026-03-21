@@ -2,12 +2,14 @@ import { create } from 'zustand';
 import type { CanvasNode, Viewport } from '../types/data';
 import { generateId } from '../utils/ids';
 
+const MAX_HISTORY = 50;
+
 interface CanvasState {
   nodes: CanvasNode[];
   viewport: Viewport;
   selectedNodeIds: string[];
 
-  // Node CRUD
+  // Node CRUD (all push to undo history)
   addNode: (node: CanvasNode) => void;
   updateNode: (id: string, updates: Partial<CanvasNode>) => void;
   deleteNode: (id: string) => void;
@@ -17,7 +19,7 @@ interface CanvasState {
   loadPageNodes: (nodes: CanvasNode[]) => void;
   getNodesSnapshot: () => CanvasNode[];
 
-  // Selection (multi-select support)
+  // Selection
   selectNode: (id: string, additive: boolean) => void;
   clearSelection: () => void;
 
@@ -27,10 +29,28 @@ interface CanvasState {
   // Clipboard
   copySelectedNodes: () => void;
   pasteNodes: (offsetX?: number, offsetY?: number) => void;
+
+  // Undo/Redo
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
 }
 
-// Internal clipboard (module-level, persists across store resets)
+// Module-level state (persists across renders, not serialized)
 let clipboard: CanvasNode[] = [];
+let undoStack: CanvasNode[][] = [];
+let redoStack: CanvasNode[][] = [];
+
+function pushUndo(nodes: CanvasNode[]) {
+  undoStack.push(nodes.map((n) => ({ ...n, data: { ...n.data } })));
+  if (undoStack.length > MAX_HISTORY) undoStack.shift();
+  redoStack = []; // Clear redo on new action
+}
+
+function deepCopyNodes(nodes: CanvasNode[]): CanvasNode[] {
+  return nodes.map((n) => ({ ...n, data: { ...n.data } }));
+}
 
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodes: [],
@@ -38,36 +58,51 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   selectedNodeIds: [],
 
   addNode: (node) =>
-    set((state) => ({ nodes: [...state.nodes, node] })),
+    set((state) => {
+      pushUndo(state.nodes);
+      return { nodes: [...state.nodes, node] };
+    }),
 
   updateNode: (id, updates) =>
-    set((state) => ({
-      nodes: state.nodes.map((n) =>
-        n.id === id ? { ...n, ...updates } : n,
-      ),
-    })),
+    set((state) => {
+      pushUndo(state.nodes);
+      return {
+        nodes: state.nodes.map((n) =>
+          n.id === id ? { ...n, ...updates } : n,
+        ),
+      };
+    }),
 
   deleteNode: (id) =>
-    set((state) => ({
-      nodes: state.nodes.filter((n) => n.id !== id),
-      selectedNodeIds: state.selectedNodeIds.filter((sid) => sid !== id),
-    })),
+    set((state) => {
+      pushUndo(state.nodes);
+      return {
+        nodes: state.nodes.filter((n) => n.id !== id),
+        selectedNodeIds: state.selectedNodeIds.filter((sid) => sid !== id),
+      };
+    }),
 
   deleteSelectedNodes: () =>
-    set((state) => ({
-      nodes: state.nodes.filter((n) => !state.selectedNodeIds.includes(n.id)),
-      selectedNodeIds: [],
-    })),
+    set((state) => {
+      pushUndo(state.nodes);
+      return {
+        nodes: state.nodes.filter((n) => !state.selectedNodeIds.includes(n.id)),
+        selectedNodeIds: [],
+      };
+    }),
 
-  loadPageNodes: (nodes) =>
-    set({ nodes, selectedNodeIds: [] }),
+  loadPageNodes: (nodes) => {
+    // Reset history on page switch
+    undoStack = [];
+    redoStack = [];
+    set({ nodes, selectedNodeIds: [] });
+  },
 
   getNodesSnapshot: () => get().nodes,
 
   selectNode: (id, additive) =>
     set((state) => {
       if (additive) {
-        // Ctrl+Click: toggle selection
         const already = state.selectedNodeIds.includes(id);
         return {
           selectedNodeIds: already
@@ -75,7 +110,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
             : [...state.selectedNodeIds, id],
         };
       }
-      // Normal click: single select
       return { selectedNodeIds: [id] };
     }),
 
@@ -90,7 +124,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     const state = get();
     clipboard = state.nodes
       .filter((n) => state.selectedNodeIds.includes(n.id))
-      .map((n) => ({ ...n }));
+      .map((n) => ({ ...n, data: { ...n.data } }));
   },
 
   pasteNodes: (offsetX = 20, offsetY = 20) => {
@@ -102,9 +136,31 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       y: n.y + offsetY,
       data: { ...n.data },
     }));
-    set((state) => ({
-      nodes: [...state.nodes, ...newNodes],
-      selectedNodeIds: newNodes.map((n) => n.id),
-    }));
+    set((state) => {
+      pushUndo(state.nodes);
+      return {
+        nodes: [...state.nodes, ...newNodes],
+        selectedNodeIds: newNodes.map((n) => n.id),
+      };
+    });
   },
+
+  undo: () => {
+    if (undoStack.length === 0) return;
+    const current = get().nodes;
+    redoStack.push(deepCopyNodes(current));
+    const prev = undoStack.pop()!;
+    set({ nodes: prev, selectedNodeIds: [] });
+  },
+
+  redo: () => {
+    if (redoStack.length === 0) return;
+    const current = get().nodes;
+    undoStack.push(deepCopyNodes(current));
+    const next = redoStack.pop()!;
+    set({ nodes: next, selectedNodeIds: [] });
+  },
+
+  canUndo: () => undoStack.length > 0,
+  canRedo: () => redoStack.length > 0,
 }));

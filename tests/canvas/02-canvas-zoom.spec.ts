@@ -21,7 +21,7 @@ test.describe('02 - Canvas Zoom (REQ-CANVAS-003, REQ-CANVAS-004)', () => {
   });
 
   test('Ctrl+wheel zoom in increases scale', async ({ page }) => {
-    const canvas = page.locator('[data-testid="canvas-container"] canvas');
+    const canvas = page.locator('[data-testid="canvas-container"] canvas').last();
     const box = await canvas.boundingBox();
     expect(box).not.toBeNull();
 
@@ -41,7 +41,7 @@ test.describe('02 - Canvas Zoom (REQ-CANVAS-003, REQ-CANVAS-004)', () => {
   });
 
   test('Ctrl+wheel zoom out decreases scale', async ({ page }) => {
-    const canvas = page.locator('[data-testid="canvas-container"] canvas');
+    const canvas = page.locator('[data-testid="canvas-container"] canvas').last();
     const box = await canvas.boundingBox();
     expect(box).not.toBeNull();
 
@@ -61,7 +61,7 @@ test.describe('02 - Canvas Zoom (REQ-CANVAS-003, REQ-CANVAS-004)', () => {
   });
 
   test('scale is clamped within [0.1, 5.0]', async ({ page }) => {
-    const canvas = page.locator('[data-testid="canvas-container"] canvas');
+    const canvas = page.locator('[data-testid="canvas-container"] canvas').last();
     const box = await canvas.boundingBox();
     expect(box).not.toBeNull();
 
