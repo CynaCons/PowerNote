@@ -245,6 +245,8 @@
 | v0.3.6 E2E Tests 22-33 | **Done** (39 new tests, all green) |
 | v0.3.7 UX Fixes | In progress |
 | | - Fix auto-width text blocks |
+| | - Fix undo batching (text placement = 1 undo entry) |
+| | - Fix notebook search includes active page unsaved nodes |
 
 ---
 

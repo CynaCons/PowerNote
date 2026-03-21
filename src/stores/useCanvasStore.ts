@@ -42,11 +42,28 @@ interface CanvasState {
 let clipboard: CanvasNode[] = [];
 let undoStack: CanvasNode[][] = [];
 let redoStack: CanvasNode[][] = [];
+let batchDepth = 0; // When > 0, only the first pushUndo in the batch saves a snapshot
 
 function pushUndo(nodes: CanvasNode[]) {
+  if (batchDepth > 0) return; // Inside a batch — skip intermediate snapshots
   undoStack.push(nodes.map((n) => ({ ...n, data: { ...n.data } })));
   if (undoStack.length > MAX_HISTORY) undoStack.shift();
   redoStack = []; // Clear redo on new action
+}
+
+/** Start a batch — the NEXT pushUndo saves, all subsequent ones inside the batch are skipped */
+export function undoBatchStart(nodes: CanvasNode[]) {
+  if (batchDepth === 0) {
+    // Save the snapshot at the start of the batch
+    undoStack.push(nodes.map((n) => ({ ...n, data: { ...n.data } })));
+    if (undoStack.length > MAX_HISTORY) undoStack.shift();
+    redoStack = [];
+  }
+  batchDepth++;
+}
+
+export function undoBatchEnd() {
+  if (batchDepth > 0) batchDepth--;
 }
 
 function deepCopyNodes(nodes: CanvasNode[]): CanvasNode[] {

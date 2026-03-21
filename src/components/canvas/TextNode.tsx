@@ -3,6 +3,7 @@ import { Group, Rect } from 'react-konva';
 import { Html } from 'react-konva-utils';
 import type Konva from 'konva';
 import type { CanvasNode, TextNodeData } from '../../types/data';
+import { undoBatchEnd } from '../../stores/useCanvasStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { TextEditor } from './TextEditor';
 import { calculateSnap, type SnapLine } from './SnapGuides';
@@ -116,9 +117,11 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
     updateNode(node.id, {
       data: { ...data, text: newText },
     });
+    undoBatchEnd(); // End batch started on text placement (if any)
   };
 
   const handleCancelEdit = () => {
+    undoBatchEnd(); // End batch even on cancel
     setIsEditing(false);
   };
 

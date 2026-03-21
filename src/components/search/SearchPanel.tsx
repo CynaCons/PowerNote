@@ -69,10 +69,13 @@ export function SearchPanel({ isOpen, isNotebookWide, onClose, onNavigateToResul
     }
 
     // Notebook-wide search: all sections, all pages
+    // For the active page, use canvas store nodes (live data) instead of workspace store (stale)
     const results: SearchResult[] = [];
     for (const section of workspace.sections) {
       for (const page of section.pages) {
-        for (const node of page.nodes) {
+        const isActivePage = section.id === activeSectionId && page.id === activePageId;
+        const pageNodes = isActivePage ? nodes : page.nodes;
+        for (const node of pageNodes) {
           if (node.type !== 'text') continue;
           const text = (node.data as any).text || '';
           if (!text.toLowerCase().includes(q)) continue;

@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { Stage, Layer } from 'react-konva';
 import type Konva from 'konva';
-import { useCanvasStore } from '../../stores/useCanvasStore';
+import { useCanvasStore, undoBatchStart } from '../../stores/useCanvasStore';
 import { useToolStore } from '../../stores/useToolStore';
 import { CanvasNode } from './CanvasNode';
 import { SnapGuides, type SnapLine } from './SnapGuides';
@@ -142,7 +142,8 @@ export function InfiniteCanvas() {
           },
         };
 
-        // Revert to select BEFORE adding node — prevents any race condition
+        // Batch: addNode + first updateNode (blur commit) = single undo entry
+        undoBatchStart(useCanvasStore.getState().nodes);
         useToolStore.getState().setTool('select');
         addNode(newNode);
         selectNode(newNode.id, false);

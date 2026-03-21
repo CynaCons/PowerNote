@@ -69,8 +69,8 @@ test.describe('22 - Undo/Redo (REQ-CANVAS-007)', () => {
     expect(store.nodes).toHaveLength(1);
   });
 
-  test('undo reverts a text edit', async ({ page }) => {
-    // Place a text block and type "Hello"
+  test('undo reverts a text placement+edit as single action', async ({ page }) => {
+    // Place a text block and type "Hello" — batched as single undo entry
     await activateTool(page, 'text');
     await clickCanvas(page, 400, 300);
 
@@ -83,13 +83,12 @@ test.describe('22 - Undo/Redo (REQ-CANVAS-007)', () => {
     let store = await getCanvasStore(page);
     expect(store.nodes[0].data.text).toBe('Hello');
 
-    // Undo the edit — should revert to empty text (the addNode state)
+    // Single undo should revert the entire placement+edit (batched)
     await page.keyboard.press('Control+z');
     await page.waitForTimeout(200);
 
     store = await getCanvasStore(page);
-    expect(store.nodes).toHaveLength(1);
-    expect(store.nodes[0].data.text).toBe('');
+    expect(store.nodes).toHaveLength(0);
   });
 
   test('multiple undos: place 3 texts, undo 3 times → 0 nodes', async ({ page }) => {
