@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "Bash(where npm:*)",
+      "Bash(where npx:*)",
+      "Bash(where node:*)",
+      "Bash(ls \"C:\\\\dev\\\\private-repo\\\\PowerNote\\\\node_modules\\\\.bin\\\\vite\"*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm view:*)",
+      "Bash(npm install:*)"
+    ]
+  }
+}

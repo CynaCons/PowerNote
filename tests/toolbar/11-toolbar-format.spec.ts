@@ -23,7 +23,7 @@ test.describe('11 - Toolbar Format (REQ-TOOL-002..005)', () => {
     await expect(textarea).toBeVisible({ timeout: 2000 });
 
     await textarea.fill('Hello');
-    await textarea.press('Enter');
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.waitForTimeout(300);
 
     // After commit, node is still selected and text tool is active,

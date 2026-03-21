@@ -23,7 +23,7 @@ test.describe('04 - Text Edit (REQ-TEXT-003, REQ-TEXT-004, REQ-TEXT-005)', () =>
     await expect(textarea).toBeVisible({ timeout: 2000 });
 
     await textarea.fill('Hello World');
-    await textarea.press('Enter');
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
 
     await page.waitForTimeout(200);
 
@@ -81,12 +81,16 @@ test.describe('04 - Text Edit (REQ-TEXT-003, REQ-TEXT-004, REQ-TEXT-005)', () =>
     await expect(textarea).toBeVisible({ timeout: 2000 });
 
     await textarea.fill('Edit me');
-    await textarea.press('Enter');
+    // Blur by clicking elsewhere — but first deactivate text tool to avoid placing new nodes
+    await page.evaluate(() => {
+      (window as any).__POWERNOTE_STORES__.tool.getState().setTool('select');
+    });
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
 
     await page.waitForTimeout(300);
 
     // Textarea should be gone after commit
-    await expect(textarea).not.toBeVisible();
+    await expect(textarea).not.toBeVisible({ timeout: 2000 });
 
     // Double-click at the same canvas position to re-edit
     await dblClickCanvas(page, 400, 300);

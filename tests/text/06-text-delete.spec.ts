@@ -24,7 +24,7 @@ test.describe('06 - Text Delete (REQ-TEXT-009, REQ-TEXT-010)', () => {
     await expect(textarea).toBeVisible({ timeout: 2000 });
 
     await textarea.fill('Delete me');
-    await textarea.press('Enter');
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
 
     await page.waitForTimeout(300);
 

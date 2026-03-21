@@ -1,6 +1,6 @@
 // ── Node types ──────────────────────────────────────────────
 
-export type NodeType = 'text' | 'image' | 'shape' | 'container';
+export type NodeType = 'text' | 'image' | 'shape';
 
 export interface TextNodeData {
   text: string;
@@ -10,16 +10,6 @@ export interface TextNodeData {
   fill: string;
 }
 
-export interface ContainerNodeData {
-  title: string;
-  isCollapsed: boolean;
-  headerHeight: number;
-  fill: string;
-  borderColor: string;
-}
-
-export type NodeData = TextNodeData | ContainerNodeData;
-
 export interface CanvasNode {
   id: string;
   type: NodeType;
@@ -27,18 +17,7 @@ export interface CanvasNode {
   y: number;
   width: number;
   height: number;
-  parentContainerId?: string | null;
-  data: NodeData;
-}
-
-// ── Type guards ─────────────────────────────────────────────
-
-export function isTextNode(node: CanvasNode): node is CanvasNode & { data: TextNodeData } {
-  return node.type === 'text';
-}
-
-export function isContainerNode(node: CanvasNode): node is CanvasNode & { data: ContainerNodeData } {
-  return node.type === 'container';
+  data: TextNodeData; // union with ImageNodeData | ShapeNodeData later
 }
 
 // ── Hierarchy types ─────────────────────────────────────────
@@ -63,7 +42,7 @@ export interface WorkspaceData {
 
 // ── Tool types ──────────────────────────────────────────────
 
-export type ToolType = 'select' | 'text' | 'draw' | 'container';
+export type ToolType = 'select' | 'text' | 'draw';
 
 export interface TextOptions {
   fontSize: number;

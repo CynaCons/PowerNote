@@ -11,7 +11,9 @@ export async function getCanvasStore(page: Page) {
     return {
       nodes: state.nodes,
       viewport: state.viewport,
-      selectedNodeId: state.selectedNodeId,
+      selectedNodeIds: state.selectedNodeIds,
+      // Backward compat: first selected or null
+      selectedNodeId: state.selectedNodeIds?.[0] ?? null,
     };
   });
 }

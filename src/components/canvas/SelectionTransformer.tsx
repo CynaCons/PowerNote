@@ -4,11 +4,11 @@ import type Konva from 'konva';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 
 interface SelectionTransformerProps {
-  selectedNodeId: string | null;
+  selectedNodeIds: string[];
   stageRef: React.RefObject<Konva.Stage | null>;
 }
 
-export function SelectionTransformer({ selectedNodeId, stageRef }: SelectionTransformerProps) {
+export function SelectionTransformer({ selectedNodeIds, stageRef }: SelectionTransformerProps) {
   const transformerRef = useRef<Konva.Transformer>(null);
   const updateNode = useCanvasStore((s) => s.updateNode);
   const nodes = useCanvasStore((s) => s.nodes);
@@ -18,26 +18,36 @@ export function SelectionTransformer({ selectedNodeId, stageRef }: SelectionTran
     const stage = stageRef.current;
     if (!transformer || !stage) return;
 
-    if (!selectedNodeId) {
+    if (selectedNodeIds.length === 0) {
       transformer.nodes([]);
       transformer.getLayer()?.batchDraw();
       return;
     }
 
-    // Find the Konva node on the stage by id
-    const selectedNode = stage.findOne(`#${selectedNodeId}`);
-    if (selectedNode) {
-      transformer.nodes([selectedNode]);
-      transformer.getLayer()?.batchDraw();
-    } else {
-      transformer.nodes([]);
-      transformer.getLayer()?.batchDraw();
+    // Find all selected Konva nodes on the stage
+    // Nodes are inside Groups, so we need to find the Groups by looking for the Text id
+    const selectedKonvaNodes: Konva.Node[] = [];
+    for (const nodeId of selectedNodeIds) {
+      // The Text element has the id, but we want its parent Group
+      const found: Konva.Node | undefined = stage.findOne(`#${nodeId}`);
+      if (found) {
+        const group: Konva.Node | null = found.parent;
+        if (group && group !== stage) {
+          selectedKonvaNodes.push(group);
+        }
+      }
     }
-  }, [selectedNodeId, stageRef, nodes]);
+
+    transformer.nodes(selectedKonvaNodes);
+    transformer.getLayer()?.batchDraw();
+  }, [selectedNodeIds, stageRef, nodes]);
 
   const handleTransformEnd = () => {
     const transformer = transformerRef.current;
-    if (!transformer || !selectedNodeId) return;
+    if (!transformer || selectedNodeIds.length === 0) return;
+
+    // Only handle single-node resize (multi-select can't resize)
+    if (selectedNodeIds.length !== 1) return;
 
     const node = transformer.nodes()[0];
     if (!node) return;
@@ -45,21 +55,19 @@ export function SelectionTransformer({ selectedNodeId, stageRef }: SelectionTran
     const scaleX = node.scaleX();
     const scaleY = node.scaleY();
 
-    // Reset scale and apply it to width/height instead
     node.scaleX(1);
     node.scaleY(1);
 
-    const storeNode = useCanvasStore.getState().nodes.find((n) => n.id === selectedNodeId);
+    const storeNode = useCanvasStore.getState().nodes.find((n) => n.id === selectedNodeIds[0]);
     if (!storeNode) return;
 
     const newWidth = Math.max(50, node.width() * scaleX);
 
     if (storeNode.type === 'text') {
-      // For text: only resize width, let Konva recalculate height from text reflow
       node.width(newWidth);
       const reflowedHeight = node.height();
 
-      updateNode(selectedNodeId, {
+      updateNode(selectedNodeIds[0], {
         x: node.x(),
         y: node.y(),
         width: newWidth,
@@ -67,9 +75,8 @@ export function SelectionTransformer({ selectedNodeId, stageRef }: SelectionTran
         data: { ...storeNode.data },
       });
     } else {
-      // For other node types: resize both dimensions
       const newHeight = Math.max(20, node.height() * scaleY);
-      updateNode(selectedNodeId, {
+      updateNode(selectedNodeIds[0], {
         x: node.x(),
         y: node.y(),
         width: newWidth,
@@ -82,7 +89,6 @@ export function SelectionTransformer({ selectedNodeId, stageRef }: SelectionTran
     <Transformer
       ref={transformerRef}
       boundBoxFunc={(_oldBox, newBox) => {
-        // Minimum size constraint
         if (newBox.width < 50 || newBox.height < 20) {
           return _oldBox;
         }
@@ -96,6 +102,9 @@ export function SelectionTransformer({ selectedNodeId, stageRef }: SelectionTran
       anchorSize={8}
       anchorCornerRadius={2}
       padding={2}
+      // Disable resize for multi-select
+      resizeEnabled={selectedNodeIds.length === 1}
+      rotateEnabled={false}
     />
   );
 }

@@ -1,36 +1,41 @@
 import { create } from 'zustand';
-import type { CanvasNode, Viewport, ContainerNodeData } from '../types/data';
+import type { CanvasNode, Viewport } from '../types/data';
+import { generateId } from '../utils/ids';
 
 interface CanvasState {
   nodes: CanvasNode[];
   viewport: Viewport;
-  selectedNodeId: string | null;
+  selectedNodeIds: string[];
 
   // Node CRUD
   addNode: (node: CanvasNode) => void;
   updateNode: (id: string, updates: Partial<CanvasNode>) => void;
   deleteNode: (id: string) => void;
+  deleteSelectedNodes: () => void;
 
   // Bulk operations for page switching
   loadPageNodes: (nodes: CanvasNode[]) => void;
   getNodesSnapshot: () => CanvasNode[];
 
-  // Selection
-  setSelectedNodeId: (id: string | null) => void;
+  // Selection (multi-select support)
+  selectNode: (id: string, additive: boolean) => void;
+  clearSelection: () => void;
 
   // Viewport
   setViewport: (viewport: Partial<Viewport>) => void;
 
-  // Container-specific
-  toggleContainerCollapse: (containerId: string) => void;
-  moveNodeIntoContainer: (nodeId: string, containerId: string) => void;
-  moveNodeOutOfContainer: (nodeId: string) => void;
+  // Clipboard
+  copySelectedNodes: () => void;
+  pasteNodes: (offsetX?: number, offsetY?: number) => void;
 }
+
+// Internal clipboard (module-level, persists across store resets)
+let clipboard: CanvasNode[] = [];
 
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodes: [],
   viewport: { x: 0, y: 0, scale: 1 },
-  selectedNodeId: null,
+  selectedNodeIds: [],
 
   addNode: (node) =>
     set((state) => ({ nodes: [...state.nodes, node] })),
@@ -43,61 +48,63 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     })),
 
   deleteNode: (id) =>
-    set((state) => {
-      const deletedNode = state.nodes.find((n) => n.id === id);
+    set((state) => ({
+      nodes: state.nodes.filter((n) => n.id !== id),
+      selectedNodeIds: state.selectedNodeIds.filter((sid) => sid !== id),
+    })),
 
-      // If deleting a container, release its children
-      let updatedNodes = state.nodes.filter((n) => n.id !== id);
-      if (deletedNode?.type === 'container') {
-        updatedNodes = updatedNodes.map((n) =>
-          n.parentContainerId === id
-            ? { ...n, parentContainerId: null }
-            : n,
-        );
-      }
-
-      return {
-        nodes: updatedNodes,
-        selectedNodeId:
-          state.selectedNodeId === id ? null : state.selectedNodeId,
-      };
-    }),
+  deleteSelectedNodes: () =>
+    set((state) => ({
+      nodes: state.nodes.filter((n) => !state.selectedNodeIds.includes(n.id)),
+      selectedNodeIds: [],
+    })),
 
   loadPageNodes: (nodes) =>
-    set({ nodes, selectedNodeId: null }),
+    set({ nodes, selectedNodeIds: [] }),
 
   getNodesSnapshot: () => get().nodes,
 
-  setSelectedNodeId: (id) => set({ selectedNodeId: id }),
+  selectNode: (id, additive) =>
+    set((state) => {
+      if (additive) {
+        // Ctrl+Click: toggle selection
+        const already = state.selectedNodeIds.includes(id);
+        return {
+          selectedNodeIds: already
+            ? state.selectedNodeIds.filter((sid) => sid !== id)
+            : [...state.selectedNodeIds, id],
+        };
+      }
+      // Normal click: single select
+      return { selectedNodeIds: [id] };
+    }),
+
+  clearSelection: () => set({ selectedNodeIds: [] }),
 
   setViewport: (viewport) =>
     set((state) => ({
       viewport: { ...state.viewport, ...viewport },
     })),
 
-  toggleContainerCollapse: (containerId) =>
-    set((state) => ({
-      nodes: state.nodes.map((n) => {
-        if (n.id !== containerId || n.type !== 'container') return n;
-        const data = n.data as ContainerNodeData;
-        return {
-          ...n,
-          data: { ...data, isCollapsed: !data.isCollapsed },
-        };
-      }),
-    })),
+  copySelectedNodes: () => {
+    const state = get();
+    clipboard = state.nodes
+      .filter((n) => state.selectedNodeIds.includes(n.id))
+      .map((n) => ({ ...n }));
+  },
 
-  moveNodeIntoContainer: (nodeId, containerId) =>
+  pasteNodes: (offsetX = 20, offsetY = 20) => {
+    if (clipboard.length === 0) return;
+    const newNodes = clipboard.map((n) => ({
+      ...n,
+      id: generateId(),
+      x: n.x + offsetX,
+      y: n.y + offsetY,
+      data: { ...n.data },
+    }));
     set((state) => ({
-      nodes: state.nodes.map((n) =>
-        n.id === nodeId ? { ...n, parentContainerId: containerId } : n,
-      ),
-    })),
-
-  moveNodeOutOfContainer: (nodeId) =>
-    set((state) => ({
-      nodes: state.nodes.map((n) =>
-        n.id === nodeId ? { ...n, parentContainerId: null } : n,
-      ),
-    })),
+      nodes: [...state.nodes, ...newNodes],
+      selectedNodeIds: newNodes.map((n) => n.id),
+    }));
+  },
 }));

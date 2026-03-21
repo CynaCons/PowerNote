@@ -64,7 +64,7 @@ test.describe('08 - Hierarchy Navigate (REQ-HIER-004, REQ-HIER-011)', () => {
     const textarea = page.locator('textarea');
     await expect(textarea).toBeVisible({ timeout: 2000 });
     await textarea.fill('Page 2 content');
-    await textarea.press('Enter');
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.waitForTimeout(300);
 
     // Verify the text node exists on this page

@@ -5,8 +5,8 @@ import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useToolStore } from '../../stores/useToolStore';
 import { CanvasNode } from './CanvasNode';
 import { SelectionTransformer } from './SelectionTransformer';
+import { TrashButton } from './TrashButton';
 import { generateId } from '../../utils/ids';
-import { createContainerNode } from '../../utils/defaults';
 import type { CanvasNode as CanvasNodeType } from '../../types/data';
 import './InfiniteCanvas.css';
 
@@ -24,8 +24,9 @@ export function InfiniteCanvas() {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   const nodes = useCanvasStore((s) => s.nodes);
-  const selectedNodeId = useCanvasStore((s) => s.selectedNodeId);
-  const setSelectedNodeId = useCanvasStore((s) => s.setSelectedNodeId);
+  const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds);
+  const selectNode = useCanvasStore((s) => s.selectNode);
+  const clearSelection = useCanvasStore((s) => s.clearSelection);
   const addNode = useCanvasStore((s) => s.addNode);
   const setViewport = useCanvasStore((s) => s.setViewport);
 
@@ -107,7 +108,6 @@ export function InfiniteCanvas() {
   // ── Stage click (place text or deselect) ──────────────────
   const handleStageClick = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
-      // Only handle clicks on the stage background (not on shapes)
       if (e.target !== stageRef.current) return;
 
       const stage = stageRef.current;
@@ -138,58 +138,81 @@ export function InfiniteCanvas() {
         };
 
         addNode(newNode);
-        setSelectedNodeId(newNode.id);
+        selectNode(newNode.id, false);
         autoEditNodeId = newNode.id;
-      } else if (activeTool === 'container') {
-        const newContainer = createContainerNode(stageX, stageY);
-        addNode(newContainer);
-        setSelectedNodeId(newContainer.id);
       } else {
-        // Deselect on background click
-        setSelectedNodeId(null);
+        clearSelection();
       }
     },
-    [activeTool, textOptions, addNode, setSelectedNodeId],
+    [activeTool, textOptions, addNode, selectNode, clearSelection],
+  );
+
+  // ── Node selection handler (passed to CanvasNode) ─────────
+  const handleNodeSelect = useCallback(
+    (id: string, additive: boolean) => {
+      selectNode(id, additive);
+    },
+    [selectNode],
   );
 
   // ── Keyboard shortcuts ──────────────────────────────────────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't capture when typing in an input/textarea
       const tag = (e.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
+      // Delete / Backspace: delete selected nodes
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedNodeId) {
+        const store = useCanvasStore.getState();
+        if (store.selectedNodeIds.length > 0) {
           e.preventDefault();
-          useCanvasStore.getState().deleteNode(selectedNodeId);
+          store.deleteSelectedNodes();
         }
       }
 
+      // Escape: clear selection
       if (e.key === 'Escape') {
-        setSelectedNodeId(null);
+        clearSelection();
       }
 
+      // T: toggle text tool
       if (e.key === 't' || e.key === 'T') {
         const toolStore = useToolStore.getState();
         toolStore.setTool(toolStore.activeTool === 'text' ? 'select' : 'text');
       }
 
-      if (e.key === 'c' || e.key === 'C') {
-        const toolStore = useToolStore.getState();
-        toolStore.setTool(toolStore.activeTool === 'container' ? 'select' : 'container');
+      // Ctrl+C: copy
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        const store = useCanvasStore.getState();
+        if (store.selectedNodeIds.length > 0) {
+          e.preventDefault();
+          store.copySelectedNodes();
+        }
+      }
+
+      // Ctrl+V: paste
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault();
+        useCanvasStore.getState().pasteNodes();
+      }
+
+      // Ctrl+A: select all
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        e.preventDefault();
+        const store = useCanvasStore.getState();
+        const allIds = store.nodes.map((n) => n.id);
+        // Select all by setting selectedNodeIds directly
+        useCanvasStore.setState({ selectedNodeIds: allIds });
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNodeId, setSelectedNodeId]);
+  }, [clearSelection]);
 
   // Cursor style based on active tool
   const cursorClass =
-    activeTool === 'text' || activeTool === 'container'
-      ? 'infinite-canvas--crosshair'
-      : '';
+    activeTool === 'text' ? 'infinite-canvas--crosshair' : '';
 
   // Get current stage scale for text editor positioning
   const currentScale = stageRef.current?.scaleX() ?? 1;
@@ -211,25 +234,29 @@ export function InfiniteCanvas() {
             {nodes.map((node) => {
               const isAutoEdit = autoEditNodeId === node.id;
               if (isAutoEdit) {
-                autoEditNodeId = null; // consume once
+                autoEditNodeId = null;
               }
               return (
                 <CanvasNode
                   key={node.id}
                   node={node}
-                  isSelected={selectedNodeId === node.id}
-                  onSelect={setSelectedNodeId}
+                  isSelected={selectedNodeIds.includes(node.id)}
+                  onSelect={handleNodeSelect}
                   stageScale={currentScale}
                   autoEdit={isAutoEdit}
                 />
               );
             })}
             <SelectionTransformer
-              selectedNodeId={selectedNodeId}
+              selectedNodeIds={selectedNodeIds}
               stageRef={stageRef}
             />
           </Layer>
         </Stage>
+      )}
+      {/* Floating trash button for selected nodes */}
+      {selectedNodeIds.length > 0 && (
+        <TrashButton />
       )}
     </div>
   );

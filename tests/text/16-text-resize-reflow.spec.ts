@@ -25,7 +25,7 @@ test.describe('16 - Text Resize Reflow (REQ-TEXT-008)', () => {
     await expect(textarea).toBeVisible({ timeout: 2000 });
 
     await textarea.fill('Short text');
-    await textarea.press('Enter');
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.waitForTimeout(300);
 
     // Verify the node width is the default 200
@@ -43,7 +43,7 @@ test.describe('16 - Text Resize Reflow (REQ-TEXT-008)', () => {
     await expect(textarea).toBeVisible({ timeout: 2000 });
 
     await textarea.fill('This is a longer sentence that should cause the text to wrap within the default width of the text block');
-    await textarea.press('Enter');
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.waitForTimeout(300);
 
     // Verify the node has a reasonable height (positive, indicating reflow worked)

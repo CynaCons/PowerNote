@@ -23,7 +23,7 @@ test.describe('05 - Text Drag (REQ-TEXT-006)', () => {
     await expect(textarea).toBeVisible({ timeout: 2000 });
 
     await textarea.fill('Drag me');
-    await textarea.press('Enter');
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
 
     await page.waitForTimeout(300);
 

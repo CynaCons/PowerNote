@@ -17,25 +17,114 @@ export function TextEditor({ node, stageScale, onFinish, onCancel }: TextEditorP
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    // Focus and select all on mount
     textarea.focus();
     textarea.select();
 
-    // Auto-height
     textarea.style.height = 'auto';
     textarea.style.height = textarea.scrollHeight + 'px';
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    // Tab: indent current line
+    if (e.key === 'Tab' && !e.shiftKey) {
       e.preventDefault();
-      onFinish(textareaRef.current?.value ?? '');
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const value = textarea.value;
+
+      // Find the start of the current line
+      const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+
+      // Insert two spaces at the start of the line
+      textarea.value = value.substring(0, lineStart) + '  ' + value.substring(lineStart);
+      textarea.selectionStart = start + 2;
+      textarea.selectionEnd = end + 2;
+      autoHeight(textarea);
     }
+
+    // Shift+Tab: unindent current line
+    if (e.key === 'Tab' && e.shiftKey) {
+      e.preventDefault();
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const value = textarea.value;
+
+      const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+      const lineContent = value.substring(lineStart);
+
+      if (lineContent.startsWith('  ')) {
+        textarea.value = value.substring(0, lineStart) + value.substring(lineStart + 2);
+        textarea.selectionStart = Math.max(lineStart, start - 2);
+        textarea.selectionEnd = Math.max(lineStart, end - 2);
+      }
+      autoHeight(textarea);
+    }
+
+    // Enter: auto-continue bullet/numbered lists
+    if (e.key === 'Enter' && !e.shiftKey) {
+      const start = textarea.selectionStart;
+      const value = textarea.value;
+      const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+      const currentLine = value.substring(lineStart, start);
+
+      // Check for bullet point pattern: "  • text" or "  - text" or "  * text"
+      const bulletMatch = currentLine.match(/^(\s*)([-*•])\s/);
+      if (bulletMatch) {
+        e.preventDefault();
+        const indent = bulletMatch[1];
+        const bullet = bulletMatch[2];
+        // If the line is just the bullet with no content, remove it (end the list)
+        const contentAfterBullet = currentLine.substring(bulletMatch[0].length).trim();
+        if (contentAfterBullet === '') {
+          // Remove the empty bullet line
+          textarea.value = value.substring(0, lineStart) + value.substring(start);
+          textarea.selectionStart = lineStart;
+          textarea.selectionEnd = lineStart;
+        } else {
+          const insert = `\n${indent}${bullet} `;
+          textarea.value = value.substring(0, start) + insert + value.substring(start);
+          textarea.selectionStart = start + insert.length;
+          textarea.selectionEnd = start + insert.length;
+        }
+        autoHeight(textarea);
+        return;
+      }
+
+      // Check for numbered list pattern: "  1. text"
+      const numberMatch = currentLine.match(/^(\s*)(\d+)\.\s/);
+      if (numberMatch) {
+        e.preventDefault();
+        const indent = numberMatch[1];
+        const num = parseInt(numberMatch[2], 10);
+        const contentAfterNumber = currentLine.substring(numberMatch[0].length).trim();
+        if (contentAfterNumber === '') {
+          textarea.value = value.substring(0, lineStart) + value.substring(start);
+          textarea.selectionStart = lineStart;
+          textarea.selectionEnd = lineStart;
+        } else {
+          const insert = `\n${indent}${num + 1}. `;
+          textarea.value = value.substring(0, start) + insert + value.substring(start);
+          textarea.selectionStart = start + insert.length;
+          textarea.selectionEnd = start + insert.length;
+        }
+        autoHeight(textarea);
+        return;
+      }
+
+      // Default: Shift+Enter behavior (new line) since we use Enter for plain text too
+      // Actually for a text editor, Enter should just create a new line
+      // Let it pass through naturally
+    }
+
+    // Escape: cancel
     if (e.key === 'Escape') {
       e.preventDefault();
       onCancel();
     }
-    // Stop propagation so Konva doesn't capture keyboard events
+
     e.stopPropagation();
   };
 
@@ -43,16 +132,16 @@ export function TextEditor({ node, stageScale, onFinish, onCancel }: TextEditorP
     onFinish(textareaRef.current?.value ?? '');
   };
 
-  const handleInput = () => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
+  const autoHeight = (textarea: HTMLTextAreaElement) => {
     textarea.style.height = 'auto';
     textarea.style.height = textarea.scrollHeight + 'px';
   };
 
-  // Scale factor — the textarea renders inside the Konva transform,
-  // but we need it to appear at 1:1 for readability
-  const inverseScale = 1 / stageScale;
+  const handleInput = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    autoHeight(textarea);
+  };
 
   return (
     <Html
@@ -61,10 +150,7 @@ export function TextEditor({ node, stageScale, onFinish, onCancel }: TextEditorP
         y: node.y,
       }}
       divProps={{
-        style: {
-          // The Html component is already positioned by the group transform.
-          // We just need to counteract the canvas scale for the textarea.
-        },
+        style: {},
       }}
     >
       <textarea
@@ -80,7 +166,7 @@ export function TextEditor({ node, stageScale, onFinish, onCancel }: TextEditorP
           width: node.width * stageScale,
           minHeight: 24 * stageScale,
           fontSize: data.fontSize * stageScale,
-          fontFamily: data.fontFamily,
+          fontFamily: 'monospace',
           fontStyle: data.fontStyle.includes('italic') ? 'italic' : 'normal',
           fontWeight: data.fontStyle.includes('bold') ? 'bold' : 'normal',
           color: data.fill,
@@ -92,9 +178,11 @@ export function TextEditor({ node, stageScale, onFinish, onCancel }: TextEditorP
           resize: 'none',
           overflow: 'hidden',
           background: 'white',
-          lineHeight: '1.2',
+          lineHeight: '1.4',
+          whiteSpace: 'pre-wrap',
+          tabSize: 2,
           transformOrigin: 'top left',
-          transform: `scale(${inverseScale})`,
+          transform: `scale(${1 / stageScale})`,
         }}
       />
     </Html>

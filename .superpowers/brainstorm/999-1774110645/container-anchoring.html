@@ -1,0 +1,40 @@
+<h2>How should container anchoring work?</h2>
+<p class="subtitle">When a node is dropped inside a container's bounds, how does the relationship form?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Auto-anchor on drop (Recommended)</h3>
+      <p>When you drag a node and release it inside a container's expanded area, it automatically becomes a child. Drag it outside to unparent. Visual indicator (highlight) shows when you're hovering over a container during drag.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Most intuitive — matches Figma/PowerPoint behavior</li><li>Zero extra clicks</li><li>Visual feedback during drag</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Accidental parenting possible</li><li>More complex drag logic</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Manual anchor via context menu</h3>
+      <p>Right-click a node → "Move into container" → pick which container. More explicit but slower.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>No accidental parenting</li><li>Simple to implement</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Breaks flow — too many clicks</li><li>Feels like a database, not a canvas</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Hybrid: Auto-anchor + modifier key to prevent</h3>
+      <p>Auto-anchor on drop (like A), but hold Alt during drag to prevent anchoring. Best of both worlds.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Intuitive default behavior</li><li>Escape hatch for power users</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Discoverability of Alt key</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

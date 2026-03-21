@@ -1,4 +1,4 @@
-import { Layers, Type, BoxSelect, Pen } from 'lucide-react';
+import { Layers, Type, Pen } from 'lucide-react';
 import { useToolStore } from '../../stores/useToolStore';
 import './NavRail.css';
 
@@ -34,16 +34,6 @@ export function NavRail({ onToggleHierarchy, isHierarchyOpen }: NavRailProps) {
           onClick={() => setTool(activeTool === 'text' ? 'select' : 'text')}
         >
           <Type size={20} />
-        </button>
-
-        <button
-          className={`nav-rail__btn ${activeTool === 'container' ? 'nav-rail__btn--active' : ''}`}
-          title="Container tool (C)"
-          aria-label="Container tool"
-          data-testid="nav-container-tool"
-          onClick={() => setTool(activeTool === 'container' ? 'select' : 'container')}
-        >
-          <BoxSelect size={20} />
         </button>
 
         <button

@@ -53,7 +53,7 @@ test.describe('10 - Toolbar Show (REQ-TOOL-001)', () => {
     await expect(textarea).toBeVisible({ timeout: 2000 });
 
     await textarea.fill('Toolbar test');
-    await textarea.press('Enter');
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.waitForTimeout(300);
 
     // Deactivate text tool — switch to select mode
