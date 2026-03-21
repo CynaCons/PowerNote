@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import { Group, Rect } from 'react-konva';
 import { Html } from 'react-konva-utils';
 import type Konva from 'konva';
@@ -41,6 +41,7 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
   const groupRef = useRef<Konva.Group>(null);
   const htmlRef = useRef<HTMLDivElement>(null);
   const updateNode = useCanvasStore((s) => s.updateNode);
+  const updateNodeSilent = useCanvasStore((s) => s.updateNodeSilent);
   const [isEditing, setIsEditing] = useState(!!autoEdit);
 
   // Parse markdown to HTML
@@ -49,24 +50,18 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
     return marked.parse(data.text) as string;
   }, [data.text]);
 
-  // Measure the HTML content dimensions and sync back to store
-  const syncDimensions = useCallback(() => {
-    if (htmlRef.current) {
-      const w = Math.max(60, htmlRef.current.scrollWidth);
-      const h = Math.max(24, htmlRef.current.offsetHeight);
-      const updates: Partial<CanvasNode> = {};
-      if (Math.abs(w - node.width) > 2) updates.width = w;
-      if (Math.abs(h - node.height) > 2) updates.height = h;
-      if (Object.keys(updates).length > 0) {
-        updateNode(node.id, updates);
-      }
-    }
-  }, [node.id, node.width, node.height, updateNode]);
-
+  // Measure the HTML content dimensions and sync back to store (silent — no undo push)
   useEffect(() => {
-    const timer = setTimeout(syncDimensions, 50);
+    const timer = setTimeout(() => {
+      if (!htmlRef.current) return;
+      const w = Math.max(60, htmlRef.current.scrollWidth + 8); // +8 for padding
+      const h = Math.max(24, htmlRef.current.offsetHeight);
+      if (Math.abs(w - node.width) > 2 || Math.abs(h - node.height) > 2) {
+        updateNodeSilent(node.id, { width: w, height: h });
+      }
+    }, 60);
     return () => clearTimeout(timer);
-  }, [renderedHtml, syncDimensions]);
+  }, [renderedHtml, node.id, node.width, node.height, updateNodeSilent]);
 
   const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
     // Only snap when Shift is held

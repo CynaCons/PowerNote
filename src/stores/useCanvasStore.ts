@@ -12,6 +12,7 @@ interface CanvasState {
   // Node CRUD (all push to undo history)
   addNode: (node: CanvasNode) => void;
   updateNode: (id: string, updates: Partial<CanvasNode>) => void;
+  updateNodeSilent: (id: string, updates: Partial<CanvasNode>) => void; // no undo push (for layout sync)
   deleteNode: (id: string) => void;
   deleteSelectedNodes: () => void;
 
@@ -72,6 +73,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         ),
       };
     }),
+
+  updateNodeSilent: (id, updates) =>
+    set((state) => ({
+      nodes: state.nodes.map((n) =>
+        n.id === id ? { ...n, ...updates } : n,
+      ),
+    })),
 
   deleteNode: (id) =>
     set((state) => {

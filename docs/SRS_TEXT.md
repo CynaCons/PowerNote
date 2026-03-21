@@ -31,3 +31,5 @@ Allow users to create, edit, move, and delete markdown-capable text blocks on th
 | REQ-TEXT-017 | The text editor shall support Tab/Shift+Tab for indentation | Should | — |
 | REQ-TEXT-018 | The text editor shall auto-continue bullet points and numbered lists on Enter | Should | — |
 | REQ-TEXT-019 | Shift+drag shall show snap alignment guides when edges/centers align with other nodes | Should | — |
+| REQ-TEXT-020 | Text blocks shall auto-size width to fit rendered content (min 60px, max 800px) | Must | T21 |
+| REQ-TEXT-021 | Markdown task list checkboxes (- [ ] / - [x]) shall be clickable to toggle state | Must | — |

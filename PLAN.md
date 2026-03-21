@@ -244,6 +244,7 @@
 | v0.3.5 Search | **Done** |
 | v0.3.6 Polish + Tag | **Done** |
 | v0.3.7 UX Fixes | In progress |
+| | - Fix auto-width text blocks |
 
 ---
 
