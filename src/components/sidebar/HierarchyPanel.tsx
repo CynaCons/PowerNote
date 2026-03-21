@@ -19,6 +19,8 @@ export function HierarchyPanel({ isOpen }: HierarchyPanelProps) {
   const deleteSection = useWorkspaceStore((s) => s.deleteSection);
   const renamePage = useWorkspaceStore((s) => s.renamePage);
   const deletePage = useWorkspaceStore((s) => s.deletePage);
+  const reorderSection = useWorkspaceStore((s) => s.reorderSection);
+  const reorderPage = useWorkspaceStore((s) => s.reorderPage);
 
   const canvasNodes = useCanvasStore((s) => s.nodes);
   const loadPageNodes = useCanvasStore((s) => s.loadPageNodes);
@@ -78,10 +80,11 @@ export function HierarchyPanel({ isOpen }: HierarchyPanelProps) {
         </button>
       </div>
       <div className="hierarchy-panel__content">
-        {workspace.sections.map((section) => (
+        {workspace.sections.map((section, sectionIndex) => (
           <SectionItem
             key={section.id}
             section={section}
+            sectionIndex={sectionIndex}
             activePageId={activePageId}
             onNavigate={handleNavigate}
             onAddPage={(sid) => addPage(sid)}
@@ -89,6 +92,8 @@ export function HierarchyPanel({ isOpen }: HierarchyPanelProps) {
             onDeleteSection={handleDeleteSection}
             onRenamePage={renamePage}
             onDeletePage={handleDeletePage}
+            onReorderSection={reorderSection}
+            onReorderPage={reorderPage}
           />
         ))}
       </div>

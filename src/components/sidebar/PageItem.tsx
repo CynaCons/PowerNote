@@ -5,20 +5,24 @@ import './HierarchyPanel.css';
 
 interface PageItemProps {
   page: Page;
+  pageIndex: number;
   sectionId: string;
   isActive: boolean;
   onNavigate: (sectionId: string, pageId: string) => void;
   onRenamePage: (sectionId: string, pageId: string, title: string) => void;
   onDeletePage: (sectionId: string, pageId: string) => void;
+  onReorderPage: (fromIndex: number, toIndex: number) => void;
 }
 
 export function PageItem({
   page,
+  pageIndex,
   sectionId,
   isActive,
   onNavigate,
   onRenamePage,
   onDeletePage,
+  onReorderPage,
 }: PageItemProps) {
   const [isRenaming, setIsRenaming] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +73,32 @@ export function PageItem({
     <div
       className={`hierarchy-page ${isActive ? 'hierarchy-page--active' : ''}`}
       data-testid={`page-${page.id}`}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('powernote/page-index', String(pageIndex));
+        e.dataTransfer.setData('powernote/page-section', sectionId);
+        e.dataTransfer.effectAllowed = 'move';
+        e.stopPropagation(); // Don't trigger section drag
+      }}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes('powernote/page-index')) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.currentTarget.classList.add('hierarchy-page--dragover');
+        }
+      }}
+      onDragLeave={(e) => {
+        e.currentTarget.classList.remove('hierarchy-page--dragover');
+      }}
+      onDrop={(e) => {
+        e.currentTarget.classList.remove('hierarchy-page--dragover');
+        e.stopPropagation();
+        const fromStr = e.dataTransfer.getData('powernote/page-index');
+        if (fromStr !== '') {
+          e.preventDefault();
+          onReorderPage(Number(fromStr), pageIndex);
+        }
+      }}
     >
       <button
         className="hierarchy-page__nav"

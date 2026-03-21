@@ -54,6 +54,10 @@
   margin-bottom: 4px;
 }
 
+.hierarchy-section--dragover {
+  border-top: 2px solid #2563eb;
+}
+
 .hierarchy-section__header {
   display: flex;
   align-items: center;
@@ -157,6 +161,10 @@
   background: var(--color-active);
   color: var(--color-primary);
   font-weight: 500;
+}
+
+.hierarchy-page--dragover {
+  border-top: 2px solid #2563eb;
 }
 
 .hierarchy-page--renaming {

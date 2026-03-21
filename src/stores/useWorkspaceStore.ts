@@ -27,6 +27,11 @@ interface WorkspaceState {
 
   // Node sync: save nodes back to the active page
   savePageNodes: (nodes: CanvasNode[]) => void;
+
+  // Reorder
+  reorderSection: (fromIndex: number, toIndex: number) => void;
+  reorderPage: (sectionId: string, fromIndex: number, toIndex: number) => void;
+  movePageToSection: (pageId: string, fromSectionId: string, toSectionId: string, toIndex: number) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
@@ -183,6 +188,64 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
           ),
         },
       }));
+    },
+
+    reorderSection: (fromIndex, toIndex) => {
+      set((state) => {
+        const sections = [...state.workspace.sections];
+        const [moved] = sections.splice(fromIndex, 1);
+        sections.splice(toIndex, 0, moved);
+        return { workspace: { ...state.workspace, sections } };
+      });
+    },
+
+    reorderPage: (sectionId, fromIndex, toIndex) => {
+      set((state) => ({
+        workspace: {
+          ...state.workspace,
+          sections: state.workspace.sections.map((s) => {
+            if (s.id !== sectionId) return s;
+            const pages = [...s.pages];
+            const [moved] = pages.splice(fromIndex, 1);
+            pages.splice(toIndex, 0, moved);
+            return { ...s, pages };
+          }),
+        },
+      }));
+    },
+
+    movePageToSection: (pageId, fromSectionId, toSectionId, toIndex) => {
+      set((state) => {
+        let movedPage: Page | undefined;
+        const sections = state.workspace.sections.map((s) => {
+          if (s.id === fromSectionId) {
+            const pages = s.pages.filter((p) => {
+              if (p.id === pageId) {
+                movedPage = p;
+                return false;
+              }
+              return true;
+            });
+            // Guard: don't leave a section empty
+            if (pages.length === 0) return s;
+            return { ...s, pages };
+          }
+          return s;
+        });
+
+        if (!movedPage) return state;
+
+        const finalSections = sections.map((s) => {
+          if (s.id === toSectionId) {
+            const pages = [...s.pages];
+            pages.splice(toIndex, 0, movedPage!);
+            return { ...s, pages };
+          }
+          return s;
+        });
+
+        return { workspace: { ...state.workspace, sections: finalSections } };
+      });
     },
   };
 });

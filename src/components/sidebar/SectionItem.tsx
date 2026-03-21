@@ -6,6 +6,7 @@ import './HierarchyPanel.css';
 
 interface SectionItemProps {
   section: Section;
+  sectionIndex: number;
   activePageId: string;
   onNavigate: (sectionId: string, pageId: string) => void;
   onAddPage: (sectionId: string) => void;
@@ -13,10 +14,13 @@ interface SectionItemProps {
   onDeleteSection: (sectionId: string) => void;
   onRenamePage: (sectionId: string, pageId: string, title: string) => void;
   onDeletePage: (sectionId: string, pageId: string) => void;
+  onReorderSection: (fromIndex: number, toIndex: number) => void;
+  onReorderPage: (sectionId: string, fromIndex: number, toIndex: number) => void;
 }
 
 export function SectionItem({
   section,
+  sectionIndex,
   activePageId,
   onNavigate,
   onAddPage,
@@ -24,6 +28,8 @@ export function SectionItem({
   onDeleteSection,
   onRenamePage,
   onDeletePage,
+  onReorderSection,
+  onReorderPage,
 }: SectionItemProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -56,7 +62,32 @@ export function SectionItem({
   };
 
   return (
-    <div className="hierarchy-section" data-testid={`section-${section.id}`}>
+    <div
+      className="hierarchy-section"
+      data-testid={`section-${section.id}`}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('powernote/section-index', String(sectionIndex));
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes('powernote/section-index')) {
+          e.preventDefault();
+          e.currentTarget.classList.add('hierarchy-section--dragover');
+        }
+      }}
+      onDragLeave={(e) => {
+        e.currentTarget.classList.remove('hierarchy-section--dragover');
+      }}
+      onDrop={(e) => {
+        e.currentTarget.classList.remove('hierarchy-section--dragover');
+        const fromStr = e.dataTransfer.getData('powernote/section-index');
+        if (fromStr !== '') {
+          e.preventDefault();
+          onReorderSection(Number(fromStr), sectionIndex);
+        }
+      }}
+    >
       <div className="hierarchy-section__header">
         <button
           className="hierarchy-section__toggle"
@@ -107,15 +138,17 @@ export function SectionItem({
       </div>
       {isExpanded && (
         <div className="hierarchy-section__pages">
-          {section.pages.map((page) => (
+          {section.pages.map((page, pageIndex) => (
             <PageItem
               key={page.id}
               page={page}
+              pageIndex={pageIndex}
               sectionId={section.id}
               isActive={page.id === activePageId}
               onNavigate={onNavigate}
               onRenamePage={onRenamePage}
               onDeletePage={onDeletePage}
+              onReorderPage={(fromIdx, toIdx) => onReorderPage(section.id, fromIdx, toIdx)}
             />
           ))}
         </div>
