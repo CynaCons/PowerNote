@@ -28,13 +28,7 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
   const groupRef = useRef<Konva.Group>(null);
   const htmlRef = useRef<HTMLDivElement>(null);
   const updateNode = useCanvasStore((s) => s.updateNode);
-  const [isEditing, setIsEditing] = useState(false);
-
-  useEffect(() => {
-    if (autoEdit) {
-      setIsEditing(true);
-    }
-  }, [autoEdit]);
+  const [isEditing, setIsEditing] = useState(!!autoEdit);
 
   // Parse markdown to HTML
   const renderedHtml = useMemo(() => {
