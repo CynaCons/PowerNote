@@ -1,9 +1,17 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
-import { Text, Group, Rect } from 'react-konva';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { Group, Rect } from 'react-konva';
+import { Html } from 'react-konva-utils';
 import type Konva from 'konva';
 import type { CanvasNode, TextNodeData } from '../../types/data';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { TextEditor } from './TextEditor';
+import { marked } from 'marked';
+
+// Configure marked for inline rendering
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+});
 
 interface TextNodeProps {
   node: CanvasNode;
@@ -15,10 +23,10 @@ interface TextNodeProps {
 
 export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit }: TextNodeProps) {
   const data = node.data as TextNodeData;
-  const textRef = useRef<Konva.Text>(null);
+  const groupRef = useRef<Konva.Group>(null);
+  const htmlRef = useRef<HTMLDivElement>(null);
   const updateNode = useCanvasStore((s) => s.updateNode);
   const [isEditing, setIsEditing] = useState(false);
-  const [textHeight, setTextHeight] = useState(30);
 
   useEffect(() => {
     if (autoEdit) {
@@ -26,15 +34,27 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit }: T
     }
   }, [autoEdit]);
 
-  const measureHeight = useCallback(() => {
-    if (textRef.current) {
-      setTextHeight(textRef.current.height());
+  // Parse markdown to HTML
+  const renderedHtml = useMemo(() => {
+    if (!data.text) return '';
+    return marked.parse(data.text) as string;
+  }, [data.text]);
+
+  // Measure the HTML content height and sync back to store
+  const syncHeight = useCallback(() => {
+    if (htmlRef.current) {
+      const h = htmlRef.current.offsetHeight;
+      if (h > 0 && Math.abs(h - node.height) > 2) {
+        updateNode(node.id, { height: h });
+      }
     }
-  }, []);
+  }, [node.id, node.height, updateNode]);
 
   useEffect(() => {
-    measureHeight();
-  }, [node.data, node.width, measureHeight]);
+    // Delay measurement to let the DOM render
+    const timer = setTimeout(syncHeight, 50);
+    return () => clearTimeout(timer);
+  }, [renderedHtml, node.width, syncHeight]);
 
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
     updateNode(node.id, {
@@ -44,7 +64,6 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit }: T
   };
 
   const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    // Stop propagation so stage doesn't start panning
     e.cancelBubble = true;
   };
 
@@ -82,8 +101,11 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit }: T
     );
   }
 
+  const hasContent = data.text && data.text.trim().length > 0;
+
   return (
     <Group
+      ref={groupRef}
       x={node.x}
       y={node.y}
       draggable
@@ -96,28 +118,56 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit }: T
           x={-2}
           y={-2}
           width={node.width + 4}
-          height={textHeight + 4}
+          height={(node.height || 30) + 4}
           fill="#eff6ff"
+          stroke="#2563eb"
+          strokeWidth={1}
           cornerRadius={3}
+          listening={false}
         />
       )}
-      <Text
-        ref={textRef}
+
+      {/* Invisible hit area for click/dblclick detection */}
+      <Rect
         id={node.id}
         x={0}
         y={0}
         width={node.width}
-        text={data.text || 'Double-click to edit'}
-        fontSize={data.fontSize}
-        fontFamily={data.fontFamily}
-        fontStyle={data.fontStyle}
-        fill={data.text ? data.fill : '#999999'}
-        padding={4}
+        height={node.height || 30}
+        fill="transparent"
         onClick={handleClick}
         onTap={handleClick}
         onDblClick={handleDblClick}
         onDblTap={handleDblClick}
       />
+
+      {/* Markdown-rendered HTML overlay */}
+      <Html
+        groupProps={{ x: 0, y: 0 }}
+        divProps={{
+          style: { pointerEvents: 'none' },
+        }}
+      >
+        <div
+          ref={htmlRef}
+          className="powernote-markdown"
+          style={{
+            width: node.width,
+            fontSize: data.fontSize,
+            fontFamily: data.fontFamily,
+            color: hasContent ? data.fill : '#999999',
+            padding: 4,
+            lineHeight: '1.4',
+            wordWrap: 'break-word',
+            overflowWrap: 'break-word',
+            pointerEvents: 'none',
+            userSelect: 'none',
+          }}
+          dangerouslySetInnerHTML={{
+            __html: hasContent ? renderedHtml : '<p>Double-click to edit</p>',
+          }}
+        />
+      </Html>
     </Group>
   );
 }
