@@ -86,3 +86,23 @@
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px var(--color-active);
 }
+
+.text-toolbar__color-picker {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 0;
+  cursor: pointer;
+  background: none;
+  margin-left: 2px;
+}
+
+.text-toolbar__color-picker::-webkit-color-swatch-wrapper {
+  padding: 1px;
+}
+
+.text-toolbar__color-picker::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}

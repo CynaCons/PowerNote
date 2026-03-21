@@ -86,6 +86,14 @@ export function TextToolbar({ options, onChange }: TextToolbarProps) {
             title={color.label}
           />
         ))}
+        <input
+          type="color"
+          className="text-toolbar__color-picker"
+          value={options.fill}
+          onChange={(e) => onChange({ fill: e.target.value })}
+          title="Custom color"
+          data-testid="color-picker"
+        />
       </div>
     </div>
   );
