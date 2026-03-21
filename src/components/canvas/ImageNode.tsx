@@ -125,19 +125,91 @@ export function ImageNode({ node, isSelected, onSelect, stageScale, onSnapChange
         />
       )}
 
-      {/* Selection border */}
+      {/* Selection border + resize handles */}
       {isSelected && (
-        <Rect
-          x={-2}
-          y={-2}
-          width={node.width + 4}
-          height={node.height + 4}
-          stroke="#2563eb"
-          strokeWidth={1.5}
-          fill="transparent"
-          dash={[6, 3]}
-          listening={false}
-        />
+        <>
+          <Rect
+            x={-2}
+            y={-2}
+            width={node.width + 4}
+            height={node.height + 4}
+            stroke="#2563eb"
+            strokeWidth={1.5}
+            fill="transparent"
+            dash={[6, 3]}
+            listening={false}
+          />
+          {/* Corner resize handles */}
+          {[
+            { cx: 0, cy: 0, cursor: 'nw-resize', anchor: 'tl' },
+            { cx: node.width, cy: 0, cursor: 'ne-resize', anchor: 'tr' },
+            { cx: 0, cy: node.height, cursor: 'sw-resize', anchor: 'bl' },
+            { cx: node.width, cy: node.height, cursor: 'se-resize', anchor: 'br' },
+          ].map(({ cx, cy, cursor, anchor }) => (
+            <Rect
+              key={anchor}
+              x={cx - 5}
+              y={cy - 5}
+              width={10}
+              height={10}
+              fill="#ffffff"
+              stroke="#2563eb"
+              strokeWidth={1}
+              cornerRadius={2}
+              onMouseEnter={(e) => { e.target.getStage()!.container().style.cursor = cursor; }}
+              onMouseLeave={(e) => { e.target.getStage()!.container().style.cursor = 'default'; }}
+              draggable
+              onDragMove={(e) => {
+                e.cancelBubble = true;
+                const handle = e.target;
+                const hx = handle.x() + 5;
+                const hy = handle.y() + 5;
+
+                let newW = node.width;
+                let newH = node.height;
+                let newX = node.x;
+                let newY = node.y;
+
+                if (anchor === 'br') {
+                  newW = Math.max(30, hx);
+                  newH = Math.max(30, hy);
+                } else if (anchor === 'bl') {
+                  const dx = hx;
+                  newW = Math.max(30, node.width - dx);
+                  newX = node.x + (node.width - newW);
+                  newH = Math.max(30, hy);
+                } else if (anchor === 'tr') {
+                  newW = Math.max(30, hx);
+                  const dy = hy;
+                  newH = Math.max(30, node.height - dy);
+                  newY = node.y + (node.height - newH);
+                } else if (anchor === 'tl') {
+                  const dx = hx;
+                  const dy = hy;
+                  newW = Math.max(30, node.width - dx);
+                  newH = Math.max(30, node.height - dy);
+                  newX = node.x + (node.width - newW);
+                  newY = node.y + (node.height - newH);
+                }
+
+                // Keep aspect ratio
+                const aspect = node.width / node.height;
+                if (newW / newH > aspect) {
+                  newW = newH * aspect;
+                } else {
+                  newH = newW / aspect;
+                }
+
+                updateNode(node.id, { x: newX, y: newY, width: newW, height: newH });
+
+                // Reset handle to corner position (it will re-render)
+                handle.x(anchor.includes('r') ? newW - 5 : -5);
+                handle.y(anchor.includes('b') ? newH - 5 : -5);
+              }}
+              onDragEnd={(e) => { e.cancelBubble = true; }}
+            />
+          ))}
+        </>
       )}
     </Group>
   );

@@ -81,6 +81,7 @@ export function SelectionTransformer({ selectedNodeIds, stageRef }: SelectionTra
 
   return (
     <Transformer
+      key={resizeEnabled ? 'resize' : 'no-resize'}
       ref={transformerRef}
       borderStroke="#2563eb"
       borderStrokeWidth={1.5}

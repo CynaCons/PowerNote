@@ -111,13 +111,14 @@ function renderGrid() {
 
   // Vertical lines
   for (let x = start; x <= end; x += GRID_SPACING) {
+    const isMajor = x % (GRID_SPACING * 5) === 0;
     elements.push(
       <Line
         key={`grid-v-${x}`}
         points={[x, start, x, end]}
-        stroke="#e5e5e5"
-        strokeWidth={0.5}
-        dash={[4, 6]}
+        stroke={isMajor ? '#c8c8c8' : '#dedede'}
+        strokeWidth={isMajor ? 1 : 0.5}
+        dash={isMajor ? undefined : [4, 6]}
         listening={false}
       />,
     );
@@ -125,13 +126,14 @@ function renderGrid() {
 
   // Horizontal lines
   for (let y = start; y <= end; y += GRID_SPACING) {
+    const isMajor = y % (GRID_SPACING * 5) === 0;
     elements.push(
       <Line
         key={`grid-h-${y}`}
         points={[start, y, end, y]}
-        stroke="#e5e5e5"
-        strokeWidth={0.5}
-        dash={[4, 6]}
+        stroke={isMajor ? '#c8c8c8' : '#dedede'}
+        strokeWidth={isMajor ? 1 : 0.5}
+        dash={isMajor ? undefined : [4, 6]}
         listening={false}
       />,
     );

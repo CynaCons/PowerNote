@@ -54,11 +54,14 @@ const MIN_SCALE = 0.1;
 const MAX_SCALE = 5.0;
 const ZOOM_FACTOR = 1.05;
 
+export type CanvasBgColor = '#ffffff' | '#f5f5f5' | '#e5e5e5' | 'paper';
+
 interface InfiniteCanvasProps {
   backgroundMode?: BackgroundMode;
+  bgColor?: CanvasBgColor;
 }
 
-export function InfiniteCanvas({ backgroundMode = 'pages' }: InfiniteCanvasProps) {
+export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }: InfiniteCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
 
@@ -431,7 +434,12 @@ export function InfiniteCanvas({ backgroundMode = 'pages' }: InfiniteCanvasProps
   const currentScale = stageRef.current?.scaleX() ?? 1;
 
   return (
-    <div ref={containerRef} className={`infinite-canvas ${cursorClass}`} data-testid="canvas-container">
+    <div
+      ref={containerRef}
+      className={`infinite-canvas ${cursorClass} ${bgColor === 'paper' ? 'infinite-canvas--paper' : ''}`}
+      style={{ backgroundColor: bgColor === 'paper' ? '#f5f0e8' : bgColor }}
+      data-testid="canvas-container"
+    >
       {dimensions.width > 0 && dimensions.height > 0 && (
         <Stage
           ref={stageRef}

@@ -8,3 +8,21 @@
 .infinite-canvas--crosshair canvas {
   cursor: crosshair !important;
 }
+
+.infinite-canvas--paper {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 28px,
+      rgba(0, 0, 0, 0.03) 28px,
+      rgba(0, 0, 0, 0.03) 29px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 28px,
+      rgba(0, 0, 0, 0.02) 28px,
+      rgba(0, 0, 0, 0.02) 29px
+    );
+}

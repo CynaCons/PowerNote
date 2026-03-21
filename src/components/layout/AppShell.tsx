@@ -7,6 +7,7 @@ import { BottomToolbar } from '../toolbar/BottomToolbar';
 import { SearchPanel } from '../search/SearchPanel';
 import { SettingsPanel } from '../settings/SettingsPanel';
 import type { BackgroundMode } from '../canvas/PageGuides';
+import type { CanvasBgColor } from '../canvas/InfiniteCanvas';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { buildExportHtml, downloadFile } from '../../utils/serialization';
@@ -19,6 +20,7 @@ export function AppShell() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchNotebookWide, setSearchNotebookWide] = useState(false);
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('pages');
+  const [bgColor, setBgColor] = useState<CanvasBgColor>('#ffffff');
 
   // Ctrl+S / Ctrl+F / Ctrl+Shift+F keyboard shortcuts
   useEffect(() => {
@@ -76,7 +78,7 @@ export function AppShell() {
       <div className="canvas-area">
         <HierarchyPanel isOpen={isHierarchyOpen} />
         <div className="canvas-area__content">
-          <InfiniteCanvas backgroundMode={backgroundMode} />
+          <InfiniteCanvas backgroundMode={backgroundMode} bgColor={bgColor} />
           <BottomToolbar />
           <SearchPanel
             isOpen={searchOpen}
@@ -90,6 +92,8 @@ export function AppShell() {
         <SettingsPanel
           backgroundMode={backgroundMode}
           onChangeBackgroundMode={setBackgroundMode}
+          bgColor={bgColor}
+          onChangeBgColor={setBgColor}
         />
       )}
     </div>
