@@ -49,21 +49,24 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
     return marked.parse(data.text) as string;
   }, [data.text]);
 
-  // Measure the HTML content height and sync back to store
-  const syncHeight = useCallback(() => {
+  // Measure the HTML content dimensions and sync back to store
+  const syncDimensions = useCallback(() => {
     if (htmlRef.current) {
-      const h = htmlRef.current.offsetHeight;
-      if (h > 0 && Math.abs(h - node.height) > 2) {
-        updateNode(node.id, { height: h });
+      const w = Math.max(60, htmlRef.current.scrollWidth);
+      const h = Math.max(24, htmlRef.current.offsetHeight);
+      const updates: Partial<CanvasNode> = {};
+      if (Math.abs(w - node.width) > 2) updates.width = w;
+      if (Math.abs(h - node.height) > 2) updates.height = h;
+      if (Object.keys(updates).length > 0) {
+        updateNode(node.id, updates);
       }
     }
-  }, [node.id, node.height, updateNode]);
+  }, [node.id, node.width, node.height, updateNode]);
 
   useEffect(() => {
-    // Delay measurement to let the DOM render
-    const timer = setTimeout(syncHeight, 50);
+    const timer = setTimeout(syncDimensions, 50);
     return () => clearTimeout(timer);
-  }, [renderedHtml, node.width, syncHeight]);
+  }, [renderedHtml, syncDimensions]);
 
   const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
     // Only snap when Shift is held
@@ -202,7 +205,9 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
             }
           }}
           style={{
-            width: node.width,
+            minWidth: 60,
+            maxWidth: 800,
+            width: 'max-content',
             fontSize: data.fontSize,
             fontFamily: data.fontFamily,
             color: hasContent ? data.fill : '#999999',

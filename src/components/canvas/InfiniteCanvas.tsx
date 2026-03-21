@@ -132,7 +132,7 @@ export function InfiniteCanvas() {
           type: 'text',
           x: stageX,
           y: stageY,
-          width: 200,
+          width: 120,
           height: 30,
           data: {
             text: '',
