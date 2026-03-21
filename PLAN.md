@@ -165,55 +165,55 @@
 > Undo/redo, A4 page guides, auto-width text, drag reorder, search
 
 ### v0.3.0 — Undo/Redo (per-page)
-- [ ] Undo/redo history stack per page in canvas store
-- [ ] Ctrl+Z undo, Ctrl+Shift+Z / Ctrl+Y redo
-- [ ] Track: add, delete, move, edit operations
-- [ ] History clears on page switch
-- [ ] SRS: REQ-CANVAS-007..009
-- [ ] E2E tests
+- [x] Undo/redo history stack per page in canvas store
+- [x] Ctrl+Z undo, Ctrl+Shift+Z / Ctrl+Y redo
+- [x] Track: add, delete, move, edit operations
+- [x] History clears on page switch
+- [x] SRS: REQ-CANVAS-007..009
+- [x] E2E tests
 
 ### v0.3.1 — A4 Page Guides (visual only)
-- [ ] Render dotted A4 page boundary rectangles on canvas background layer
-- [ ] Multiple pages tile vertically (infinite scroll of A4 pages)
-- [ ] Light gray dotted lines, no snap behavior
-- [ ] Toggle visibility from a button or setting
-- [ ] SRS: REQ-CANVAS-010..011
+- [x] Render dotted A4 page boundary rectangles on canvas background layer
+- [x] Multiple pages tile vertically (infinite scroll of A4 pages)
+- [x] Light gray dotted lines, no snap behavior
+- [x] Toggle visibility from a button or setting
+- [x] SRS: REQ-CANVAS-010..011
 
 ### v0.3.2 — Markdown Checkboxes (Task Lists)
-- [ ] Support `- [ ]` and `- [x]` syntax in markdown rendering
-- [ ] Render as clickable checkboxes in display mode
-- [ ] Clicking a checkbox toggles its state in the node's text data
-- [ ] SRS: REQ-TEXT-022
-- [ ] E2E test
+- [x] Support `- [ ]` and `- [x]` syntax in markdown rendering
+- [x] Render as clickable checkboxes in display mode
+- [x] Clicking a checkbox toggles its state in the node's text data
+- [x] SRS: REQ-TEXT-022
+- [x] E2E test
 
 ### v0.3.3 — Auto-Width Text Blocks
-- [ ] Text blocks grow horizontally to fit content (no fixed 200px)
-- [ ] No max-width cap — wraps only on manual Enter
-- [ ] Measure rendered markdown HTML width and sync to node
-- [ ] Minimum width (e.g. 60px) for empty blocks
-- [ ] SRS: REQ-TEXT-020..021
-- [ ] E2E tests
+- [x] Text blocks grow horizontally to fit content (no fixed 200px)
+- [x] No max-width cap — wraps only on manual Enter
+- [x] Measure rendered markdown HTML width and sync to node
+- [x] Minimum width (e.g. 60px) for empty blocks
+- [x] SRS: REQ-TEXT-020..021
+- [x] E2E tests
 
 ### v0.3.4 — Drag Reorder (Hierarchy Panel)
-- [ ] Drag sections to reorder in the hierarchy panel
-- [ ] Drag pages to reorder within a section
-- [ ] Drag pages between sections
-- [ ] Visual drag indicator (insertion line)
-- [ ] SRS: REQ-HIER-012..014
-- [ ] E2E tests
+- [x] Drag sections to reorder in the hierarchy panel
+- [x] Drag pages to reorder within a section
+- [x] Drag pages between sections
+- [x] Visual drag indicator (insertion line)
+- [x] SRS: REQ-HIER-012..014
+- [x] E2E tests
 
 ### v0.3.5 — Search (Ctrl+F / Ctrl+Shift+F)
-- [ ] Ctrl+F: search bar for current page — highlights matching text blocks
-- [ ] Ctrl+Shift+F: notebook-wide search — searches across all sections/pages
-- [ ] Results list with page/section context, click to navigate
-- [ ] Search input in a floating panel (top-center or sidebar)
-- [ ] SRS: REQ-SEARCH-001..005
-- [ ] E2E tests
+- [x] Ctrl+F: search bar for current page — highlights matching text blocks
+- [x] Ctrl+Shift+F: notebook-wide search — searches across all sections/pages
+- [x] Results list with page/section context, click to navigate
+- [x] Search input in a floating panel (top-center or sidebar)
+- [x] SRS: REQ-SEARCH-001..005
+- [x] E2E tests
 
 ### v0.3.6 — E2E Tests + Polish
-- [ ] New E2E tests for all v0.3 features
-- [ ] SRS documents updated
-- [ ] Full test suite green
+- [x] New E2E tests for all v0.3 features (tests 22-33, 39 tests, all green)
+- [x] SRS documents updated
+- [x] Full test suite green
 - [ ] Git tag v0.3.0
 
 ---
@@ -242,7 +242,7 @@
 | v0.3.3 Auto-Width Text | **Done** |
 | v0.3.4 Drag Reorder | **Done** |
 | v0.3.5 Search | **Done** |
-| v0.3.6 Polish + Tag | **Done** |
+| v0.3.6 E2E Tests 22-33 | **Done** (39 new tests, all green) |
 | v0.3.7 UX Fixes | In progress |
 | | - Fix auto-width text blocks |
 
