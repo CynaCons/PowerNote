@@ -279,6 +279,7 @@
 | | - Fix auto-width text blocks |
 | | - Fix undo batching (text placement = 1 undo entry) |
 | | - Fix notebook search includes active page unsaved nodes |
+| | - Fix hierarchy panel: push canvas right instead of overlay |
 
 ---
 

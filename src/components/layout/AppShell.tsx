@@ -69,15 +69,17 @@ export function AppShell() {
       />
       <TopBar />
       <div className="canvas-area">
-        <InfiniteCanvas />
         <HierarchyPanel isOpen={isHierarchyOpen} />
-        <BottomToolbar />
-        <SearchPanel
-          isOpen={searchOpen}
-          isNotebookWide={searchNotebookWide}
-          onClose={() => setSearchOpen(false)}
-          onNavigateToResult={handleNavigateToResult}
-        />
+        <div className="canvas-area__content">
+          <InfiniteCanvas />
+          <BottomToolbar />
+          <SearchPanel
+            isOpen={searchOpen}
+            isNotebookWide={searchNotebookWide}
+            onClose={() => setSearchOpen(false)}
+            onNavigateToResult={handleNavigateToResult}
+          />
+        </div>
       </div>
     </div>
   );

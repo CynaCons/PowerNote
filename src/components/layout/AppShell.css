@@ -11,7 +11,14 @@
 
 .canvas-area {
   grid-area: canvas;
+  display: flex;
   background: var(--color-canvas-bg);
+  position: relative;
+  overflow: hidden;
+}
+
+.canvas-area__content {
+  flex: 1;
   position: relative;
   overflow: hidden;
 }
