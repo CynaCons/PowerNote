@@ -93,39 +93,7 @@ export function TopBar() {
   };
 
   const handleZoomToFit = () => {
-    const nodes = useCanvasStore.getState().nodes;
-    if (nodes.length === 0) return;
-
-    const canvasEl = document.querySelector('[data-testid="canvas-container"]');
-    if (!canvasEl) return;
-    const { width: cw, height: ch } = canvasEl.getBoundingClientRect();
-
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const n of nodes) {
-      minX = Math.min(minX, n.x);
-      minY = Math.min(minY, n.y);
-      maxX = Math.max(maxX, n.x + (n.width || 200));
-      maxY = Math.max(maxY, n.y + (n.height || 40));
-    }
-
-    const contentW = maxX - minX;
-    const contentH = maxY - minY;
-    const padding = 60;
-    const scale = Math.min(
-      (cw - padding * 2) / contentW,
-      (ch - padding * 2) / contentH,
-      2, // max zoom
-    );
-    const clampedScale = Math.max(0.1, Math.min(5, scale));
-
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-
-    useCanvasStore.getState().setViewport({
-      x: cw / 2 - centerX * clampedScale,
-      y: ch / 2 - centerY * clampedScale,
-      scale: clampedScale,
-    });
+    useCanvasStore.getState().zoomToFit();
   };
 
   return (

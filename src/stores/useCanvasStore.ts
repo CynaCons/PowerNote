@@ -27,6 +27,9 @@ interface CanvasState {
 
   // Viewport
   setViewport: (viewport: Partial<Viewport>) => void;
+  _stageRef: { current: any | null };
+  setStageRef: (stage: any) => void;
+  zoomToFit: () => void;
 
   // Clipboard
   copySelectedNodes: () => void;
@@ -44,6 +47,7 @@ let clipboard: CanvasNode[] = [];
 let undoStack: CanvasNode[][] = [];
 let redoStack: CanvasNode[][] = [];
 let batchDepth = 0; // When > 0, only the first pushUndo in the batch saves a snapshot
+let _konvaStageRef: any = null; // Konva.Stage reference for direct manipulation
 
 function pushUndo(nodes: CanvasNode[]) {
   if (batchDepth > 0) return; // Inside a batch — skip intermediate snapshots
@@ -148,10 +152,69 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   clearSelection: () => set({ selectedNodeIds: [] }),
 
-  setViewport: (viewport) =>
+  setViewport: (viewport) => {
     set((state) => ({
       viewport: { ...state.viewport, ...viewport },
-    })),
+    }));
+    // Sync the Konva Stage if ref is available
+    if (_konvaStageRef) {
+      const v = get().viewport;
+      _konvaStageRef.scale({ x: v.scale, y: v.scale });
+      _konvaStageRef.position({ x: v.x, y: v.y });
+      _konvaStageRef.batchDraw();
+    }
+  },
+
+  _stageRef: { current: null }, // kept for interface compat
+
+  setStageRef: (stage) => {
+    _konvaStageRef = stage;
+  },
+
+  zoomToFit: () => {
+    const nodes = get().nodes;
+    if (nodes.length === 0) return;
+
+    const stage = _konvaStageRef;
+    if (!stage) return;
+    const container = stage.container();
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of nodes) {
+      minX = Math.min(minX, n.x);
+      minY = Math.min(minY, n.y);
+      maxX = Math.max(maxX, n.x + (n.width || 200));
+      maxY = Math.max(maxY, n.y + (n.height || 40));
+    }
+
+    const contentW = maxX - minX;
+    const contentH = maxY - minY;
+    if (contentW <= 0 || contentH <= 0) return;
+
+    const padding = 60;
+    const scale = Math.min(
+      (cw - padding * 2) / contentW,
+      (ch - padding * 2) / contentH,
+      2,
+    );
+    const clampedScale = Math.max(0.1, Math.min(5, scale));
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    const newViewport = {
+      x: cw / 2 - centerX * clampedScale,
+      y: ch / 2 - centerY * clampedScale,
+      scale: clampedScale,
+    };
+
+    set({ viewport: newViewport });
+    stage.scale({ x: clampedScale, y: clampedScale });
+    stage.position({ x: newViewport.x, y: newViewport.y });
+    stage.batchDraw();
+  },
 
   copySelectedNodes: () => {
     const state = get();

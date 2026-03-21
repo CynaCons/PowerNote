@@ -38,6 +38,17 @@ export function InfiniteCanvas({ backgroundMode = 'pages' }: InfiniteCanvasProps
 
   const activeTool = useToolStore((s) => s.activeTool);
 
+  // Register stage ref for zoom-to-fit and external viewport control
+  useEffect(() => {
+    // Small delay to ensure Stage has mounted and ref is populated
+    const timer = setTimeout(() => {
+      if (stageRef.current) {
+        useCanvasStore.getState().setStageRef(stageRef.current);
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [dimensions]);
+
   // ── Resize observer ────────────────────────────────────────
   useEffect(() => {
     const container = containerRef.current;
@@ -102,6 +113,19 @@ export function InfiniteCanvas({ backgroundMode = 'pages' }: InfiniteCanvasProps
   // ── Pinch-to-zoom (touch) ─────────────────────────────────
   const lastPinchDist = useRef<number | null>(null);
   const lastPinchCenter = useRef<{ x: number; y: number } | null>(null);
+  const isPinching = useRef(false);
+
+  // Detect multi-touch start to disable Stage dragging during pinch
+  const handleTouchStart = useCallback(
+    (e: Konva.KonvaEventObject<TouchEvent>) => {
+      if (e.evt.touches.length >= 2) {
+        isPinching.current = true;
+        // Stop Konva's built-in drag so it doesn't conflict with pinch
+        stageRef.current?.stopDrag();
+      }
+    },
+    [],
+  );
 
   const handleTouchMove = useCallback(
     (e: Konva.KonvaEventObject<TouchEvent>) => {
@@ -113,6 +137,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages' }: InfiniteCanvasProps
       }
 
       e.evt.preventDefault();
+      isPinching.current = true;
       const stage = stageRef.current;
       if (!stage) return;
 
@@ -161,6 +186,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages' }: InfiniteCanvasProps
   const handleTouchEnd = useCallback(() => {
     lastPinchDist.current = null;
     lastPinchCenter.current = null;
+    isPinching.current = false;
   }, []);
 
   // ── Drag end (pan) ────────────────────────────────────────
@@ -316,6 +342,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages' }: InfiniteCanvasProps
           onDragEnd={handleDragEnd}
           onClick={handleStageClick}
           onTap={handleStageClick}
+          onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
