@@ -218,10 +218,42 @@
 
 ---
 
-## v0.4 — Save/Load + Images (planned)
-> Save/load HTML files, image nodes, export
+## v0.4 — Save/Load (Self-Contained HTML)
+> Export the entire app + data as a single editable HTML file. Open to restore.
 
-## v0.5 — Drawing + Shapes (planned)
+### v0.4.0 — Serialization + Download Button
+- [ ] Serialize full workspace state (all sections, pages, nodes) to JSON
+- [ ] Download button in TopBar (right side) + Ctrl+S shortcut
+- [ ] Generate HTML file: Vite production bundle + embedded JSON data
+- [ ] `<script id="powernote-data" type="application/json">{ ... }</script>`
+- [ ] Build system: `vite build` produces the app bundle, export injects data into it
+- [ ] File downloads as `<notebook-name>.html`
+
+### v0.4.1 — Load / Hydrate from HTML
+- [ ] On app start, check for embedded `#powernote-data` script tag
+- [ ] If found, parse JSON and hydrate workspace store
+- [ ] If not found, start with default empty workspace
+- [ ] "Open" button in TopBar to import an existing .html file
+- [ ] File input reads HTML, extracts JSON from the script tag, hydrates
+
+### v0.4.2 — Round-Trip Testing
+- [ ] E2E test: fill real content (multi-section, multi-page, markdown, checkboxes)
+- [ ] Export to HTML file
+- [ ] Open exported HTML in a new Playwright page
+- [ ] Verify all content matches (sections, pages, node positions, text)
+- [ ] Re-export from the opened file → verify identical output
+- [ ] SRS: REQ-FILE-001..006
+
+### v0.4.3 — Polish + Tag v0.4.0
+- [ ] Edge cases: empty notebook, special characters, large notebooks
+- [ ] Error handling for corrupt/invalid HTML files
+- [ ] Full test suite green
+- [ ] Git tag v0.4.0
+
+## v0.5 — Images (planned)
+> Image nodes on canvas, drag-drop, paste from clipboard
+
+## v0.6 — Drawing + Shapes (planned)
 > Freehand drawing, rectangles, arrows
 
 ## v0.6 — Cloud Sync (planned)
