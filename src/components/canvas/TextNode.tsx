@@ -145,28 +145,13 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
       onDragEnd={handleDragEnd}
       onMouseDown={handleMouseDown}
     >
-      {/* Selection highlight background */}
-      {isSelected && (
-        <Rect
-          x={-2}
-          y={-2}
-          width={node.width + 4}
-          height={(node.height || 30) + 4}
-          fill="#eff6ff"
-          stroke="#2563eb"
-          strokeWidth={1}
-          cornerRadius={3}
-          listening={false}
-        />
-      )}
-
-      {/* Invisible hit area for click/dblclick detection */}
+      {/* Invisible hit area for click/dblclick — sized generously to catch clicks */}
       <Rect
         id={node.id}
-        x={0}
-        y={0}
-        width={node.width}
-        height={node.height || 30}
+        x={-4}
+        y={-4}
+        width={Math.max(node.width, 120) + 8}
+        height={Math.max(node.height || 30, 24) + 8}
         fill="transparent"
         onClick={handleClick}
         onTap={handleClick}
@@ -174,7 +159,7 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
         onDblTap={handleDblClick}
       />
 
-      {/* Markdown-rendered HTML overlay */}
+      {/* Markdown-rendered HTML overlay — selection highlight applied via CSS */}
       <Html
         groupProps={{ x: 0, y: 0 }}
         divProps={{
@@ -183,9 +168,8 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
       >
         <div
           ref={htmlRef}
-          className="powernote-markdown"
+          className={`powernote-markdown ${isSelected ? 'powernote-markdown--selected' : ''}`}
           onClick={(e) => {
-            // Handle checkbox clicks
             const target = e.target as HTMLElement;
             if (target.tagName === 'INPUT' && target.getAttribute('type') === 'checkbox') {
               e.stopPropagation();

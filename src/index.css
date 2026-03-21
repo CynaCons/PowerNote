@@ -47,6 +47,11 @@ button:disabled {
 }
 
 /* ── Markdown rendering (Jupyter-style) ──────────── */
+.powernote-markdown--selected {
+  background: #eff6ff;
+  outline: 1.5px solid #2563eb;
+  border-radius: 3px;
+}
 .powernote-markdown p {
   margin: 0 0 0.4em 0;
 }
