@@ -5,17 +5,21 @@ import { InfiniteCanvas } from '../canvas/InfiniteCanvas';
 import { HierarchyPanel } from '../sidebar/HierarchyPanel';
 import { BottomToolbar } from '../toolbar/BottomToolbar';
 import { SearchPanel } from '../search/SearchPanel';
+import { SettingsPanel } from '../settings/SettingsPanel';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { buildExportHtml, downloadFile } from '../../utils/serialization';
+import { showToast } from './Toast';
 import './AppShell.css';
 
 export function AppShell() {
   const [isHierarchyOpen, setIsHierarchyOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchNotebookWide, setSearchNotebookWide] = useState(false);
+  const [showPageGuides, setShowPageGuides] = useState(true);
 
-  // Ctrl+F / Ctrl+Shift+F keyboard shortcuts
+  // Ctrl+S / Ctrl+F / Ctrl+Shift+F keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl+S: save
@@ -25,7 +29,11 @@ export function AppShell() {
         useWorkspaceStore.getState().savePageNodes(canvasNodes);
         const ws = useWorkspaceStore.getState().workspace;
         buildExportHtml(ws).then((html) => {
-          downloadFile(html, ws.filename.replace(/[^a-zA-Z0-9_-]/g, '_') + '.html');
+          downloadFile(html, ws.filename.replace(/[^a-zA-Z0-9_\- ]/g, '_') + '.html');
+          useWorkspaceStore.getState().markClean();
+          showToast('Notebook saved successfully', 'success');
+        }).catch(() => {
+          showToast('Failed to save notebook', 'error');
         });
       }
 
@@ -44,18 +52,12 @@ export function AppShell() {
     const ws = useWorkspaceStore.getState();
     const canvas = useCanvasStore.getState();
 
-    // Save current page nodes before navigating
     ws.savePageNodes(canvas.nodes);
-
-    // Navigate to the target page
     ws.setActivePage(sectionId, pageId);
 
-    // Load the target page's nodes
     const section = ws.workspace.sections.find((s) => s.id === sectionId);
     const page = section?.pages.find((p) => p.id === pageId);
     canvas.loadPageNodes(page?.nodes ?? []);
-
-    // Select the matched node
     canvas.selectNode(nodeId, false);
 
     setSearchOpen(false);
@@ -66,12 +68,14 @@ export function AppShell() {
       <NavRail
         onToggleHierarchy={() => setIsHierarchyOpen((prev) => !prev)}
         isHierarchyOpen={isHierarchyOpen}
+        onToggleSettings={() => setIsSettingsOpen((prev) => !prev)}
+        isSettingsOpen={isSettingsOpen}
       />
       <TopBar />
       <div className="canvas-area">
         <HierarchyPanel isOpen={isHierarchyOpen} />
         <div className="canvas-area__content">
-          <InfiniteCanvas />
+          <InfiniteCanvas showPageGuides={showPageGuides} />
           <BottomToolbar />
           <SearchPanel
             isOpen={searchOpen}
@@ -81,6 +85,12 @@ export function AppShell() {
           />
         </div>
       </div>
+      {isSettingsOpen && (
+        <SettingsPanel
+          showPageGuides={showPageGuides}
+          onTogglePageGuides={setShowPageGuides}
+        />
+      )}
     </div>
   );
 }

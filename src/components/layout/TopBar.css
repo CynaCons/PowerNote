@@ -21,6 +21,28 @@
 .top-bar__filename {
   color: var(--color-text-muted);
   font-weight: 500;
+  cursor: pointer;
+}
+
+.top-bar__filename:hover {
+  color: var(--color-text);
+}
+
+.top-bar__dirty {
+  color: var(--color-primary);
+  font-weight: bold;
+}
+
+.top-bar__filename-input {
+  background: var(--color-hover);
+  border: 1px solid var(--color-primary);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  outline: none;
+  min-width: 120px;
 }
 
 .top-bar__separator {

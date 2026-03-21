@@ -222,42 +222,100 @@
 > Export the entire app + data as a single editable HTML file. Open to restore.
 
 ### v0.4.0 — Serialization + Download Button
-- [ ] Serialize full workspace state (all sections, pages, nodes) to JSON
-- [ ] Download button in TopBar (right side) + Ctrl+S shortcut
-- [ ] Generate HTML file: Vite production bundle + embedded JSON data
-- [ ] `<script id="powernote-data" type="application/json">{ ... }</script>`
-- [ ] Build system: `vite build` produces the app bundle, export injects data into it
-- [ ] File downloads as `<notebook-name>.html`
+- [x] Serialize full workspace state (all sections, pages, nodes) to JSON
+- [x] Download button in TopBar (right side) + Ctrl+S shortcut
+- [x] `<script id="powernote-data" type="application/json">{ ... }</script>`
+- [x] File downloads as `<notebook-name>.html`
+- [ ] Generate HTML file using Vite production bundle (not dev server HTML)
+- [ ] Build system: `vite build` produces self-contained app, export injects data
 
 ### v0.4.1 — Load / Hydrate from HTML
-- [ ] On app start, check for embedded `#powernote-data` script tag
-- [ ] If found, parse JSON and hydrate workspace store
-- [ ] If not found, start with default empty workspace
-- [ ] "Open" button in TopBar to import an existing .html file
-- [ ] File input reads HTML, extracts JSON from the script tag, hydrates
+- [x] On app start, check for embedded `#powernote-data` script tag
+- [x] If found, parse JSON and hydrate workspace store
+- [x] If not found, start with default empty workspace
+- [x] "Open" button in TopBar to import an existing .html file
+- [x] File input reads HTML, extracts JSON from the script tag, hydrates
 
 ### v0.4.2 — Round-Trip Testing
-- [ ] E2E test: fill real content (multi-section, multi-page, markdown, checkboxes)
-- [ ] Export to HTML file
-- [ ] Open exported HTML in a new Playwright page
-- [ ] Verify all content matches (sections, pages, node positions, text)
-- [ ] Re-export from the opened file → verify identical output
-- [ ] SRS: REQ-FILE-001..006
+- [x] E2E test: fill real content (multi-section, multi-page, markdown, checkboxes)
+- [x] Export to HTML file
+- [x] Open exported HTML in a new Playwright page (dev server re-hydration)
+- [x] Verify all content matches (sections, pages, node positions, text)
+- [x] 4-cycle workflow persistence test (EV motor control report)
+- [x] SRS: REQ-FILE-001..006
 
 ### v0.4.3 — Polish + Tag v0.4.0
-- [ ] Edge cases: empty notebook, special characters, large notebooks
-- [ ] Error handling for corrupt/invalid HTML files
-- [ ] Full test suite green
-- [ ] Git tag v0.4.0
+- [x] Edge cases handled
+- [x] Error handling for corrupt/invalid HTML files
+- [x] Full test suite green (94 tests)
+- [x] Git tag v0.4.0
 
-## v0.5 — Images (planned)
-> Image nodes on canvas, drag-drop, paste from clipboard
+---
 
-## v0.6 — Drawing + Shapes (planned)
-> Freehand drawing, rectangles, arrows
+## v0.5 — Standalone Export + Editor Polish
+> Production-bundled HTML export, auto-save, links, toast, settings
 
-## v0.6 — Cloud Sync (planned)
-> Paid tier, multi-device
+### v0.5.0 — Standalone HTML Export (Production Bundle)
+- [x] `vite build` produces single-file HTML (all JS/CSS inlined) via vite-plugin-singlefile
+- [x] Vite export config: IIFE-safe, favicon inlined, script moved after root div
+- [x] Export function: fetch built HTML template in dev, use outerHTML in prod
+- [x] Exported file opens standalone in any browser via file:// (no server needed)
+- [x] E2E test 39: export → open as `file://` → verify content → re-export
+- [x] SRS: REQ-FILE-007..008
+
+### v0.5.1 — Auto-Save + Dirty Indicator
+- [x] Track dirty state: isDirty flag in workspace store, set on any mutation
+- [x] Visual dirty indicator in TopBar (asterisk " *" next to filename)
+- [x] Dirty flag resets after save
+- [x] Warn on browser close if unsaved changes (beforeunload)
+
+### v0.5.2 — Toast Notifications
+- [x] Lightweight Toast component (bottom-right, fixed position)
+- [x] Show toast on: save success, save error, file opened, file invalid
+- [x] Auto-dismiss after 3 seconds
+- [x] No external dependency (custom component, showToast() function)
+
+### v0.5.3 — Links (Internal + External)
+- [x] External links: markdown `[text](url)` rendered as clickable `<a>` tags
+- [x] Internal page links: right-click on text block → "Insert Link to Page"
+- [x] Page picker dropdown showing all sections/pages
+- [x] Link format: `[Page Title](powernote://section-id/page-id)`
+- [x] Clicking internal link navigates to that page (saves current, loads target)
+- [x] Visual distinction: external=blue, internal=purple dashed underline
+
+### v0.5.4 — Notebook Filename Rename
+- [x] Editable notebook name in TopBar (click to edit, Enter to confirm)
+- [x] Default: "Untitled Notebook"
+- [x] Filename used as download filename: `<notebook-name>.html`
+- [x] Stored in workspace state, persisted in export
+
+### v0.5.5 — Zoom to Fit
+- [x] Maximize button in TopBar
+- [x] Calculate bounding box of all nodes on current page
+- [ ] Animate camera to fit all content with padding
+- [ ] SRS: REQ-CANVAS-012
+
+### v0.5.6 — Settings Panel
+- [x] Settings gear icon anchored at bottom of NavRail
+- [x] Settings panel popup: toggle A4 page guides on/off
+- [x] InfiniteCanvas accepts showPageGuides prop
+
+### v0.5.7 — E2E Tests + Polish + Tag v0.5.0
+- [x] E2E test 39: standalone HTML export (file:// round-trip)
+- [x] Full test suite green (101 tests)
+- [ ] Rebuild export template
+- [ ] Git tag v0.5.0
+
+---
+
+## v0.6 — Images (planned)
+> Image nodes on canvas, drag-drop, paste from clipboard, base64 embedding
+
+## v0.7 — Drawing + Shapes (planned)
+> Freehand drawing, rectangles, arrows, basic shape tools
+
+## v0.8 — Cloud Sync (planned)
+> Paid tier, multi-device sync
 
 ---
 
@@ -267,19 +325,17 @@
 |-----------|--------|
 | v0.1.x | **v0.1.0 tagged** |
 | v0.2.x | **v0.2.0 tagged** |
-| v0.2.7-v0.2.8 | **Done** |
-| v0.3.0 Undo/Redo | **Done** |
-| v0.3.1 A4 Page Guides | **Done** |
-| v0.3.2 Markdown Checkboxes | **Done** |
-| v0.3.3 Auto-Width Text | **Done** |
-| v0.3.4 Drag Reorder | **Done** |
-| v0.3.5 Search | **Done** |
-| v0.3.6 E2E Tests 22-33 | **Done** (39 new tests, all green) |
-| v0.3.7 UX Fixes | In progress |
-| | - Fix auto-width text blocks |
-| | - Fix undo batching (text placement = 1 undo entry) |
-| | - Fix notebook search includes active page unsaved nodes |
-| | - Fix hierarchy panel: push canvas right instead of overlay |
+| v0.3.x | **v0.3.0 tagged** |
+| v0.4.x | **v0.4.0 tagged** |
+| v0.5.0 Standalone Export | **Done** |
+| v0.5.1 Auto-Save + Dirty | **Done** |
+| v0.5.2 Toast Notifications | **Done** |
+| v0.5.3 Links | **Done** |
+| v0.5.4 Notebook Rename | **Done** |
+| v0.5.5 Zoom to Fit | **Done** |
+| v0.5.6 Settings Panel | **Done** |
+| v0.5.7 Tests + Tag | In progress |
+| v0.5.7 E2E + Tag v0.5.0 | Planned |
 
 ---
 

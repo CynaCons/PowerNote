@@ -18,7 +18,11 @@ const MIN_SCALE = 0.1;
 const MAX_SCALE = 5.0;
 const ZOOM_FACTOR = 1.05;
 
-export function InfiniteCanvas() {
+interface InfiniteCanvasProps {
+  showPageGuides?: boolean;
+}
+
+export function InfiniteCanvas({ showPageGuides = true }: InfiniteCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
 
@@ -250,7 +254,7 @@ export function InfiniteCanvas() {
           onTap={handleStageClick}
         >
           <Layer>
-            <PageGuides visible={true} />
+            <PageGuides visible={showPageGuides} />
           </Layer>
           <Layer>
             {nodes.map((node) => {

@@ -85,7 +85,7 @@ ${JSON.stringify(mockData)}
       expect(cs.nodes[0].data.text).toContain('Imported Content');
 
       // Verify breadcrumb updated
-      await expect(page.locator('[data-testid="topbar-filename"]')).toHaveText('Imported Notebook');
+      await expect(page.locator('[data-testid="topbar-filename"]')).toContainText('Imported Notebook');
       await expect(page.locator('[data-testid="topbar-section"]')).toHaveText('Imported Section');
     } finally {
       fs.unlinkSync(tmpFile);

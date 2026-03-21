@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { CanvasNode, Viewport } from '../types/data';
 import { generateId } from '../utils/ids';
+import { useWorkspaceStore } from './useWorkspaceStore';
 
 const MAX_HISTORY = 50;
 
@@ -78,12 +79,14 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   addNode: (node) =>
     set((state) => {
       pushUndo(state.nodes);
+      useWorkspaceStore.getState().markDirty();
       return { nodes: [...state.nodes, node] };
     }),
 
   updateNode: (id, updates) =>
     set((state) => {
       pushUndo(state.nodes);
+      useWorkspaceStore.getState().markDirty();
       return {
         nodes: state.nodes.map((n) =>
           n.id === id ? { ...n, ...updates } : n,
@@ -92,15 +95,19 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     }),
 
   updateNodeSilent: (id, updates) =>
-    set((state) => ({
-      nodes: state.nodes.map((n) =>
-        n.id === id ? { ...n, ...updates } : n,
-      ),
-    })),
+    set((state) => {
+      useWorkspaceStore.getState().markDirty();
+      return {
+        nodes: state.nodes.map((n) =>
+          n.id === id ? { ...n, ...updates } : n,
+        ),
+      };
+    }),
 
   deleteNode: (id) =>
     set((state) => {
       pushUndo(state.nodes);
+      useWorkspaceStore.getState().markDirty();
       return {
         nodes: state.nodes.filter((n) => n.id !== id),
         selectedNodeIds: state.selectedNodeIds.filter((sid) => sid !== id),
@@ -110,6 +117,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   deleteSelectedNodes: () =>
     set((state) => {
       pushUndo(state.nodes);
+      useWorkspaceStore.getState().markDirty();
       return {
         nodes: state.nodes.filter((n) => !state.selectedNodeIds.includes(n.id)),
         selectedNodeIds: [],

@@ -6,6 +6,9 @@ interface WorkspaceState {
   workspace: WorkspaceData;
   activeSectionId: string;
   activePageId: string;
+  isDirty: boolean;
+  markDirty: () => void;
+  markClean: () => void;
 
   // Getters
   getActiveSection: () => Section | undefined;
@@ -43,6 +46,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     workspace: initial,
     activeSectionId: firstSection.id,
     activePageId: firstPage.id,
+    isDirty: false,
+    markDirty: () => set({ isDirty: true }),
+    markClean: () => set({ isDirty: false }),
 
     getActiveSection: () => {
       const { workspace, activeSectionId } = get();
@@ -59,6 +65,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       set((state) => {
         const section = createSection(title);
         return {
+          isDirty: true,
           workspace: {
             ...state.workspace,
             sections: [...state.workspace.sections, section],
@@ -69,6 +76,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
 
     renameSection: (sectionId, title) => {
       set((state) => ({
+        isDirty: true,
         workspace: {
           ...state.workspace,
           sections: state.workspace.sections.map((s) =>
@@ -86,6 +94,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         // Guard: always keep at least 1 section
         if (remaining.length === 0) return state;
         return {
+          isDirty: true,
           workspace: { ...state.workspace, sections: remaining },
           activeSectionId:
             state.activeSectionId === sectionId
@@ -101,6 +110,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
 
     addPage: (sectionId, title?: string) => {
       set((state) => ({
+        isDirty: true,
         workspace: {
           ...state.workspace,
           sections: state.workspace.sections.map((s) =>
@@ -114,6 +124,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
 
     renamePage: (sectionId, pageId, title) => {
       set((state) => ({
+        isDirty: true,
         workspace: {
           ...state.workspace,
           sections: state.workspace.sections.map((s) =>
@@ -140,6 +151,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         // Guard: always keep at least 1 page per section
         if (remaining.length === 0) return state;
         return {
+          isDirty: true,
           workspace: {
             ...state.workspace,
             sections: state.workspace.sections.map((s) =>
@@ -174,6 +186,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
 
     savePageNodes: (nodes) => {
       set((state) => ({
+        isDirty: true,
         workspace: {
           ...state.workspace,
           sections: state.workspace.sections.map((s) =>
@@ -195,12 +208,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         const sections = [...state.workspace.sections];
         const [moved] = sections.splice(fromIndex, 1);
         sections.splice(toIndex, 0, moved);
-        return { workspace: { ...state.workspace, sections } };
+        return { isDirty: true, workspace: { ...state.workspace, sections } };
       });
     },
 
     reorderPage: (sectionId, fromIndex, toIndex) => {
       set((state) => ({
+        isDirty: true,
         workspace: {
           ...state.workspace,
           sections: state.workspace.sections.map((s) => {
@@ -244,7 +258,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
           return s;
         });
 
-        return { workspace: { ...state.workspace, sections: finalSections } };
+        return { isDirty: true, workspace: { ...state.workspace, sections: finalSections } };
       });
     },
   };

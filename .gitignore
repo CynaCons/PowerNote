@@ -1,6 +1,7 @@
 node_modules
 dist
 dist-ssr
+dist-template
 *.local
 .DS_Store
 *.tsbuildinfo

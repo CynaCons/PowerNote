@@ -5,9 +5,28 @@ import type Konva from 'konva';
 import type { CanvasNode, TextNodeData } from '../../types/data';
 import { undoBatchEnd } from '../../stores/useCanvasStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
+import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { TextEditor } from './TextEditor';
 import { calculateSnap, type SnapLine } from './SnapGuides';
 import { marked } from 'marked';
+
+// Handle powernote:// internal links
+function handleInternalLink(href: string) {
+  // Format: powernote://section-id/page-id
+  const match = href.match(/^powernote:\/\/([^/]+)\/(.+)$/);
+  if (!match) return;
+  const [, sectionId, pageId] = match;
+  const ws = useWorkspaceStore.getState();
+  const canvas = useCanvasStore.getState();
+
+  // Save current page nodes before navigating
+  ws.savePageNodes(canvas.nodes);
+  ws.setActivePage(sectionId, pageId);
+
+  const section = ws.workspace.sections.find((s) => s.id === sectionId);
+  const page = section?.pages.find((p) => p.id === pageId);
+  canvas.loadPageNodes(page?.nodes ?? []);
+}
 
 // Configure marked for GFM + task lists
 marked.setOptions({
@@ -44,6 +63,7 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
   const updateNode = useCanvasStore((s) => s.updateNode);
   const updateNodeSilent = useCanvasStore((s) => s.updateNodeSilent);
   const [isEditing, setIsEditing] = useState(!!autoEdit);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   // Parse markdown to HTML
   const renderedHtml = useMemo(() => {
@@ -174,6 +194,7 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
           className={`powernote-markdown ${isSelected ? 'powernote-markdown--selected' : ''}`}
           onClick={(e) => {
             const target = e.target as HTMLElement;
+            // Handle checkbox clicks
             if (target.tagName === 'INPUT' && target.getAttribute('type') === 'checkbox') {
               e.stopPropagation();
               const checkboxes = htmlRef.current?.querySelectorAll('input[type="checkbox"]');
@@ -185,6 +206,22 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
                 }
               }
             }
+            // Handle link clicks
+            if (target.tagName === 'A') {
+              e.stopPropagation();
+              e.preventDefault();
+              const href = target.getAttribute('href') || '';
+              if (href.startsWith('powernote://')) {
+                handleInternalLink(href);
+              } else if (href.startsWith('http://') || href.startsWith('https://')) {
+                window.open(href, '_blank', 'noopener');
+              }
+            }
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setContextMenu({ x: e.clientX, y: e.clientY });
           }}
           style={{
             minWidth: 60,
@@ -204,7 +241,96 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
             __html: hasContent ? renderedHtml : '<p>Double-click to edit</p>',
           }}
         />
+        {/* Context menu for inserting links */}
+        {contextMenu && (
+          <LinkContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            onInsertLink={(sectionId, pageId, pageTitle) => {
+              const link = `[${pageTitle}](powernote://${sectionId}/${pageId})`;
+              updateNode(node.id, {
+                data: { ...data, text: data.text + '\n' + link },
+              });
+              setContextMenu(null);
+            }}
+            onClose={() => setContextMenu(null)}
+          />
+        )}
       </Html>
     </Group>
+  );
+}
+
+function LinkContextMenu({
+  x,
+  y,
+  onInsertLink,
+  onClose,
+}: {
+  x: number;
+  y: number;
+  onInsertLink: (sectionId: string, pageId: string, pageTitle: string) => void;
+  onClose: () => void;
+}) {
+  const workspace = useWorkspaceStore((s) => s.workspace);
+  const [showPages, setShowPages] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={menuRef}
+      data-testid="link-context-menu"
+      style={{
+        position: 'fixed',
+        left: x,
+        top: y,
+        background: '#fff',
+        border: '1px solid #ddd',
+        borderRadius: 6,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        zIndex: 9999,
+        minWidth: 180,
+        padding: '4px 0',
+        fontSize: 13,
+        pointerEvents: 'auto',
+      }}
+    >
+      {!showPages ? (
+        <div
+          style={{ padding: '6px 12px', cursor: 'pointer' }}
+          onClick={() => setShowPages(true)}
+          onMouseOver={(e) => ((e.target as HTMLElement).style.background = '#f0f0f0')}
+          onMouseOut={(e) => ((e.target as HTMLElement).style.background = 'transparent')}
+        >
+          Insert Link to Page...
+        </div>
+      ) : (
+        <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+          {workspace.sections.map((section) =>
+            section.pages.map((page) => (
+              <div
+                key={page.id}
+                style={{ padding: '4px 12px', cursor: 'pointer' }}
+                onClick={() => onInsertLink(section.id, page.id, page.title)}
+                onMouseOver={(e) => ((e.target as HTMLElement).style.background = '#f0f0f0')}
+                onMouseOut={(e) => ((e.target as HTMLElement).style.background = 'transparent')}
+              >
+                {section.title} / {page.title}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
   );
 }

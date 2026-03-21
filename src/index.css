@@ -130,6 +130,15 @@ button:disabled {
 .powernote-markdown a {
   color: #2563eb;
   text-decoration: none;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.powernote-markdown a:hover {
+  text-decoration: underline;
+}
+.powernote-markdown a[href^="powernote://"] {
+  color: #7c3aed;
+  border-bottom: 1px dashed #7c3aed;
 }
 .powernote-markdown table {
   border-collapse: collapse;

@@ -1,13 +1,15 @@
-import { Layers, Type, Pen } from 'lucide-react';
+import { Layers, Type, Pen, Settings } from 'lucide-react';
 import { useToolStore } from '../../stores/useToolStore';
 import './NavRail.css';
 
 interface NavRailProps {
   onToggleHierarchy: () => void;
   isHierarchyOpen: boolean;
+  onToggleSettings: () => void;
+  isSettingsOpen: boolean;
 }
 
-export function NavRail({ onToggleHierarchy, isHierarchyOpen }: NavRailProps) {
+export function NavRail({ onToggleHierarchy, isHierarchyOpen, onToggleSettings, isSettingsOpen }: NavRailProps) {
   const activeTool = useToolStore((s) => s.activeTool);
   const setTool = useToolStore((s) => s.setTool);
 
@@ -44,6 +46,18 @@ export function NavRail({ onToggleHierarchy, isHierarchyOpen }: NavRailProps) {
           disabled
         >
           <Pen size={20} />
+        </button>
+      </div>
+
+      <div className="nav-rail__bottom">
+        <button
+          className={`nav-rail__btn ${isSettingsOpen ? 'nav-rail__btn--active' : ''}`}
+          title="Settings"
+          aria-label="Settings"
+          data-testid="nav-settings"
+          onClick={onToggleSettings}
+        >
+          <Settings size={20} />
         </button>
       </div>
     </nav>
