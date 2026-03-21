@@ -308,8 +308,44 @@
 
 ---
 
-## v0.6 — Images (planned)
-> Image nodes on canvas, drag-drop, paste from clipboard, base64 embedding
+## v0.6 — Images on Canvas
+> Image nodes: paste, drag-drop, file picker, resize, base64 in export
+
+### v0.6.0 — Image Data Model + Component
+- [x] ImageNodeData type (src, alt, naturalWidth, naturalHeight)
+- [x] NodeData union type (TextNodeData | ImageNodeData)
+- [x] ImageNode.tsx — renders base64 image on Konva canvas
+- [x] CanvasNode dispatcher routes image type
+
+### v0.6.1 — Clipboard Paste (Ctrl+V)
+- [x] Paste handler detects image items from clipboard
+- [x] Converts to base64 data URI, places at canvas center
+
+### v0.6.2 — Drag-Drop Files
+- [x] dragover/drop handlers on canvas container
+- [x] Converts drop position to canvas coordinates
+- [x] Auto-scales images to max 600px width
+
+### v0.6.3 — Image Tool in NavRail
+- [x] Image icon button in NavRail (between text and draw)
+- [x] Hidden file input with accept="image/*"
+- [x] File picker opens on click, adds image to canvas
+
+### v0.6.4 — Image Resize
+- [x] SelectionTransformer enables resize handles for image nodes
+- [x] Keep aspect ratio on resize
+- [x] Transform end updates node dimensions in store
+
+### v0.6.5 — Base64 in HTML Export
+- [x] Images are base64 data URIs — automatically embedded in export
+- [x] E2E test verifies image data survives save/load round-trip
+
+### v0.6.6 — E2E Tests + Tag v0.6.0
+- [x] Test 40: image add, select, save/load round-trip (3 tests)
+- [x] Full test suite green (104 tests)
+- [x] Git tag v0.6.0
+
+---
 
 ## v0.7 — Drawing + Shapes (planned)
 > Freehand drawing, rectangles, arrows, basic shape tools
@@ -327,15 +363,8 @@
 | v0.2.x | **v0.2.0 tagged** |
 | v0.3.x | **v0.3.0 tagged** |
 | v0.4.x | **v0.4.0 tagged** |
-| v0.5.0 Standalone Export | **Done** |
-| v0.5.1 Auto-Save + Dirty | **Done** |
-| v0.5.2 Toast Notifications | **Done** |
-| v0.5.3 Links | **Done** |
-| v0.5.4 Notebook Rename | **Done** |
-| v0.5.5 Zoom to Fit | **Done** |
-| v0.5.6 Settings Panel | **Done** |
-| v0.5.7 Tests + Tag | In progress |
-| v0.5.7 E2E + Tag v0.5.0 | Planned |
+| v0.5.x | **v0.5.0 tagged** |
+| v0.6.x | **v0.6.0 tagged** |
 
 ---
 

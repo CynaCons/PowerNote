@@ -8,11 +8,47 @@ import { SnapGuides, type SnapLine } from './SnapGuides';
 import { PageGuides, type BackgroundMode } from './PageGuides';
 import { TrashButton } from './TrashButton';
 import { generateId } from '../../utils/ids';
-import type { CanvasNode as CanvasNodeType } from '../../types/data';
+import type { CanvasNode as CanvasNodeType, ImageNodeData } from '../../types/data';
 import './InfiniteCanvas.css';
 
 // Track the most recently placed node so it auto-enters edit mode
 let autoEditNodeId: string | null = null;
+
+/** Read a File (image) as a base64 data URI, then add it to the canvas */
+function addImageFromFile(file: File, x: number, y: number) {
+  if (!file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const src = reader.result as string;
+    const img = new Image();
+    img.onload = () => {
+      // Scale down if too large (max 600px wide)
+      const maxW = 600;
+      let w = img.naturalWidth;
+      let h = img.naturalHeight;
+      if (w > maxW) {
+        h = h * (maxW / w);
+        w = maxW;
+      }
+      const node: CanvasNodeType = {
+        id: generateId(),
+        type: 'image',
+        x, y,
+        width: w,
+        height: h,
+        data: {
+          src,
+          alt: file.name || 'image',
+          naturalWidth: img.naturalWidth,
+          naturalHeight: img.naturalHeight,
+        } as ImageNodeData,
+      };
+      useCanvasStore.getState().addNode(node);
+    };
+    img.src = src;
+  };
+  reader.readAsDataURL(file);
+}
 
 const MIN_SCALE = 0.1;
 const MAX_SCALE = 5.0;
@@ -71,6 +107,70 @@ export function InfiniteCanvas({ backgroundMode = 'pages' }: InfiniteCanvasProps
     });
 
     return () => observer.disconnect();
+  }, []);
+
+  // ── Clipboard paste (Ctrl+V for images) ─────────────────
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) {
+            // Place at center of visible canvas
+            const stage = stageRef.current;
+            const cx = stage ? (dimensions.width / 2 - stage.x()) / stage.scaleX() : 200;
+            const cy = stage ? (dimensions.height / 2 - stage.y()) / stage.scaleY() : 200;
+            addImageFromFile(file, cx, cy);
+          }
+          return;
+        }
+      }
+    };
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [dimensions]);
+
+  // ── Drag-drop files onto canvas ─────────────────────────
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault();
+      e.dataTransfer!.dropEffect = 'copy';
+    };
+
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault();
+      const files = e.dataTransfer?.files;
+      if (!files) return;
+
+      const stage = stageRef.current;
+      const rect = container.getBoundingClientRect();
+
+      for (const file of Array.from(files)) {
+        if (file.type.startsWith('image/')) {
+          // Convert drop position to canvas coordinates
+          const dropX = stage
+            ? (e.clientX - rect.left - stage.x()) / stage.scaleX()
+            : e.clientX - rect.left;
+          const dropY = stage
+            ? (e.clientY - rect.top - stage.y()) / stage.scaleY()
+            : e.clientY - rect.top;
+          addImageFromFile(file, dropX, dropY);
+        }
+      }
+    };
+
+    container.addEventListener('dragover', handleDragOver);
+    container.addEventListener('drop', handleDrop);
+    return () => {
+      container.removeEventListener('dragover', handleDragOver);
+      container.removeEventListener('drop', handleDrop);
+    };
   }, []);
 
   // ── Zoom (Ctrl + wheel) ───────────────────────────────────

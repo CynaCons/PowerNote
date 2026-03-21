@@ -10,6 +10,15 @@ export interface TextNodeData {
   fill: string;
 }
 
+export interface ImageNodeData {
+  src: string; // base64 data URI or URL
+  alt: string;
+  naturalWidth: number;
+  naturalHeight: number;
+}
+
+export type NodeData = TextNodeData | ImageNodeData;
+
 export interface CanvasNode {
   id: string;
   type: NodeType;
@@ -17,7 +26,7 @@ export interface CanvasNode {
   y: number;
   width: number;
   height: number;
-  data: TextNodeData; // union with ImageNodeData | ShapeNodeData later
+  data: NodeData;
 }
 
 // ── Hierarchy types ─────────────────────────────────────────
