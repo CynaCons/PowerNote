@@ -37,12 +37,15 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit }: T
   }, [node.data, node.width, measureHeight]);
 
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
-    // Group is positioned at (node.x, node.y), drag moves it
-    // e.target.x()/y() gives the new absolute position directly
     updateNode(node.id, {
       x: e.target.x(),
       y: e.target.y(),
     });
+  };
+
+  const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Stop propagation so stage doesn't start panning
+    e.cancelBubble = true;
   };
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -53,6 +56,7 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit }: T
 
   const handleDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
+    onSelect(node.id, false);
     setIsEditing(true);
   };
 
@@ -84,10 +88,7 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit }: T
       y={node.y}
       draggable
       onDragEnd={handleDragEnd}
-      onClick={handleClick}
-      onTap={handleClick}
-      onDblClick={handleDblClick}
-      onDblTap={handleDblClick}
+      onMouseDown={handleMouseDown}
     >
       {/* Selection highlight background */}
       {isSelected && (
@@ -98,7 +99,6 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit }: T
           height={textHeight + 4}
           fill="#eff6ff"
           cornerRadius={3}
-          listening={false}
         />
       )}
       <Text
@@ -113,6 +113,10 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit }: T
         fontStyle={data.fontStyle}
         fill={data.text ? data.fill : '#999999'}
         padding={4}
+        onClick={handleClick}
+        onTap={handleClick}
+        onDblClick={handleDblClick}
+        onDblTap={handleDblClick}
       />
     </Group>
   );

@@ -140,6 +140,8 @@ export function InfiniteCanvas() {
         addNode(newNode);
         selectNode(newNode.id, false);
         autoEditNodeId = newNode.id;
+        // Revert to select tool after placing — one-shot behavior
+        useToolStore.getState().setTool('select');
       } else {
         clearSelection();
       }

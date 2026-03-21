@@ -56,11 +56,7 @@ test.describe('10 - Toolbar Show (REQ-TOOL-001)', () => {
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.waitForTimeout(300);
 
-    // Deactivate text tool — switch to select mode
-    await activateTool(page, 'text');
-    await page.waitForTimeout(100);
-
-    // Deselect by clicking an empty part of the canvas
+    // Tool auto-reverted to select after placing. Deselect by clicking empty canvas
     await clickCanvas(page, 200, 200);
     await page.waitForTimeout(200);
 

@@ -1,24 +1,51 @@
-.trash-button {
+.selection-actions {
   position: absolute;
   top: 12px;
   right: 12px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  gap: 4px;
+  padding: 6px 10px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  color: #dc2626;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.15s ease;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   z-index: 25;
+  user-select: none;
 }
 
-.trash-button:hover {
+.selection-actions__count {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.selection-actions__divider {
+  width: 1px;
+  height: 20px;
+  background: var(--color-border);
+  margin: 0 4px;
+}
+
+.selection-actions__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.selection-actions__btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.selection-actions__btn--danger:hover {
   background: #fef2f2;
-  border-color: #dc2626;
-  transform: scale(1.05);
+  color: #dc2626;
 }
