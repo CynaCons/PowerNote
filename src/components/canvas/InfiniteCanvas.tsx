@@ -6,6 +6,7 @@ import { useToolStore } from '../../stores/useToolStore';
 import { CanvasNode } from './CanvasNode';
 import { SelectionTransformer } from './SelectionTransformer';
 import { generateId } from '../../utils/ids';
+import { createContainerNode } from '../../utils/defaults';
 import type { CanvasNode as CanvasNodeType } from '../../types/data';
 import './InfiniteCanvas.css';
 
@@ -109,18 +110,17 @@ export function InfiniteCanvas() {
       // Only handle clicks on the stage background (not on shapes)
       if (e.target !== stageRef.current) return;
 
+      const stage = stageRef.current;
+      if (!stage) return;
+
+      const pointer = stage.getPointerPosition();
+      if (!pointer) return;
+
+      const scale = stage.scaleX();
+      const stageX = (pointer.x - stage.x()) / scale;
+      const stageY = (pointer.y - stage.y()) / scale;
+
       if (activeTool === 'text') {
-        const stage = stageRef.current;
-        if (!stage) return;
-
-        const pointer = stage.getPointerPosition();
-        if (!pointer) return;
-
-        // Convert screen coords to stage coords (accounting for pan/zoom)
-        const scale = stage.scaleX();
-        const stageX = (pointer.x - stage.x()) / scale;
-        const stageY = (pointer.y - stage.y()) / scale;
-
         const newNode: CanvasNodeType = {
           id: generateId(),
           type: 'text',
@@ -134,13 +134,16 @@ export function InfiniteCanvas() {
             fontFamily: textOptions.fontFamily,
             fontStyle: textOptions.fontStyle,
             fill: textOptions.fill,
-            width: 200,
           },
         };
 
         addNode(newNode);
         setSelectedNodeId(newNode.id);
         autoEditNodeId = newNode.id;
+      } else if (activeTool === 'container') {
+        const newContainer = createContainerNode(stageX, stageY);
+        addNode(newContainer);
+        setSelectedNodeId(newContainer.id);
       } else {
         // Deselect on background click
         setSelectedNodeId(null);
@@ -171,6 +174,11 @@ export function InfiniteCanvas() {
         const toolStore = useToolStore.getState();
         toolStore.setTool(toolStore.activeTool === 'text' ? 'select' : 'text');
       }
+
+      if (e.key === 'c' || e.key === 'C') {
+        const toolStore = useToolStore.getState();
+        toolStore.setTool(toolStore.activeTool === 'container' ? 'select' : 'container');
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -179,13 +187,15 @@ export function InfiniteCanvas() {
 
   // Cursor style based on active tool
   const cursorClass =
-    activeTool === 'text' ? 'infinite-canvas--crosshair' : '';
+    activeTool === 'text' || activeTool === 'container'
+      ? 'infinite-canvas--crosshair'
+      : '';
 
   // Get current stage scale for text editor positioning
   const currentScale = stageRef.current?.scaleX() ?? 1;
 
   return (
-    <div ref={containerRef} className={`infinite-canvas ${cursorClass}`}>
+    <div ref={containerRef} className={`infinite-canvas ${cursorClass}`} data-testid="canvas-container">
       {dimensions.width > 0 && dimensions.height > 0 && (
         <Stage
           ref={stageRef}

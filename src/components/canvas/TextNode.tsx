@@ -1,7 +1,7 @@
-import { useRef, useState, useEffect } from 'react';
-import { Text, Group } from 'react-konva';
+import { useRef, useState, useEffect, useCallback } from 'react';
+import { Text, Group, Rect } from 'react-konva';
 import type Konva from 'konva';
-import type { CanvasNode } from '../../types/data';
+import type { CanvasNode, TextNodeData } from '../../types/data';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { TextEditor } from './TextEditor';
 
@@ -13,11 +13,12 @@ interface TextNodeProps {
   autoEdit?: boolean;
 }
 
-export function TextNode({ node, isSelected: _isSelected, onSelect, stageScale, autoEdit }: TextNodeProps) {
-  // _isSelected kept for future use (e.g., visual feedback beyond Transformer)
+export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit }: TextNodeProps) {
+  const data = node.data as TextNodeData;
   const textRef = useRef<Konva.Text>(null);
   const updateNode = useCanvasStore((s) => s.updateNode);
   const [isEditing, setIsEditing] = useState(false);
+  const [textHeight, setTextHeight] = useState(node.height);
 
   // Auto-enter edit mode for newly placed text blocks
   useEffect(() => {
@@ -25,6 +26,17 @@ export function TextNode({ node, isSelected: _isSelected, onSelect, stageScale, 
       setIsEditing(true);
     }
   }, [autoEdit]);
+
+  // Track text height for the selection background
+  const measureHeight = useCallback(() => {
+    if (textRef.current) {
+      setTextHeight(textRef.current.height());
+    }
+  }, []);
+
+  useEffect(() => {
+    measureHeight();
+  }, [node.data, node.width, measureHeight]);
 
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
     updateNode(node.id, {
@@ -34,7 +46,7 @@ export function TextNode({ node, isSelected: _isSelected, onSelect, stageScale, 
   };
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    e.cancelBubble = true; // Prevent stage click from firing
+    e.cancelBubble = true;
     onSelect(node.id);
   };
 
@@ -45,7 +57,7 @@ export function TextNode({ node, isSelected: _isSelected, onSelect, stageScale, 
   const handleFinishEdit = (newText: string) => {
     setIsEditing(false);
     updateNode(node.id, {
-      data: { ...node.data, text: newText },
+      data: { ...data, text: newText },
     });
   };
 
@@ -65,20 +77,33 @@ export function TextNode({ node, isSelected: _isSelected, onSelect, stageScale, 
   }
 
   return (
-    <Group>
+    <Group
+      draggable
+      onDragEnd={handleDragEnd}
+    >
+      {/* Selection highlight background */}
+      {isSelected && (
+        <Rect
+          x={node.x - 2}
+          y={node.y - 2}
+          width={node.width + 4}
+          height={textHeight + 4}
+          fill="#eff6ff"
+          cornerRadius={3}
+          listening={false}
+        />
+      )}
       <Text
         ref={textRef}
         id={node.id}
         x={node.x}
         y={node.y}
         width={node.width}
-        text={node.data.text || 'Double-click to edit'}
-        fontSize={node.data.fontSize}
-        fontFamily={node.data.fontFamily}
-        fontStyle={node.data.fontStyle}
-        fill={node.data.text ? node.data.fill : '#999999'}
-        draggable
-        onDragEnd={handleDragEnd}
+        text={data.text || 'Double-click to edit'}
+        fontSize={data.fontSize}
+        fontFamily={data.fontFamily}
+        fontStyle={data.fontStyle}
+        fill={data.text ? data.fill : '#999999'}
         onClick={handleClick}
         onTap={handleClick}
         onDblClick={handleDblClick}

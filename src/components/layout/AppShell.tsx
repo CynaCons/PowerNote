@@ -10,7 +10,7 @@ export function AppShell() {
   const [isHierarchyOpen, setIsHierarchyOpen] = useState(false);
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-testid="app-shell">
       <NavRail
         onToggleHierarchy={() => setIsHierarchyOpen((prev) => !prev)}
         isHierarchyOpen={isHierarchyOpen}

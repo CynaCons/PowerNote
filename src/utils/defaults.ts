@@ -1,4 +1,4 @@
-import type { WorkspaceData, Section, Page, TextOptions } from '../types/data';
+import type { WorkspaceData, Section, Page, TextOptions, CanvasNode } from '../types/data';
 import { generateId } from './ids';
 
 export function createPage(title = 'Untitled Page'): Page {
@@ -22,6 +22,24 @@ export function createWorkspace(): WorkspaceData {
     version: '0.1.0',
     filename: 'Untitled Notebook',
     sections: [createSection('Section 1')],
+  };
+}
+
+export function createContainerNode(x: number, y: number): CanvasNode {
+  return {
+    id: generateId(),
+    type: 'container',
+    x,
+    y,
+    width: 300,
+    height: 200,
+    data: {
+      title: 'Container',
+      isCollapsed: false,
+      headerHeight: 32,
+      fill: '#ffffff',
+      borderColor: '#d4d4d4',
+    },
   };
 }
 

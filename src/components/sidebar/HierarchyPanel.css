@@ -85,7 +85,19 @@
   white-space: nowrap;
 }
 
-.hierarchy-section__add {
+.hierarchy-section__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.hierarchy-section__header:hover .hierarchy-section__actions {
+  opacity: 1;
+}
+
+.hierarchy-section__action-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -93,17 +105,30 @@
   height: 24px;
   border-radius: 4px;
   color: var(--color-text-muted);
-  opacity: 0;
   transition: all 0.15s ease;
 }
 
-.hierarchy-section__header:hover .hierarchy-section__add {
-  opacity: 1;
-}
-
-.hierarchy-section__add:hover {
+.hierarchy-section__action-btn:hover {
   background: var(--color-hover);
   color: var(--color-text);
+}
+
+.hierarchy-section__action-btn--danger:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.hierarchy-section__rename-input {
+  flex: 1;
+  min-width: 0;
+  padding: 1px 4px;
+  border: 1px solid var(--color-primary);
+  border-radius: 3px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+  background: white;
 }
 
 .hierarchy-section__pages {
@@ -114,13 +139,12 @@
 .hierarchy-page {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
   width: 100%;
-  padding: 4px 8px 4px 12px;
+  padding: 0 4px 0 0;
   border-radius: 4px;
   color: var(--color-text-muted);
   font-size: 13px;
-  text-align: left;
   transition: all 0.15s ease;
 }
 
@@ -135,8 +159,72 @@
   font-weight: 500;
 }
 
+.hierarchy-page--renaming {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 12px;
+}
+
+.hierarchy-page__nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 4px 4px 4px 12px;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+
 .hierarchy-page__title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.hierarchy-page__actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.hierarchy-page:hover .hierarchy-page__actions {
+  opacity: 1;
+}
+
+.hierarchy-page__action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  color: var(--color-text-muted);
+  transition: all 0.15s ease;
+}
+
+.hierarchy-page__action-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.hierarchy-page__action-btn--danger:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.hierarchy-page__rename-input {
+  flex: 1;
+  min-width: 0;
+  padding: 1px 4px;
+  border: 1px solid var(--color-primary);
+  border-radius: 3px;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  background: white;
 }

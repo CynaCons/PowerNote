@@ -1,6 +1,7 @@
 import { useToolStore } from '../../stores/useToolStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { TextToolbar } from './TextToolbar';
+import { isTextNode } from '../../types/data';
 import type { TextOptions } from '../../types/data';
 import './BottomToolbar.css';
 
@@ -18,34 +19,33 @@ export function BottomToolbar() {
     : null;
 
   const isTextContext =
-    activeTool === 'text' || (selectedNode && selectedNode.type === 'text');
+    activeTool === 'text' || (selectedNode && isTextNode(selectedNode));
 
   if (!isTextContext) return null;
 
   // If a text node is selected, use its data; otherwise use tool defaults
-  const currentOptions: TextOptions = selectedNode
-    ? {
-        fontSize: selectedNode.data.fontSize,
-        fontFamily: selectedNode.data.fontFamily,
-        fontStyle: selectedNode.data.fontStyle,
-        fill: selectedNode.data.fill,
-      }
-    : textOptions;
+  const currentOptions: TextOptions =
+    selectedNode && isTextNode(selectedNode)
+      ? {
+          fontSize: selectedNode.data.fontSize,
+          fontFamily: selectedNode.data.fontFamily,
+          fontStyle: selectedNode.data.fontStyle,
+          fill: selectedNode.data.fill,
+        }
+      : textOptions;
 
   const handleChange = (updates: Partial<TextOptions>) => {
-    if (selectedNode) {
-      // Update the selected node directly
+    if (selectedNode && isTextNode(selectedNode)) {
       updateNode(selectedNode.id, {
         data: { ...selectedNode.data, ...updates },
       });
     } else {
-      // Update tool defaults for next text block
       setTextOptions(updates);
     }
   };
 
   return (
-    <div className="bottom-toolbar">
+    <div className="bottom-toolbar" data-testid="bottom-toolbar">
       <TextToolbar options={currentOptions} onChange={handleChange} />
     </div>
   );

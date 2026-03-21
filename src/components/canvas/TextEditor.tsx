@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Html } from 'react-konva-utils';
-import type { CanvasNode } from '../../types/data';
+import type { CanvasNode, TextNodeData } from '../../types/data';
 
 interface TextEditorProps {
   node: CanvasNode;
@@ -10,6 +10,7 @@ interface TextEditorProps {
 }
 
 export function TextEditor({ node, stageScale, onFinish, onCancel }: TextEditorProps) {
+  const data = node.data as TextNodeData;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -68,7 +69,7 @@ export function TextEditor({ node, stageScale, onFinish, onCancel }: TextEditorP
     >
       <textarea
         ref={textareaRef}
-        defaultValue={node.data.text}
+        defaultValue={data.text}
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
         onInput={handleInput}
@@ -76,13 +77,13 @@ export function TextEditor({ node, stageScale, onFinish, onCancel }: TextEditorP
           position: 'absolute',
           top: 0,
           left: 0,
-          width: node.data.width * stageScale,
+          width: node.width * stageScale,
           minHeight: 24 * stageScale,
-          fontSize: node.data.fontSize * stageScale,
-          fontFamily: node.data.fontFamily,
-          fontStyle: node.data.fontStyle.includes('italic') ? 'italic' : 'normal',
-          fontWeight: node.data.fontStyle.includes('bold') ? 'bold' : 'normal',
-          color: node.data.fill,
+          fontSize: data.fontSize * stageScale,
+          fontFamily: data.fontFamily,
+          fontStyle: data.fontStyle.includes('italic') ? 'italic' : 'normal',
+          fontWeight: data.fontStyle.includes('bold') ? 'bold' : 'normal',
+          color: data.fill,
           border: '2px solid #2563eb',
           borderRadius: 3,
           padding: `${4 * stageScale}px`,

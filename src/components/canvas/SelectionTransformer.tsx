@@ -49,19 +49,33 @@ export function SelectionTransformer({ selectedNodeId, stageRef }: SelectionTran
     node.scaleX(1);
     node.scaleY(1);
 
-    const newWidth = Math.max(50, node.width() * scaleX);
-    const newHeight = Math.max(20, node.height() * scaleY);
+    const storeNode = useCanvasStore.getState().nodes.find((n) => n.id === selectedNodeId);
+    if (!storeNode) return;
 
-    updateNode(selectedNodeId, {
-      x: node.x(),
-      y: node.y(),
-      width: newWidth,
-      height: newHeight,
-      data: {
-        ...useCanvasStore.getState().nodes.find((n) => n.id === selectedNodeId)!.data,
+    const newWidth = Math.max(50, node.width() * scaleX);
+
+    if (storeNode.type === 'text') {
+      // For text: only resize width, let Konva recalculate height from text reflow
+      node.width(newWidth);
+      const reflowedHeight = node.height();
+
+      updateNode(selectedNodeId, {
+        x: node.x(),
+        y: node.y(),
         width: newWidth,
-      },
-    });
+        height: reflowedHeight,
+        data: { ...storeNode.data },
+      });
+    } else {
+      // For other node types: resize both dimensions
+      const newHeight = Math.max(20, node.height() * scaleY);
+      updateNode(selectedNodeId, {
+        x: node.x(),
+        y: node.y(),
+        width: newWidth,
+        height: newHeight,
+      });
+    }
   };
 
   return (

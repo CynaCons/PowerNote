@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { CanvasNode, Viewport } from '../types/data';
+import type { CanvasNode, Viewport, ContainerNodeData } from '../types/data';
 
 interface CanvasState {
   nodes: CanvasNode[];
@@ -20,6 +20,11 @@ interface CanvasState {
 
   // Viewport
   setViewport: (viewport: Partial<Viewport>) => void;
+
+  // Container-specific
+  toggleContainerCollapse: (containerId: string) => void;
+  moveNodeIntoContainer: (nodeId: string, containerId: string) => void;
+  moveNodeOutOfContainer: (nodeId: string) => void;
 }
 
 export const useCanvasStore = create<CanvasState>((set, get) => ({
@@ -38,11 +43,25 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     })),
 
   deleteNode: (id) =>
-    set((state) => ({
-      nodes: state.nodes.filter((n) => n.id !== id),
-      selectedNodeId:
-        state.selectedNodeId === id ? null : state.selectedNodeId,
-    })),
+    set((state) => {
+      const deletedNode = state.nodes.find((n) => n.id === id);
+
+      // If deleting a container, release its children
+      let updatedNodes = state.nodes.filter((n) => n.id !== id);
+      if (deletedNode?.type === 'container') {
+        updatedNodes = updatedNodes.map((n) =>
+          n.parentContainerId === id
+            ? { ...n, parentContainerId: null }
+            : n,
+        );
+      }
+
+      return {
+        nodes: updatedNodes,
+        selectedNodeId:
+          state.selectedNodeId === id ? null : state.selectedNodeId,
+      };
+    }),
 
   loadPageNodes: (nodes) =>
     set({ nodes, selectedNodeId: null }),
@@ -54,5 +73,31 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setViewport: (viewport) =>
     set((state) => ({
       viewport: { ...state.viewport, ...viewport },
+    })),
+
+  toggleContainerCollapse: (containerId) =>
+    set((state) => ({
+      nodes: state.nodes.map((n) => {
+        if (n.id !== containerId || n.type !== 'container') return n;
+        const data = n.data as ContainerNodeData;
+        return {
+          ...n,
+          data: { ...data, isCollapsed: !data.isCollapsed },
+        };
+      }),
+    })),
+
+  moveNodeIntoContainer: (nodeId, containerId) =>
+    set((state) => ({
+      nodes: state.nodes.map((n) =>
+        n.id === nodeId ? { ...n, parentContainerId: containerId } : n,
+      ),
+    })),
+
+  moveNodeOutOfContainer: (nodeId) =>
+    set((state) => ({
+      nodes: state.nodes.map((n) =>
+        n.id === nodeId ? { ...n, parentContainerId: null } : n,
+      ),
     })),
 }));

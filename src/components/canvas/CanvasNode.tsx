@@ -1,5 +1,6 @@
 import type { CanvasNode as CanvasNodeType } from '../../types/data';
 import { TextNode } from './TextNode';
+import { ContainerNode } from './ContainerNode';
 
 interface CanvasNodeProps {
   node: CanvasNodeType;
@@ -19,6 +20,15 @@ export function CanvasNode({ node, isSelected, onSelect, stageScale, autoEdit }:
           onSelect={onSelect}
           stageScale={stageScale}
           autoEdit={autoEdit}
+        />
+      );
+    case 'container':
+      return (
+        <ContainerNode
+          node={node}
+          isSelected={isSelected}
+          onSelect={onSelect}
+          stageScale={stageScale}
         />
       );
     default:

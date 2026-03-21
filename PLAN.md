@@ -94,13 +94,59 @@
 
 ---
 
-## v0.2 — Images + Save/Load (planned)
-> Add image support, undo/redo, save/load HTML files
+## v0.2 — Testing, CRUD, Containers
+> ASPICE-like SRS + Playwright E2E, hierarchy CRUD, text fixes, collapsible containers
 
-## v0.3 — Drawing + Shapes (planned)
+### v0.2.0 — Testing Infrastructure
+- [x] Install Playwright, create config + test directories
+- [x] Test helpers + store exposure for dev mode
+- [x] Add data-testid attributes to key DOM elements
+- [x] Smoke test: `npx playwright test` passes
+
+### v0.2.1 — SRS Documents + Baseline E2E Tests
+- [x] SRS_CANVAS.md (REQ-CANVAS-001..006)
+- [x] SRS_TEXT.md (REQ-TEXT-001..010)
+- [x] SRS_HIERARCHY.md (REQ-HIER-001..011)
+- [x] SRS_TOOLBAR.md (REQ-TOOL-001..006)
+- [x] E2E tests 00-11 covering all v0.1 features (36 tests, all green)
+- [x] All tests pass
+
+### v0.2.2 — Hierarchy CRUD UI
+- [x] Section rename (dblclick) + delete (hover icon)
+- [x] Page rename (hover pencil) + delete (hover X)
+- [x] Wire existing store actions through UI
+- [x] Guards: can't delete last section/page
+
+### v0.2.3 — Text Interaction Fixes
+- [x] Fix height reflow bug in SelectionTransformer
+- [x] Add selection visual highlight (background Rect)
+- [x] Remove duplicate width from TextNodeData
+
+### v0.2.4 — Collapsible Containers
+- [x] Data model: ContainerNodeData, parentContainerId, union type
+- [x] ContainerNode.tsx component (collapse/expand, title edit)
+- [x] Container drag moves children, auto-parent on drop
+- [x] NavRail container tool (C shortcut)
+
+### v0.2.5 — E2E Tests for v0.2 Features
+- [x] SRS_CONTAINERS.md (REQ-CONT-001..008)
+- [x] E2E tests 12-20 covering CRUD + containers
+- [x] All 62 tests pass
+
+### v0.2.6 — Polish + Tag v0.2.0
+- [x] Full test suite green (62 tests)
+- [x] Version bump to 0.2.0
+- [ ] Git tag v0.2.0
+
+---
+
+## v0.3 — Images + Save/Load (planned)
+> Image nodes, save/load HTML files, undo/redo
+
+## v0.4 — Drawing + Shapes (planned)
 > Freehand drawing, rectangles, arrows
 
-## v0.4 — Cloud Sync (planned)
+## v0.5 — Cloud Sync (planned)
 > Paid tier, multi-device
 
 ---
@@ -109,15 +155,14 @@
 
 | Iteration | Status |
 |-----------|--------|
-| v0.1.0 Project Scaffold + App Shell | **Done** |
-| v0.1.1 Zustand Stores + Default Data | **Done** |
-| v0.1.2 Infinite Canvas Pan/Zoom | **Done** |
-| v0.1.3 Text Tool: Place + Display | **Done** |
-| v0.1.4 Inline Text Editing | **Done** |
-| v0.1.5 Selection + Resize | **Done** |
-| v0.1.6 Hierarchy Panel | **Done** |
-| v0.1.7 Bottom Toolbar | **Done** |
-| v0.1.8 Polish + Stabilization | **Done** |
+| v0.1.x | **v0.1.0 tagged** |
+| v0.2.0 Testing Infrastructure | **Done** |
+| v0.2.1 SRS + Baseline Tests | **Complete** (36 tests green) |
+| v0.2.2 Hierarchy CRUD UI | **Done** |
+| v0.2.3 Text Fixes | **Done** |
+| v0.2.4 Containers | **Done** |
+| v0.2.5 New Feature Tests | **Done** (62 tests green) |
+| v0.2.6 Polish + Tag | **Done** |
 
 ---
 

@@ -1,4 +1,4 @@
-import { Layers, Type, Pen } from 'lucide-react';
+import { Layers, Type, BoxSelect, Pen } from 'lucide-react';
 import { useToolStore } from '../../stores/useToolStore';
 import './NavRail.css';
 
@@ -12,12 +12,13 @@ export function NavRail({ onToggleHierarchy, isHierarchyOpen }: NavRailProps) {
   const setTool = useToolStore((s) => s.setTool);
 
   return (
-    <nav className="nav-rail">
+    <nav className="nav-rail" data-testid="nav-rail">
       <div className="nav-rail__top">
         <button
           className={`nav-rail__btn ${isHierarchyOpen ? 'nav-rail__btn--active' : ''}`}
           title="Notes hierarchy"
           aria-label="Notes hierarchy"
+          data-testid="nav-hierarchy"
           onClick={onToggleHierarchy}
         >
           <Layers size={20} />
@@ -29,15 +30,27 @@ export function NavRail({ onToggleHierarchy, isHierarchyOpen }: NavRailProps) {
           className={`nav-rail__btn ${activeTool === 'text' ? 'nav-rail__btn--active' : ''}`}
           title="Text tool (T)"
           aria-label="Text tool"
+          data-testid="nav-text-tool"
           onClick={() => setTool(activeTool === 'text' ? 'select' : 'text')}
         >
           <Type size={20} />
         </button>
 
         <button
+          className={`nav-rail__btn ${activeTool === 'container' ? 'nav-rail__btn--active' : ''}`}
+          title="Container tool (C)"
+          aria-label="Container tool"
+          data-testid="nav-container-tool"
+          onClick={() => setTool(activeTool === 'container' ? 'select' : 'container')}
+        >
+          <BoxSelect size={20} />
+        </button>
+
+        <button
           className="nav-rail__btn"
           title="Draw tool (coming soon)"
           aria-label="Draw tool"
+          data-testid="nav-draw-tool"
           disabled
         >
           <Pen size={20} />

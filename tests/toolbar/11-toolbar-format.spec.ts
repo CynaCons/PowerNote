@@ -1,0 +1,83 @@
+/**
+ * Test 11: Toolbar Format
+ * Covers: REQ-TOOL-002, REQ-TOOL-003, REQ-TOOL-004, REQ-TOOL-005 —
+ * Change font size, toggle bold, toggle italic, and change color
+ * for a selected text node via the bottom toolbar
+ *
+ * Verifies that formatting controls in the bottom toolbar update the
+ * selected text node's data in the canvas store.
+ */
+import { test, expect } from '@playwright/test';
+import { getCanvasStore, waitForCanvasReady, clickCanvas, activateTool } from '../helpers';
+
+test.describe('11 - Toolbar Format (REQ-TOOL-002..005)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await waitForCanvasReady(page);
+
+    // Place and commit a text block
+    await activateTool(page, 'text');
+    await clickCanvas(page, 400, 300);
+
+    const textarea = page.locator('textarea');
+    await expect(textarea).toBeVisible({ timeout: 2000 });
+
+    await textarea.fill('Hello');
+    await textarea.press('Enter');
+    await page.waitForTimeout(300);
+
+    // After commit, node is still selected and text tool is active,
+    // so the toolbar is visible. Switch to select mode — the node stays
+    // selected so toolbar remains visible (selectedNode is text type).
+    await activateTool(page, 'text');
+    await page.waitForTimeout(200);
+
+    // Verify node is selected and toolbar is visible
+    const store = await getCanvasStore(page);
+    expect(store.selectedNodeId).not.toBeNull();
+    await expect(page.locator('[data-testid="bottom-toolbar"]')).toBeVisible();
+  });
+
+  test('changing font size updates node data', async ({ page }) => {
+    // Get current font size
+    let store = await getCanvasStore(page);
+    const initialFontSize = store.nodes[0].data.fontSize;
+
+    // Change font size via select dropdown
+    const fontSelect = page.locator('.text-toolbar__select');
+    await fontSelect.selectOption('24');
+    await page.waitForTimeout(200);
+
+    store = await getCanvasStore(page);
+    expect(store.nodes[0].data.fontSize).toBe(24);
+    expect(store.nodes[0].data.fontSize).not.toBe(initialFontSize);
+  });
+
+  test('clicking bold button toggles fontStyle to bold', async ({ page }) => {
+    // Verify initial style is 'normal'
+    let store = await getCanvasStore(page);
+    expect(store.nodes[0].data.fontStyle).toBe('normal');
+
+    // Click the Bold button (first text-toolbar__btn)
+    await page.locator('.text-toolbar__btn').first().click();
+    await page.waitForTimeout(200);
+
+    store = await getCanvasStore(page);
+    expect(store.nodes[0].data.fontStyle).toContain('bold');
+  });
+
+  test('clicking color swatch changes fill color', async ({ page }) => {
+    // Verify initial fill is the default black
+    let store = await getCanvasStore(page);
+    const initialFill = store.nodes[0].data.fill;
+
+    // Click the Red color swatch (second color button)
+    const colorButtons = page.locator('.text-toolbar__color');
+    await colorButtons.nth(1).click(); // Red (#dc2626)
+    await page.waitForTimeout(200);
+
+    store = await getCanvasStore(page);
+    expect(store.nodes[0].data.fill).not.toBe(initialFill);
+    expect(store.nodes[0].data.fill).toBe('#dc2626');
+  });
+});

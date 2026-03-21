@@ -15,6 +15,10 @@ export function HierarchyPanel({ isOpen }: HierarchyPanelProps) {
   const savePageNodes = useWorkspaceStore((s) => s.savePageNodes);
   const addSection = useWorkspaceStore((s) => s.addSection);
   const addPage = useWorkspaceStore((s) => s.addPage);
+  const renameSection = useWorkspaceStore((s) => s.renameSection);
+  const deleteSection = useWorkspaceStore((s) => s.deleteSection);
+  const renamePage = useWorkspaceStore((s) => s.renamePage);
+  const deletePage = useWorkspaceStore((s) => s.deletePage);
 
   const canvasNodes = useCanvasStore((s) => s.nodes);
   const loadPageNodes = useCanvasStore((s) => s.loadPageNodes);
@@ -34,24 +38,41 @@ export function HierarchyPanel({ isOpen }: HierarchyPanelProps) {
     loadPageNodes(page?.nodes ?? []);
   };
 
-  const handleAddPage = (sectionId: string) => {
-    addPage(sectionId);
+  const handleDeleteSection = (sectionId: string) => {
+    // Save current nodes before potential navigation
+    savePageNodes(canvasNodes);
+    deleteSection(sectionId);
+    // After deletion, store redirects to another section/page — reload nodes
+    const state = useWorkspaceStore.getState();
+    const newSection = state.workspace.sections.find((s) => s.id === state.activeSectionId);
+    const newPage = newSection?.pages.find((p) => p.id === state.activePageId);
+    loadPageNodes(newPage?.nodes ?? []);
   };
 
-  const handleAddSection = () => {
-    addSection();
+  const handleDeletePage = (sectionId: string, pageId: string) => {
+    if (pageId === activePageId) {
+      savePageNodes(canvasNodes);
+    }
+    deletePage(sectionId, pageId);
+    if (pageId === activePageId) {
+      const state = useWorkspaceStore.getState();
+      const section = state.workspace.sections.find((s) => s.id === sectionId);
+      const newPage = section?.pages.find((p) => p.id === state.activePageId);
+      loadPageNodes(newPage?.nodes ?? []);
+    }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="hierarchy-panel">
+    <div className="hierarchy-panel" data-testid="hierarchy-panel">
       <div className="hierarchy-panel__header">
         <span className="hierarchy-panel__title">Notes</span>
         <button
           className="hierarchy-panel__add-section"
-          onClick={handleAddSection}
+          onClick={() => addSection()}
           title="Add section"
+          data-testid="add-section-btn"
         >
           <Plus size={16} />
         </button>
@@ -63,7 +84,11 @@ export function HierarchyPanel({ isOpen }: HierarchyPanelProps) {
             section={section}
             activePageId={activePageId}
             onNavigate={handleNavigate}
-            onAddPage={handleAddPage}
+            onAddPage={(sid) => addPage(sid)}
+            onRenameSection={renameSection}
+            onDeleteSection={handleDeleteSection}
+            onRenamePage={renamePage}
+            onDeletePage={handleDeletePage}
           />
         ))}
       </div>
