@@ -4,7 +4,6 @@ import type Konva from 'konva';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useToolStore } from '../../stores/useToolStore';
 import { CanvasNode } from './CanvasNode';
-import { SelectionTransformer } from './SelectionTransformer';
 import { SnapGuides, type SnapLine } from './SnapGuides';
 import { PageGuides } from './PageGuides';
 import { TrashButton } from './TrashButton';
@@ -270,10 +269,6 @@ export function InfiniteCanvas() {
                 />
               );
             })}
-            <SelectionTransformer
-              selectedNodeIds={selectedNodeIds}
-              stageRef={stageRef}
-            />
             <SnapGuides lines={snapLines} />
           </Layer>
         </Stage>
