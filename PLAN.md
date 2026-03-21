@@ -161,13 +161,63 @@
 
 ---
 
-## v0.3 — Images + Save/Load (planned)
-> Image nodes, save/load HTML files, undo/redo
+## v0.3 — Core UX Maturity
+> Undo/redo, A4 page guides, auto-width text, drag reorder, search
 
-## v0.4 — Drawing + Shapes (planned)
+### v0.3.0 — Undo/Redo (per-page)
+- [ ] Undo/redo history stack per page in canvas store
+- [ ] Ctrl+Z undo, Ctrl+Shift+Z / Ctrl+Y redo
+- [ ] Track: add, delete, move, edit operations
+- [ ] History clears on page switch
+- [ ] SRS: REQ-CANVAS-007..009
+- [ ] E2E tests
+
+### v0.3.1 — A4 Page Guides (visual only)
+- [ ] Render dotted A4 page boundary rectangles on canvas background layer
+- [ ] Multiple pages tile vertically (infinite scroll of A4 pages)
+- [ ] Light gray dotted lines, no snap behavior
+- [ ] Toggle visibility from a button or setting
+- [ ] SRS: REQ-CANVAS-010..011
+
+### v0.3.2 — Auto-Width Text Blocks
+- [ ] Text blocks grow horizontally to fit content (no fixed 200px)
+- [ ] No max-width cap — wraps only on manual Enter
+- [ ] Measure rendered markdown HTML width and sync to node
+- [ ] Minimum width (e.g. 60px) for empty blocks
+- [ ] SRS: REQ-TEXT-020..021
+- [ ] E2E tests
+
+### v0.3.3 — Drag Reorder (Hierarchy Panel)
+- [ ] Drag sections to reorder in the hierarchy panel
+- [ ] Drag pages to reorder within a section
+- [ ] Drag pages between sections
+- [ ] Visual drag indicator (insertion line)
+- [ ] SRS: REQ-HIER-012..014
+- [ ] E2E tests
+
+### v0.3.4 — Search (Ctrl+F / Ctrl+Shift+F)
+- [ ] Ctrl+F: search bar for current page — highlights matching text blocks
+- [ ] Ctrl+Shift+F: notebook-wide search — searches across all sections/pages
+- [ ] Results list with page/section context, click to navigate
+- [ ] Search input in a floating panel (top-center or sidebar)
+- [ ] SRS: REQ-SEARCH-001..005
+- [ ] E2E tests
+
+### v0.3.5 — E2E Tests + Polish
+- [ ] New E2E tests for all v0.3 features
+- [ ] SRS documents updated
+- [ ] Full test suite green
+- [ ] Git tag v0.3.0
+
+---
+
+## v0.4 — Save/Load + Images (planned)
+> Save/load HTML files, image nodes, export
+
+## v0.5 — Drawing + Shapes (planned)
 > Freehand drawing, rectangles, arrows
 
-## v0.5 — Cloud Sync (planned)
+## v0.6 — Cloud Sync (planned)
 > Paid tier, multi-device
 
 ---
@@ -177,14 +227,15 @@
 | Iteration | Status |
 |-----------|--------|
 | v0.1.x | **v0.1.0 tagged** |
-| v0.2.0 Testing Infrastructure | **Done** |
-| v0.2.1 SRS + Baseline Tests | **Complete** (36 tests green) |
-| v0.2.2 Hierarchy CRUD UI | **Done** |
-| v0.2.3 Text Fixes | **Done** |
-| v0.2.4 Containers | **Done** |
-| v0.2.5 New Feature Tests | **Done** (62 tests green) |
-| v0.2.6 Polish + Tag | **Done** |
-| v0.2.7 Interaction Overhaul | **Done** (52 tests green) |
+| v0.2.x | **v0.2.0 tagged** |
+| v0.2.7 Interaction Overhaul | **Done** |
+| v0.2.8 UX Hardening | **Done** |
+| v0.3.0 Undo/Redo | Not started |
+| v0.3.1 A4 Page Guides | Not started |
+| v0.3.2 Auto-Width Text | Not started |
+| v0.3.3 Drag Reorder | Not started |
+| v0.3.4 Search | Not started |
+| v0.3.5 Tests + Polish | Not started |
 
 ---
 
