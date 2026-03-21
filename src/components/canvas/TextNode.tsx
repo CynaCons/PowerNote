@@ -5,6 +5,7 @@ import type Konva from 'konva';
 import type { CanvasNode, TextNodeData } from '../../types/data';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { TextEditor } from './TextEditor';
+import { calculateSnap, type SnapLine } from './SnapGuides';
 import { marked } from 'marked';
 
 // Configure marked for inline rendering
@@ -19,9 +20,10 @@ interface TextNodeProps {
   onSelect: (id: string, additive: boolean) => void;
   stageScale: number;
   autoEdit?: boolean;
+  onSnapChange: (lines: SnapLine[]) => void;
 }
 
-export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit }: TextNodeProps) {
+export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onSnapChange }: TextNodeProps) {
   const data = node.data as TextNodeData;
   const groupRef = useRef<Konva.Group>(null);
   const htmlRef = useRef<HTMLDivElement>(null);
@@ -56,7 +58,32 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit }: T
     return () => clearTimeout(timer);
   }, [renderedHtml, node.width, syncHeight]);
 
+  const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+    // Only snap when Shift is held
+    if (!e.evt.shiftKey) {
+      onSnapChange([]);
+      return;
+    }
+
+    const allNodes = useCanvasStore.getState().nodes;
+    const draggedBounds = {
+      id: node.id,
+      x: e.target.x(),
+      y: e.target.y(),
+      width: node.width,
+      height: node.height || 30,
+    };
+
+    const snap = calculateSnap(draggedBounds, allNodes);
+    onSnapChange(snap.lines);
+
+    // Apply snap position
+    e.target.x(snap.x);
+    e.target.y(snap.y);
+  };
+
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
+    onSnapChange([]); // Clear guides
     updateNode(node.id, {
       x: e.target.x(),
       y: e.target.y(),
@@ -109,6 +136,7 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit }: T
       x={node.x}
       y={node.y}
       draggable
+      onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onMouseDown={handleMouseDown}
     >

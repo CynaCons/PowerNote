@@ -5,6 +5,7 @@ import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useToolStore } from '../../stores/useToolStore';
 import { CanvasNode } from './CanvasNode';
 import { SelectionTransformer } from './SelectionTransformer';
+import { SnapGuides, type SnapLine } from './SnapGuides';
 import { TrashButton } from './TrashButton';
 import { generateId } from '../../utils/ids';
 import type { CanvasNode as CanvasNodeType } from '../../types/data';
@@ -22,6 +23,7 @@ export function InfiniteCanvas() {
   const stageRef = useRef<Konva.Stage>(null);
 
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [snapLines, setSnapLines] = useState<SnapLine[]>([]);
 
   const nodes = useCanvasStore((s) => s.nodes);
   const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds);
@@ -246,6 +248,7 @@ export function InfiniteCanvas() {
                   onSelect={handleNodeSelect}
                   stageScale={currentScale}
                   autoEdit={isAutoEdit}
+                  onSnapChange={setSnapLines}
                 />
               );
             })}
@@ -253,6 +256,7 @@ export function InfiniteCanvas() {
               selectedNodeIds={selectedNodeIds}
               stageRef={stageRef}
             />
+            <SnapGuides lines={snapLines} />
           </Layer>
         </Stage>
       )}
