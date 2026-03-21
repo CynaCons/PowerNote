@@ -42,7 +42,7 @@ test.describe('00 - Canvas Renders (REQ-CANVAS-001)', () => {
     expect(box!.height).toBeGreaterThan(100);
   });
 
-  test('draw tool is disabled', async ({ page }) => {
-    await expect(page.locator('[data-testid="nav-draw-tool"]')).toBeDisabled();
+  test('draw tool is enabled', async ({ page }) => {
+    await expect(page.locator('[data-testid="nav-draw-tool"]')).toBeEnabled();
   });
 });

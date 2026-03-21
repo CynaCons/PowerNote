@@ -6,6 +6,7 @@ import type { CanvasNode, TextNodeData } from '../../types/data';
 import { undoBatchEnd } from '../../stores/useCanvasStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
+import { useDrawStore } from '../../stores/useDrawStore';
 import { TextEditor } from './TextEditor';
 import { calculateSnap, type SnapLine } from './SnapGuides';
 import { marked } from 'marked';
@@ -19,13 +20,15 @@ function handleInternalLink(href: string) {
   const ws = useWorkspaceStore.getState();
   const canvas = useCanvasStore.getState();
 
-  // Save current page nodes before navigating
+  // Save current page nodes + strokes before navigating
   ws.savePageNodes(canvas.nodes);
+  ws.savePageStrokes(useDrawStore.getState().strokes);
   ws.setActivePage(sectionId, pageId);
 
   const section = ws.workspace.sections.find((s) => s.id === sectionId);
   const page = section?.pages.find((p) => p.id === pageId);
   canvas.loadPageNodes(page?.nodes ?? []);
+  useDrawStore.getState().loadPageStrokes(page?.strokes ?? []);
 }
 
 // Configure marked for GFM + task lists

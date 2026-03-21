@@ -9,6 +9,10 @@
   cursor: crosshair !important;
 }
 
+.infinite-canvas--none canvas {
+  cursor: none !important;
+}
+
 .infinite-canvas--paper {
   background-image:
     repeating-linear-gradient(

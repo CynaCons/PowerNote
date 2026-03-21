@@ -1,6 +1,7 @@
 import { ChevronRight, Download, FolderOpen, Maximize } from 'lucide-react';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
+import { useDrawStore } from '../../stores/useDrawStore';
 import { buildExportHtml, downloadFile, extractDataFromHtml } from '../../utils/serialization';
 import { useRef, useState, useEffect } from 'react';
 import { showToast } from './Toast';
@@ -34,6 +35,7 @@ export function TopBar() {
   const handleSave = async () => {
     const canvasNodes = useCanvasStore.getState().nodes;
     savePageNodes(canvasNodes);
+    useWorkspaceStore.getState().savePageStrokes(useDrawStore.getState().strokes);
 
     const freshWorkspace = useWorkspaceStore.getState().workspace;
     try {
@@ -66,7 +68,9 @@ export function TopBar() {
           activePageId: data.sections[0]?.pages[0]?.id,
           isDirty: false,
         });
-        useCanvasStore.getState().loadPageNodes(data.sections[0]?.pages[0]?.nodes ?? []);
+        const firstPage = data.sections[0]?.pages[0];
+        useCanvasStore.getState().loadPageNodes(firstPage?.nodes ?? []);
+        useDrawStore.getState().loadPageStrokes(firstPage?.strokes ?? []);
         showToast('Notebook opened', 'info');
       } else {
         showToast('Not a valid PowerNote file', 'error');

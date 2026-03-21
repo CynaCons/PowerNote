@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Layers, Type, Pen, ImageIcon, Settings } from 'lucide-react';
+import { Layers, Type, Pen, ImageIcon, Eraser, BoxSelect, Settings } from 'lucide-react';
 import { useToolStore } from '../../stores/useToolStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { generateId } from '../../utils/ids';
@@ -100,13 +100,33 @@ export function NavRail({ onToggleHierarchy, isHierarchyOpen, onToggleSettings, 
         </button>
 
         <button
-          className="nav-rail__btn"
-          title="Draw tool (coming soon)"
+          className={`nav-rail__btn ${activeTool === 'draw' ? 'nav-rail__btn--active' : ''}`}
+          title="Draw tool (D)"
           aria-label="Draw tool"
           data-testid="nav-draw-tool"
-          disabled
+          onClick={() => setTool(activeTool === 'draw' ? 'select' : 'draw')}
         >
           <Pen size={20} />
+        </button>
+
+        <button
+          className={`nav-rail__btn ${activeTool === 'erase' ? 'nav-rail__btn--active' : ''}`}
+          title="Eraser (E)"
+          aria-label="Eraser"
+          data-testid="nav-erase-tool"
+          onClick={() => setTool(activeTool === 'erase' ? 'select' : 'erase')}
+        >
+          <Eraser size={20} />
+        </button>
+
+        <button
+          className={`nav-rail__btn ${activeTool === 'lasso' ? 'nav-rail__btn--active' : ''}`}
+          title="Lasso select (L)"
+          aria-label="Lasso select"
+          data-testid="nav-lasso-tool"
+          onClick={() => setTool(activeTool === 'lasso' ? 'select' : 'lasso')}
+        >
+          <BoxSelect size={20} />
         </button>
 
         <input

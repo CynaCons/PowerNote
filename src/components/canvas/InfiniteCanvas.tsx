@@ -3,9 +3,11 @@ import { Stage, Layer } from 'react-konva';
 import type Konva from 'konva';
 import { useCanvasStore, undoBatchStart } from '../../stores/useCanvasStore';
 import { useToolStore } from '../../stores/useToolStore';
+import { useDrawStore } from '../../stores/useDrawStore';
 import { CanvasNode } from './CanvasNode';
 import { SnapGuides, type SnapLine } from './SnapGuides';
 import { PageGuides, type BackgroundMode } from './PageGuides';
+import { DrawingLayer } from './DrawingLayer';
 import { TrashButton } from './TrashButton';
 import { generateId } from '../../utils/ids';
 import type { CanvasNode as CanvasNodeType, ImageNodeData } from '../../types/data';
@@ -67,6 +69,17 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
 
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [snapLines, setSnapLines] = useState<SnapLine[]>([]);
+
+  // Drawing state
+  const [inProgressPoints, setInProgressPoints] = useState<number[] | null>(null);
+  const [eraserPos, setEraserPos] = useState<{ x: number; y: number; radius: number } | null>(null);
+  const [lassoRect, setLassoRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const isDrawing = useRef(false);
+  const lassoStart = useRef<{ x: number; y: number } | null>(null);
+  const eraserState = useRef({ prevDir: null as { x: number; y: number } | null, shakeScore: 0, lastTime: 0 });
+
+  const drawStrokes = useDrawStore((s) => s.strokes);
+  const selectedStrokeIds = useDrawStore((s) => s.selectedStrokeIds);
 
   const nodes = useCanvasStore((s) => s.nodes);
   const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds);
@@ -386,6 +399,24 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
         toolStore.setTool(toolStore.activeTool === 'text' ? 'select' : 'text');
       }
 
+      // D: toggle draw tool
+      if (e.key === 'd' || e.key === 'D') {
+        const toolStore = useToolStore.getState();
+        toolStore.setTool(toolStore.activeTool === 'draw' ? 'select' : 'draw');
+      }
+
+      // E: toggle eraser
+      if (e.key === 'e' || e.key === 'E') {
+        const toolStore = useToolStore.getState();
+        toolStore.setTool(toolStore.activeTool === 'erase' ? 'select' : 'erase');
+      }
+
+      // L: toggle lasso
+      if (e.key === 'l' || e.key === 'L') {
+        const toolStore = useToolStore.getState();
+        toolStore.setTool(toolStore.activeTool === 'lasso' ? 'select' : 'lasso');
+      }
+
       // Ctrl+C: copy
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
         const store = useCanvasStore.getState();
@@ -409,16 +440,26 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
         useCanvasStore.setState({ selectedNodeIds: allIds });
       }
 
-      // Ctrl+Z: undo
+      // Ctrl+Z: undo (route to draw store if drawing tools active)
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
-        useCanvasStore.getState().undo();
+        const tool = useToolStore.getState().activeTool;
+        if (tool === 'draw' || tool === 'erase' || tool === 'lasso') {
+          useDrawStore.getState().undo();
+        } else {
+          useCanvasStore.getState().undo();
+        }
       }
 
       // Ctrl+Shift+Z / Ctrl+Y: redo
       if ((e.ctrlKey || e.metaKey) && ((e.key === 'z' && e.shiftKey) || e.key === 'y')) {
         e.preventDefault();
-        useCanvasStore.getState().redo();
+        const tool = useToolStore.getState().activeTool;
+        if (tool === 'draw' || tool === 'erase' || tool === 'lasso') {
+          useDrawStore.getState().redo();
+        } else {
+          useCanvasStore.getState().redo();
+        }
       }
     };
 
@@ -426,9 +467,141 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [clearSelection]);
 
+  // ── Drawing tool event handlers ──────────────────────────
+  const isDrawTool = activeTool === 'draw' || activeTool === 'erase' || activeTool === 'lasso';
+
+  const getCanvasPoint = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    const stage = stageRef.current;
+    if (!stage) return { x: 0, y: 0 };
+    const pos = stage.getPointerPosition();
+    if (!pos) return { x: 0, y: 0 };
+    return {
+      x: (pos.x - stage.x()) / stage.scaleX(),
+      y: (pos.y - stage.y()) / stage.scaleY(),
+    };
+  }, []);
+
+  const handleDrawMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (e.target !== stageRef.current) return;
+    const tool = useToolStore.getState().activeTool;
+    const pt = getCanvasPoint(e);
+
+    if (tool === 'draw') {
+      isDrawing.current = true;
+      setInProgressPoints([pt.x, pt.y]);
+    } else if (tool === 'erase') {
+      isDrawing.current = true;
+      eraserState.current = { prevDir: null, shakeScore: 0, lastTime: Date.now() };
+      // Erase at initial position
+      const radius = 8;
+      setEraserPos({ ...pt, radius });
+      eraseAt(pt.x, pt.y, radius);
+    } else if (tool === 'lasso') {
+      lassoStart.current = pt;
+      setLassoRect({ x: pt.x, y: pt.y, w: 0, h: 0 });
+    }
+  }, [getCanvasPoint]);
+
+  const handleDrawMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    const tool = useToolStore.getState().activeTool;
+    const pt = getCanvasPoint(e);
+
+    if (tool === 'draw' && isDrawing.current) {
+      setInProgressPoints((prev) => prev ? [...prev, pt.x, pt.y] : null);
+    } else if (tool === 'erase' && isDrawing.current) {
+      // Shake detection
+      const now = Date.now();
+      const es = eraserState.current;
+      const dx = pt.x - (eraserPos?.x ?? pt.x);
+      const dy = pt.y - (eraserPos?.y ?? pt.y);
+      const dt = now - es.lastTime;
+
+      es.shakeScore *= Math.exp(-dt / 200);
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len > 2 && es.prevDir) {
+        const nx = dx / len, ny = dy / len;
+        const dot = nx * es.prevDir.x + ny * es.prevDir.y;
+        if (dot < 0) es.shakeScore += Math.abs(dot) * 2;
+      }
+      if (len > 2) es.prevDir = { x: dx / len, y: dy / len };
+      es.lastTime = now;
+
+      const radius = Math.min(50, 5 + es.shakeScore * 10);
+      setEraserPos({ x: pt.x, y: pt.y, radius });
+      eraseAt(pt.x, pt.y, radius);
+    } else if (tool === 'erase' && !isDrawing.current) {
+      // Show eraser cursor even when not pressing
+      setEraserPos({ x: pt.x, y: pt.y, radius: 8 });
+    } else if (tool === 'lasso' && lassoStart.current) {
+      const start = lassoStart.current;
+      setLassoRect({
+        x: Math.min(start.x, pt.x),
+        y: Math.min(start.y, pt.y),
+        w: Math.abs(pt.x - start.x),
+        h: Math.abs(pt.y - start.y),
+      });
+    }
+  }, [getCanvasPoint, eraserPos]);
+
+  const handleDrawMouseUp = useCallback(() => {
+    const tool = useToolStore.getState().activeTool;
+
+    if (tool === 'draw' && isDrawing.current && inProgressPoints && inProgressPoints.length >= 4) {
+      const drawOpts = useToolStore.getState().drawOptions;
+      useDrawStore.getState().addStroke({
+        id: generateId(),
+        points: inProgressPoints,
+        color: drawOpts.color,
+        strokeWidth: drawOpts.strokeWidth,
+      });
+    } else if (tool === 'lasso' && lassoRect && lassoRect.w > 5 && lassoRect.h > 5) {
+      // Find strokes within lasso rect
+      const rect = lassoRect;
+      const allStrokes = useDrawStore.getState().strokes;
+      const selected = allStrokes.filter((s) => {
+        for (let i = 0; i < s.points.length; i += 2) {
+          if (s.points[i] >= rect.x && s.points[i] <= rect.x + rect.w &&
+              s.points[i + 1] >= rect.y && s.points[i + 1] <= rect.y + rect.h) {
+            return true;
+          }
+        }
+        return false;
+      });
+      useDrawStore.getState().selectStrokes(selected.map((s) => s.id));
+    }
+
+    isDrawing.current = false;
+    setInProgressPoints(null);
+    lassoStart.current = null;
+    setLassoRect(null);
+    if (tool !== 'erase') setEraserPos(null);
+  }, [inProgressPoints, lassoRect]);
+
+  function eraseAt(x: number, y: number, radius: number) {
+    const strokes = useDrawStore.getState().strokes;
+    const toDelete: string[] = [];
+    for (const stroke of strokes) {
+      for (let i = 0; i < stroke.points.length; i += 2) {
+        const dx = stroke.points[i] - x;
+        const dy = stroke.points[i + 1] - y;
+        if (dx * dx + dy * dy < radius * radius) {
+          toDelete.push(stroke.id);
+          break;
+        }
+      }
+    }
+    if (toDelete.length > 0) {
+      useDrawStore.getState().deleteStrokes(toDelete);
+    }
+  }
+
   // Cursor style based on active tool
   const cursorClass =
-    activeTool === 'text' ? 'infinite-canvas--crosshair' : '';
+    activeTool === 'text' ? 'infinite-canvas--crosshair'
+    : activeTool === 'draw' ? 'infinite-canvas--crosshair'
+    : activeTool === 'erase' ? 'infinite-canvas--none'
+    : activeTool === 'lasso' ? 'infinite-canvas--crosshair'
+    : '';
 
   // Get current stage scale for text editor positioning
   const currentScale = stageRef.current?.scaleX() ?? 1;
@@ -445,17 +618,31 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
           ref={stageRef}
           width={dimensions.width}
           height={dimensions.height}
-          draggable
+          draggable={!isDrawTool}
           onWheel={handleWheel}
           onDragEnd={handleDragEnd}
           onClick={handleStageClick}
           onTap={handleStageClick}
+          onMouseDown={isDrawTool ? handleDrawMouseDown : undefined}
+          onMouseMove={isDrawTool ? handleDrawMouseMove : undefined}
+          onMouseUp={isDrawTool ? handleDrawMouseUp : undefined}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
           <Layer>
             <PageGuides mode={backgroundMode} nodes={nodes} />
+          </Layer>
+          <Layer listening={false}>
+            <DrawingLayer
+              strokes={drawStrokes}
+              selectedStrokeIds={selectedStrokeIds}
+              inProgressPoints={inProgressPoints}
+              inProgressColor={useToolStore.getState().drawOptions?.color ?? '#1a1a1a'}
+              inProgressWidth={useToolStore.getState().drawOptions?.strokeWidth ?? 3}
+              eraserPos={eraserPos}
+              lassoRect={lassoRect}
+            />
           </Layer>
           <Layer>
             {nodes.map((node) => {

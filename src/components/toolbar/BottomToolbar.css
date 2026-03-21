@@ -128,3 +128,31 @@
   accent-color: var(--color-primary);
   cursor: pointer;
 }
+
+/* ── Draw Toolbar ─────────────────────────────── */
+.draw-toolbar__widths {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.draw-toolbar__width-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.draw-toolbar__width-btn:hover {
+  background: var(--color-hover);
+}
+
+.draw-toolbar__width-btn--active {
+  border-color: var(--color-primary);
+  background: var(--color-active);
+}

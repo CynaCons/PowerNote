@@ -10,6 +10,7 @@ import type { BackgroundMode } from '../canvas/PageGuides';
 import type { CanvasBgColor } from '../canvas/InfiniteCanvas';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
+import { useDrawStore } from '../../stores/useDrawStore';
 import { buildExportHtml, downloadFile } from '../../utils/serialization';
 import { showToast } from './Toast';
 import './AppShell.css';
@@ -30,6 +31,7 @@ export function AppShell() {
         e.preventDefault();
         const canvasNodes = useCanvasStore.getState().nodes;
         useWorkspaceStore.getState().savePageNodes(canvasNodes);
+        useWorkspaceStore.getState().savePageStrokes(useDrawStore.getState().strokes);
         const ws = useWorkspaceStore.getState().workspace;
         buildExportHtml(ws).then((html) => {
           downloadFile(html, ws.filename.replace(/[^a-zA-Z0-9_\- ]/g, '_') + '.html');
@@ -56,11 +58,13 @@ export function AppShell() {
     const canvas = useCanvasStore.getState();
 
     ws.savePageNodes(canvas.nodes);
+    ws.savePageStrokes(useDrawStore.getState().strokes);
     ws.setActivePage(sectionId, pageId);
 
     const section = ws.workspace.sections.find((s) => s.id === sectionId);
     const page = section?.pages.find((p) => p.id === pageId);
     canvas.loadPageNodes(page?.nodes ?? []);
+    useDrawStore.getState().loadPageStrokes(page?.strokes ?? []);
     canvas.selectNode(nodeId, false);
 
     setSearchOpen(false);

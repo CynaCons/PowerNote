@@ -37,12 +37,27 @@ export interface CanvasNode {
   data: NodeData;
 }
 
+// ── Drawing strokes ─────────────────────────────────────────
+
+export interface Stroke {
+  id: string;
+  points: number[]; // flat [x1,y1,x2,y2,...] for Konva Line
+  color: string;
+  strokeWidth: number;
+}
+
+export interface DrawOptions {
+  color: string;
+  strokeWidth: number;
+}
+
 // ── Hierarchy types ─────────────────────────────────────────
 
 export interface Page {
   id: string;
   title: string;
   nodes: CanvasNode[];
+  strokes?: Stroke[];
 }
 
 export interface Section {
@@ -59,7 +74,7 @@ export interface WorkspaceData {
 
 // ── Tool types ──────────────────────────────────────────────
 
-export type ToolType = 'select' | 'text' | 'draw';
+export type ToolType = 'select' | 'text' | 'draw' | 'erase' | 'lasso';
 
 export interface TextOptions {
   fontSize: number;

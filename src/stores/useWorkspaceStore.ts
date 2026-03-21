@@ -28,8 +28,9 @@ interface WorkspaceState {
   setActiveSection: (sectionId: string) => void;
   setActivePage: (sectionId: string, pageId: string) => void;
 
-  // Node sync: save nodes back to the active page
+  // Node/stroke sync: save back to the active page
   savePageNodes: (nodes: CanvasNode[]) => void;
+  savePageStrokes: (strokes: import('../types/data').Stroke[]) => void;
 
   // Reorder
   reorderSection: (fromIndex: number, toIndex: number) => void;
@@ -195,6 +196,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
                   ...s,
                   pages: s.pages.map((p) =>
                     p.id === state.activePageId ? { ...p, nodes } : p,
+                  ),
+                }
+              : s,
+          ),
+        },
+      }));
+    },
+
+    savePageStrokes: (strokes) => {
+      set((state) => ({
+        isDirty: true,
+        workspace: {
+          ...state.workspace,
+          sections: state.workspace.sections.map((s) =>
+            s.id === state.activeSectionId
+              ? {
+                  ...s,
+                  pages: s.pages.map((p) =>
+                    p.id === state.activePageId ? { ...p, strokes } : p,
                   ),
                 }
               : s,

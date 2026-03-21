@@ -2,6 +2,7 @@ import { useToolStore } from '../../stores/useToolStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { TextToolbar } from './TextToolbar';
 import { ImageToolbar } from './ImageToolbar';
+import { DrawToolbar } from './DrawToolbar';
 import type { TextOptions } from '../../types/data';
 import './BottomToolbar.css';
 
@@ -24,8 +25,17 @@ export function BottomToolbar() {
 
   const isTextContext = activeTool === 'text' || !!selectedTextNode;
   const isImageContext = !!selectedImageNode;
+  const isDrawContext = activeTool === 'draw';
 
-  if (!isTextContext && !isImageContext) return null;
+  if (!isTextContext && !isImageContext && !isDrawContext) return null;
+
+  if (isDrawContext) {
+    return (
+      <div className="bottom-toolbar" data-testid="bottom-toolbar">
+        <DrawToolbar />
+      </div>
+    );
+  }
 
   if (isImageContext && selectedImageNode) {
     return (

@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
+import { useDrawStore } from '../../stores/useDrawStore';
 import { SectionItem } from './SectionItem';
 import './HierarchyPanel.css';
 
@@ -24,36 +25,40 @@ export function HierarchyPanel({ isOpen }: HierarchyPanelProps) {
 
   const canvasNodes = useCanvasStore((s) => s.nodes);
   const loadPageNodes = useCanvasStore((s) => s.loadPageNodes);
+  const savePageStrokes = useWorkspaceStore((s) => s.savePageStrokes);
 
   const handleNavigate = (sectionId: string, pageId: string) => {
     if (pageId === activePageId) return;
 
-    // Save current page's nodes
+    // Save current page's nodes + strokes
     savePageNodes(canvasNodes);
+    savePageStrokes(useDrawStore.getState().strokes);
 
     // Switch to new page
     setActivePage(sectionId, pageId);
 
-    // Load new page's nodes
+    // Load new page's nodes + strokes
     const section = workspace.sections.find((s) => s.id === sectionId);
     const page = section?.pages.find((p) => p.id === pageId);
     loadPageNodes(page?.nodes ?? []);
+    useDrawStore.getState().loadPageStrokes(page?.strokes ?? []);
   };
 
   const handleDeleteSection = (sectionId: string) => {
-    // Save current nodes before potential navigation
     savePageNodes(canvasNodes);
+    savePageStrokes(useDrawStore.getState().strokes);
     deleteSection(sectionId);
-    // After deletion, store redirects to another section/page — reload nodes
     const state = useWorkspaceStore.getState();
     const newSection = state.workspace.sections.find((s) => s.id === state.activeSectionId);
     const newPage = newSection?.pages.find((p) => p.id === state.activePageId);
     loadPageNodes(newPage?.nodes ?? []);
+    useDrawStore.getState().loadPageStrokes(newPage?.strokes ?? []);
   };
 
   const handleDeletePage = (sectionId: string, pageId: string) => {
     if (pageId === activePageId) {
       savePageNodes(canvasNodes);
+      savePageStrokes(useDrawStore.getState().strokes);
     }
     deletePage(sectionId, pageId);
     if (pageId === activePageId) {
@@ -61,6 +66,7 @@ export function HierarchyPanel({ isOpen }: HierarchyPanelProps) {
       const section = state.workspace.sections.find((s) => s.id === sectionId);
       const newPage = section?.pages.find((p) => p.id === state.activePageId);
       loadPageNodes(newPage?.nodes ?? []);
+      useDrawStore.getState().loadPageStrokes(newPage?.strokes ?? []);
     }
   };
 
