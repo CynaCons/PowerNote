@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Pencil, Trash2 } from 'lucide-react';
 import type { Section } from '../../types/data';
 import { PageItem } from './PageItem';
 import './HierarchyPanel.css';
@@ -118,6 +118,14 @@ export function SectionItem({
           )}
         </button>
         <div className="hierarchy-section__actions">
+          <button
+            className="hierarchy-section__action-btn"
+            onClick={() => setIsRenaming(true)}
+            title="Rename section"
+            data-testid="rename-section-btn"
+          >
+            <Pencil size={14} />
+          </button>
           <button
             className="hierarchy-section__action-btn"
             onClick={() => onAddPage(section.id)}
