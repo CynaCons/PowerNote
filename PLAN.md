@@ -235,15 +235,14 @@
 |-----------|--------|
 | v0.1.x | **v0.1.0 tagged** |
 | v0.2.x | **v0.2.0 tagged** |
-| v0.2.7 Interaction Overhaul | **Done** |
-| v0.2.8 UX Hardening | **Done** |
-| v0.3.0 Undo/Redo | Not started |
-| v0.3.1 A4 Page Guides | Not started |
-| v0.3.2 Auto-Width Text | Not started |
-| v0.3.3 Drag Reorder | Not started |
-| v0.3.4 Search | Not started |
-| v0.3.2 Markdown Checkboxes | Not started |
-| v0.3.5 Tests + Polish | Not started |
+| v0.2.7-v0.2.8 | **Done** |
+| v0.3.0 Undo/Redo | **Done** |
+| v0.3.1 A4 Page Guides | **Done** |
+| v0.3.2 Markdown Checkboxes | **Done** |
+| v0.3.3 Auto-Width Text | **Done** |
+| v0.3.4 Drag Reorder | **Done** |
+| v0.3.5 Search | **Done** |
+| v0.3.6 Polish + Tag | **Done** |
 
 ---
 
