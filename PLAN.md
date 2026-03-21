@@ -179,7 +179,14 @@
 - [ ] Toggle visibility from a button or setting
 - [ ] SRS: REQ-CANVAS-010..011
 
-### v0.3.2 — Auto-Width Text Blocks
+### v0.3.2 — Markdown Checkboxes (Task Lists)
+- [ ] Support `- [ ]` and `- [x]` syntax in markdown rendering
+- [ ] Render as clickable checkboxes in display mode
+- [ ] Clicking a checkbox toggles its state in the node's text data
+- [ ] SRS: REQ-TEXT-022
+- [ ] E2E test
+
+### v0.3.3 — Auto-Width Text Blocks
 - [ ] Text blocks grow horizontally to fit content (no fixed 200px)
 - [ ] No max-width cap — wraps only on manual Enter
 - [ ] Measure rendered markdown HTML width and sync to node
@@ -187,7 +194,7 @@
 - [ ] SRS: REQ-TEXT-020..021
 - [ ] E2E tests
 
-### v0.3.3 — Drag Reorder (Hierarchy Panel)
+### v0.3.4 — Drag Reorder (Hierarchy Panel)
 - [ ] Drag sections to reorder in the hierarchy panel
 - [ ] Drag pages to reorder within a section
 - [ ] Drag pages between sections
@@ -195,7 +202,7 @@
 - [ ] SRS: REQ-HIER-012..014
 - [ ] E2E tests
 
-### v0.3.4 — Search (Ctrl+F / Ctrl+Shift+F)
+### v0.3.5 — Search (Ctrl+F / Ctrl+Shift+F)
 - [ ] Ctrl+F: search bar for current page — highlights matching text blocks
 - [ ] Ctrl+Shift+F: notebook-wide search — searches across all sections/pages
 - [ ] Results list with page/section context, click to navigate
@@ -203,7 +210,7 @@
 - [ ] SRS: REQ-SEARCH-001..005
 - [ ] E2E tests
 
-### v0.3.5 — E2E Tests + Polish
+### v0.3.6 — E2E Tests + Polish
 - [ ] New E2E tests for all v0.3 features
 - [ ] SRS documents updated
 - [ ] Full test suite green
@@ -235,6 +242,7 @@
 | v0.3.2 Auto-Width Text | Not started |
 | v0.3.3 Drag Reorder | Not started |
 | v0.3.4 Search | Not started |
+| v0.3.2 Markdown Checkboxes | Not started |
 | v0.3.5 Tests + Polish | Not started |
 
 ---
