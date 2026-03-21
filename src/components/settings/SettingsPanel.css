@@ -34,3 +34,35 @@
 .settings-panel__row input[type="checkbox"] {
   accent-color: var(--color-primary);
 }
+
+.settings-panel__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-panel__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.settings-panel__radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.settings-panel__radio:hover {
+  color: var(--color-text);
+}
+
+.settings-panel__radio input[type="radio"] {
+  accent-color: var(--color-primary);
+}

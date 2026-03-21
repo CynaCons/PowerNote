@@ -5,7 +5,7 @@ import { useCanvasStore, undoBatchStart } from '../../stores/useCanvasStore';
 import { useToolStore } from '../../stores/useToolStore';
 import { CanvasNode } from './CanvasNode';
 import { SnapGuides, type SnapLine } from './SnapGuides';
-import { PageGuides } from './PageGuides';
+import { PageGuides, type BackgroundMode } from './PageGuides';
 import { TrashButton } from './TrashButton';
 import { generateId } from '../../utils/ids';
 import type { CanvasNode as CanvasNodeType } from '../../types/data';
@@ -19,10 +19,10 @@ const MAX_SCALE = 5.0;
 const ZOOM_FACTOR = 1.05;
 
 interface InfiniteCanvasProps {
-  showPageGuides?: boolean;
+  backgroundMode?: BackgroundMode;
 }
 
-export function InfiniteCanvas({ showPageGuides = true }: InfiniteCanvasProps) {
+export function InfiniteCanvas({ backgroundMode = 'pages' }: InfiniteCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
 
@@ -98,6 +98,70 @@ export function InfiniteCanvas({ showPageGuides = true }: InfiniteCanvasProps) {
     },
     [setViewport],
   );
+
+  // ── Pinch-to-zoom (touch) ─────────────────────────────────
+  const lastPinchDist = useRef<number | null>(null);
+  const lastPinchCenter = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchMove = useCallback(
+    (e: Konva.KonvaEventObject<TouchEvent>) => {
+      const touches = e.evt.touches;
+      if (touches.length !== 2) {
+        lastPinchDist.current = null;
+        lastPinchCenter.current = null;
+        return;
+      }
+
+      e.evt.preventDefault();
+      const stage = stageRef.current;
+      if (!stage) return;
+
+      const t1 = { x: touches[0].clientX, y: touches[0].clientY };
+      const t2 = { x: touches[1].clientX, y: touches[1].clientY };
+      const dist = Math.sqrt((t2.x - t1.x) ** 2 + (t2.y - t1.y) ** 2);
+      const center = { x: (t1.x + t2.x) / 2, y: (t1.y + t2.y) / 2 };
+
+      if (lastPinchDist.current === null) {
+        lastPinchDist.current = dist;
+        lastPinchCenter.current = center;
+        return;
+      }
+
+      const oldScale = stage.scaleX();
+      const scaleFactor = dist / lastPinchDist.current;
+      const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, oldScale * scaleFactor));
+
+      const stageBox = stage.container().getBoundingClientRect();
+      const pointerOnStage = {
+        x: center.x - stageBox.left,
+        y: center.y - stageBox.top,
+      };
+
+      const mousePointTo = {
+        x: (pointerOnStage.x - stage.x()) / oldScale,
+        y: (pointerOnStage.y - stage.y()) / oldScale,
+      };
+
+      const newPos = {
+        x: pointerOnStage.x - mousePointTo.x * newScale,
+        y: pointerOnStage.y - mousePointTo.y * newScale,
+      };
+
+      stage.scale({ x: newScale, y: newScale });
+      stage.position(newPos);
+
+      setViewport({ x: newPos.x, y: newPos.y, scale: newScale });
+
+      lastPinchDist.current = dist;
+      lastPinchCenter.current = center;
+    },
+    [setViewport],
+  );
+
+  const handleTouchEnd = useCallback(() => {
+    lastPinchDist.current = null;
+    lastPinchCenter.current = null;
+  }, []);
 
   // ── Drag end (pan) ────────────────────────────────────────
   const handleDragEnd = useCallback(
@@ -252,9 +316,11 @@ export function InfiniteCanvas({ showPageGuides = true }: InfiniteCanvasProps) {
           onDragEnd={handleDragEnd}
           onClick={handleStageClick}
           onTap={handleStageClick}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
           <Layer>
-            <PageGuides visible={showPageGuides} />
+            <PageGuides mode={backgroundMode} nodes={nodes} />
           </Layer>
           <Layer>
             {nodes.map((node) => {

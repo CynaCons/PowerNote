@@ -6,6 +6,7 @@ import { HierarchyPanel } from '../sidebar/HierarchyPanel';
 import { BottomToolbar } from '../toolbar/BottomToolbar';
 import { SearchPanel } from '../search/SearchPanel';
 import { SettingsPanel } from '../settings/SettingsPanel';
+import type { BackgroundMode } from '../canvas/PageGuides';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { buildExportHtml, downloadFile } from '../../utils/serialization';
@@ -17,7 +18,7 @@ export function AppShell() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchNotebookWide, setSearchNotebookWide] = useState(false);
-  const [showPageGuides, setShowPageGuides] = useState(true);
+  const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('pages');
 
   // Ctrl+S / Ctrl+F / Ctrl+Shift+F keyboard shortcuts
   useEffect(() => {
@@ -75,7 +76,7 @@ export function AppShell() {
       <div className="canvas-area">
         <HierarchyPanel isOpen={isHierarchyOpen} />
         <div className="canvas-area__content">
-          <InfiniteCanvas showPageGuides={showPageGuides} />
+          <InfiniteCanvas backgroundMode={backgroundMode} />
           <BottomToolbar />
           <SearchPanel
             isOpen={searchOpen}
@@ -87,8 +88,8 @@ export function AppShell() {
       </div>
       {isSettingsOpen && (
         <SettingsPanel
-          showPageGuides={showPageGuides}
-          onTogglePageGuides={setShowPageGuides}
+          backgroundMode={backgroundMode}
+          onChangeBackgroundMode={setBackgroundMode}
         />
       )}
     </div>
