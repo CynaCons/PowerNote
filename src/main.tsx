@@ -1,19 +1,31 @@
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
+import { getEmbeddedData } from './utils/serialization';
+import { useWorkspaceStore } from './stores/useWorkspaceStore';
+import { useCanvasStore } from './stores/useCanvasStore';
+
+// Hydrate from embedded data if present (self-contained HTML mode)
+const embeddedData = getEmbeddedData();
+if (embeddedData) {
+  useWorkspaceStore.setState({
+    workspace: embeddedData,
+    activeSectionId: embeddedData.sections[0]?.id,
+    activePageId: embeddedData.sections[0]?.pages[0]?.id,
+  });
+  useCanvasStore.getState().loadPageNodes(
+    embeddedData.sections[0]?.pages[0]?.nodes ?? [],
+  );
+}
 
 // Expose stores for E2E testing (dev mode only)
 if (import.meta.env.DEV) {
-  import('./stores/useWorkspaceStore').then(({ useWorkspaceStore }) => {
-    import('./stores/useCanvasStore').then(({ useCanvasStore }) => {
-      import('./stores/useToolStore').then(({ useToolStore }) => {
-        (window as any).__POWERNOTE_STORES__ = {
-          workspace: useWorkspaceStore,
-          canvas: useCanvasStore,
-          tool: useToolStore,
-        };
-      });
-    });
+  import('./stores/useToolStore').then(({ useToolStore }) => {
+    (window as any).__POWERNOTE_STORES__ = {
+      workspace: useWorkspaceStore,
+      canvas: useCanvasStore,
+      tool: useToolStore,
+    };
   });
 }
 

@@ -2,12 +2,20 @@
   grid-area: topbar;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 16px;
+  justify-content: space-between;
+  padding: 0 12px 0 16px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   font-size: 13px;
   user-select: none;
+}
+
+.top-bar__breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .top-bar__filename {
@@ -27,4 +35,36 @@
 .top-bar__crumb--active {
   color: var(--color-text);
   font-weight: 500;
+}
+
+.top-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.top-bar__action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  color: var(--color-text-muted);
+  transition: all 0.15s ease;
+}
+
+.top-bar__action-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.top-bar__action-btn--primary {
+  color: var(--color-primary);
+}
+
+.top-bar__action-btn--primary:hover {
+  background: var(--color-active);
+  color: var(--color-primary-hover);
 }

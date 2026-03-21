@@ -7,6 +7,7 @@ import { BottomToolbar } from '../toolbar/BottomToolbar';
 import { SearchPanel } from '../search/SearchPanel';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
+import { buildExportHtml, downloadFile } from '../../utils/serialization';
 import './AppShell.css';
 
 export function AppShell() {
@@ -17,6 +18,18 @@ export function AppShell() {
   // Ctrl+F / Ctrl+Shift+F keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+S: save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        const canvasNodes = useCanvasStore.getState().nodes;
+        useWorkspaceStore.getState().savePageNodes(canvasNodes);
+        const ws = useWorkspaceStore.getState().workspace;
+        buildExportHtml(ws).then((html) => {
+          downloadFile(html, ws.filename.replace(/[^a-zA-Z0-9_-]/g, '_') + '.html');
+        });
+      }
+
+      // Ctrl+F / Ctrl+Shift+F: search
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
         setSearchNotebookWide(e.shiftKey);
