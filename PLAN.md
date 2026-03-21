@@ -154,6 +154,10 @@
 - [x] CLAUDE.md created with project instructions
 - [x] 52 tests pass
 
+### v0.2.8 — UX Hardening (user feedback)
+- [x] Fix: text tool strictly one-shot, no accidental text creation on canvas clicks
+- [ ] UX assessment and improvements
+
 ---
 
 ## v0.3 — Images + Save/Load (planned)

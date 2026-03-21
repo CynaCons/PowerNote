@@ -33,7 +33,6 @@ export function InfiniteCanvas() {
   const setViewport = useCanvasStore((s) => s.setViewport);
 
   const activeTool = useToolStore((s) => s.activeTool);
-  const textOptions = useToolStore((s) => s.textOptions);
 
   // ── Resize observer ────────────────────────────────────────
   useEffect(() => {
@@ -115,14 +114,18 @@ export function InfiniteCanvas() {
       const stage = stageRef.current;
       if (!stage) return;
 
-      const pointer = stage.getPointerPosition();
-      if (!pointer) return;
+      // Read tool state fresh (not from stale closure) to prevent accidental placement
+      const currentTool = useToolStore.getState().activeTool;
+      const currentTextOptions = useToolStore.getState().textOptions;
 
-      const scale = stage.scaleX();
-      const stageX = (pointer.x - stage.x()) / scale;
-      const stageY = (pointer.y - stage.y()) / scale;
+      if (currentTool === 'text') {
+        const pointer = stage.getPointerPosition();
+        if (!pointer) return;
 
-      if (activeTool === 'text') {
+        const scale = stage.scaleX();
+        const stageX = (pointer.x - stage.x()) / scale;
+        const stageY = (pointer.y - stage.y()) / scale;
+
         const newNode: CanvasNodeType = {
           id: generateId(),
           type: 'text',
@@ -132,23 +135,23 @@ export function InfiniteCanvas() {
           height: 30,
           data: {
             text: '',
-            fontSize: textOptions.fontSize,
-            fontFamily: textOptions.fontFamily,
-            fontStyle: textOptions.fontStyle,
-            fill: textOptions.fill,
+            fontSize: currentTextOptions.fontSize,
+            fontFamily: currentTextOptions.fontFamily,
+            fontStyle: currentTextOptions.fontStyle,
+            fill: currentTextOptions.fill,
           },
         };
 
+        // Revert to select BEFORE adding node — prevents any race condition
+        useToolStore.getState().setTool('select');
         addNode(newNode);
         selectNode(newNode.id, false);
         autoEditNodeId = newNode.id;
-        // Revert to select tool after placing — one-shot behavior
-        useToolStore.getState().setTool('select');
       } else {
         clearSelection();
       }
     },
-    [activeTool, textOptions, addNode, selectNode, clearSelection],
+    [addNode, selectNode, clearSelection],
   );
 
   // ── Node selection handler (passed to CanvasNode) ─────────
