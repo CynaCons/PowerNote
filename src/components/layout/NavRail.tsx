@@ -23,38 +23,44 @@ export function NavRail({ onToggleHierarchy, isHierarchyOpen, onToggleSettings, 
   };
 
   const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith('image/')) return;
+    const files = e.target.files;
+    if (!files) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const src = reader.result as string;
-      const img = new Image();
-      img.onload = () => {
-        const maxW = 600;
-        let w = img.naturalWidth;
-        let h = img.naturalHeight;
-        if (w > maxW) {
-          h = h * (maxW / w);
-          w = maxW;
-        }
-        const node: CanvasNode = {
-          id: generateId(),
-          type: 'image',
-          x: 200, y: 200,
-          width: w, height: h,
-          data: {
-            src,
-            alt: file.name || 'image',
-            naturalWidth: img.naturalWidth,
-            naturalHeight: img.naturalHeight,
-          } as ImageNodeData,
+    let offsetY = 0;
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      const yPos = 200 + offsetY;
+      offsetY += 20; // stagger multiple images
+      reader.onload = () => {
+        const src = reader.result as string;
+        const img = new Image();
+        img.onload = () => {
+          const maxW = 600;
+          let w = img.naturalWidth;
+          let h = img.naturalHeight;
+          if (w > maxW) {
+            h = h * (maxW / w);
+            w = maxW;
+          }
+          const node: CanvasNode = {
+            id: generateId(),
+            type: 'image',
+            x: 200, y: yPos,
+            width: w, height: h,
+            data: {
+              src,
+              alt: file.name || 'image',
+              naturalWidth: img.naturalWidth,
+              naturalHeight: img.naturalHeight,
+            } as ImageNodeData,
+          };
+          useCanvasStore.getState().addNode(node);
         };
-        useCanvasStore.getState().addNode(node);
+        img.src = src;
       };
-      img.src = src;
-    };
-    reader.readAsDataURL(file);
+      reader.readAsDataURL(file);
+    });
     e.target.value = '';
   };
 
@@ -107,6 +113,7 @@ export function NavRail({ onToggleHierarchy, isHierarchyOpen, onToggleSettings, 
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          multiple
           style={{ display: 'none' }}
           onChange={handleFileSelected}
           data-testid="image-file-input"

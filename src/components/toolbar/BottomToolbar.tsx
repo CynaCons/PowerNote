@@ -1,6 +1,7 @@
 import { useToolStore } from '../../stores/useToolStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { TextToolbar } from './TextToolbar';
+import { ImageToolbar } from './ImageToolbar';
 import type { TextOptions } from '../../types/data';
 import './BottomToolbar.css';
 
@@ -13,15 +14,26 @@ export function BottomToolbar() {
   const nodes = useCanvasStore((s) => s.nodes);
   const updateNode = useCanvasStore((s) => s.updateNode);
 
-  // Find the first selected text node (if any)
-  const selectedTextNode = selectedNodeIds.length === 1
-    ? nodes.find((n) => n.id === selectedNodeIds[0] && n.type === 'text')
+  // Find the first selected node
+  const selectedNode = selectedNodeIds.length === 1
+    ? nodes.find((n) => n.id === selectedNodeIds[0])
     : null;
 
-  const isTextContext =
-    activeTool === 'text' || !!selectedTextNode;
+  const selectedTextNode = selectedNode?.type === 'text' ? selectedNode : null;
+  const selectedImageNode = selectedNode?.type === 'image' ? selectedNode : null;
 
-  if (!isTextContext) return null;
+  const isTextContext = activeTool === 'text' || !!selectedTextNode;
+  const isImageContext = !!selectedImageNode;
+
+  if (!isTextContext && !isImageContext) return null;
+
+  if (isImageContext && selectedImageNode) {
+    return (
+      <div className="bottom-toolbar" data-testid="bottom-toolbar">
+        <ImageToolbar node={selectedImageNode} />
+      </div>
+    );
+  }
 
   const currentOptions: TextOptions = selectedTextNode
     ? {

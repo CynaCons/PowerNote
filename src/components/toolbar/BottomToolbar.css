@@ -106,3 +106,25 @@
   border: none;
   border-radius: 2px;
 }
+
+/* ── Image Toolbar (crop controls) ────────────── */
+.image-toolbar__crop-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.image-toolbar__slider {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.image-toolbar__slider input[type="range"] {
+  width: 60px;
+  height: 4px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}

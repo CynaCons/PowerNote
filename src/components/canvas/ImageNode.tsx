@@ -19,7 +19,6 @@ export function ImageNode({ node, isSelected, onSelect, stageScale, onSnapChange
   const updateNode = useCanvasStore((s) => s.updateNode);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
 
-  // Load the image from src (base64 data URI or URL)
   useEffect(() => {
     const img = new window.Image();
     img.onload = () => setImage(img);
@@ -64,6 +63,17 @@ export function ImageNode({ node, isSelected, onSelect, stageScale, onSnapChange
     e.cancelBubble = true;
   };
 
+  // Calculate crop parameters for Konva
+  const crop = data.crop;
+  const cropConfig = crop && image ? {
+    crop: {
+      x: crop.x * data.naturalWidth,
+      y: crop.y * data.naturalHeight,
+      width: crop.width * data.naturalWidth,
+      height: crop.height * data.naturalHeight,
+    },
+  } : {};
+
   return (
     <Group
       ref={groupRef}
@@ -86,7 +96,7 @@ export function ImageNode({ node, isSelected, onSelect, stageScale, onSnapChange
         onTap={handleClick}
       />
 
-      {/* The actual image */}
+      {/* The actual image with optional crop */}
       {image && (
         <KonvaImage
           image={image}
@@ -94,6 +104,7 @@ export function ImageNode({ node, isSelected, onSelect, stageScale, onSnapChange
           y={0}
           width={node.width}
           height={node.height}
+          {...cropConfig}
           listening={false}
         />
       )}

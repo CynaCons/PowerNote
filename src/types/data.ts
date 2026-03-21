@@ -10,11 +10,19 @@ export interface TextNodeData {
   fill: string;
 }
 
+export interface ImageCrop {
+  x: number; // crop offset from left (0-1 ratio)
+  y: number; // crop offset from top (0-1 ratio)
+  width: number; // visible width ratio (0-1)
+  height: number; // visible height ratio (0-1)
+}
+
 export interface ImageNodeData {
   src: string; // base64 data URI or URL
   alt: string;
   naturalWidth: number;
   naturalHeight: number;
+  crop?: ImageCrop; // PowerPoint-style non-destructive crop
 }
 
 export type NodeData = TextNodeData | ImageNodeData;
