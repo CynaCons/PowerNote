@@ -10,7 +10,6 @@ interface SelectionTransformerProps {
 
 export function SelectionTransformer({ selectedNodeIds, stageRef }: SelectionTransformerProps) {
   const transformerRef = useRef<Konva.Transformer>(null);
-  const updateNode = useCanvasStore((s) => s.updateNode);
   const nodes = useCanvasStore((s) => s.nodes);
 
   useEffect(() => {
@@ -42,69 +41,15 @@ export function SelectionTransformer({ selectedNodeIds, stageRef }: SelectionTra
     transformer.getLayer()?.batchDraw();
   }, [selectedNodeIds, stageRef, nodes]);
 
-  const handleTransformEnd = () => {
-    const transformer = transformerRef.current;
-    if (!transformer || selectedNodeIds.length === 0) return;
-
-    // Only handle single-node resize (multi-select can't resize)
-    if (selectedNodeIds.length !== 1) return;
-
-    const node = transformer.nodes()[0];
-    if (!node) return;
-
-    const scaleX = node.scaleX();
-    const scaleY = node.scaleY();
-
-    node.scaleX(1);
-    node.scaleY(1);
-
-    const storeNode = useCanvasStore.getState().nodes.find((n) => n.id === selectedNodeIds[0]);
-    if (!storeNode) return;
-
-    const newWidth = Math.max(50, node.width() * scaleX);
-
-    if (storeNode.type === 'text') {
-      node.width(newWidth);
-      const reflowedHeight = node.height();
-
-      updateNode(selectedNodeIds[0], {
-        x: node.x(),
-        y: node.y(),
-        width: newWidth,
-        height: reflowedHeight,
-        data: { ...storeNode.data },
-      });
-    } else {
-      const newHeight = Math.max(20, node.height() * scaleY);
-      updateNode(selectedNodeIds[0], {
-        x: node.x(),
-        y: node.y(),
-        width: newWidth,
-        height: newHeight,
-      });
-    }
-  };
-
   return (
     <Transformer
       ref={transformerRef}
-      boundBoxFunc={(_oldBox, newBox) => {
-        if (newBox.width < 50 || newBox.height < 20) {
-          return _oldBox;
-        }
-        return newBox;
-      }}
-      onTransformEnd={handleTransformEnd}
       borderStroke="#2563eb"
       borderStrokeWidth={1.5}
-      anchorStroke="#2563eb"
-      anchorFill="white"
-      anchorSize={8}
-      anchorCornerRadius={2}
       padding={2}
-      // Disable resize for multi-select
-      resizeEnabled={selectedNodeIds.length === 1}
+      resizeEnabled={false}
       rotateEnabled={false}
+      anchorSize={0}
     />
   );
 }
