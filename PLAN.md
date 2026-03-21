@@ -136,7 +136,23 @@
 ### v0.2.6 — Polish + Tag v0.2.0
 - [x] Full test suite green (62 tests)
 - [x] Version bump to 0.2.0
-- [ ] Git tag v0.2.0
+- [x] Git tag v0.2.0
+
+### v0.2.7 — Interaction Overhaul (user feedback)
+- [x] Fix drag teleportation bug (Group coordinate doubling)
+- [x] Remove container feature (deferred to later)
+- [x] One-shot text tool (reverts to select after placing)
+- [x] Click = select, double-click = edit
+- [x] Multi-select with Ctrl+Click
+- [x] Copy-paste (Ctrl+C/V), select all (Ctrl+A)
+- [x] Selection actions panel (top-right: count, copy, duplicate, delete)
+- [x] Rich text editor (Tab indent, auto-continue bullets/numbered lists)
+- [x] Markdown rendering (Jupyter-style: headers, bold, italic, code, lists, blockquotes)
+- [x] Snap alignment guides (Shift+drag, red dashed lines at edge/center alignment)
+- [x] Remove text resize handles (OneNote-style, auto-size to content)
+- [x] Auto-enter edit mode on new text placement
+- [x] CLAUDE.md created with project instructions
+- [x] 52 tests pass
 
 ---
 
@@ -163,6 +179,7 @@
 | v0.2.4 Containers | **Done** |
 | v0.2.5 New Feature Tests | **Done** (62 tests green) |
 | v0.2.6 Polish + Tag | **Done** |
+| v0.2.7 Interaction Overhaul | **Done** (52 tests green) |
 
 ---
 
