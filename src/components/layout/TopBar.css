@@ -1,0 +1,30 @@
+.top-bar {
+  grid-area: topbar;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+  user-select: none;
+}
+
+.top-bar__filename {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.top-bar__separator {
+  color: var(--color-border);
+  flex-shrink: 0;
+}
+
+.top-bar__crumb {
+  color: var(--color-text-muted);
+}
+
+.top-bar__crumb--active {
+  color: var(--color-text);
+  font-weight: 500;
+}

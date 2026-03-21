@@ -1,0 +1,17 @@
+.app-shell {
+  display: grid;
+  grid-template-columns: var(--nav-rail-width) 1fr;
+  grid-template-rows: var(--top-bar-height) 1fr;
+  grid-template-areas:
+    "nav topbar"
+    "nav canvas";
+  height: 100%;
+  width: 100%;
+}
+
+.canvas-area {
+  grid-area: canvas;
+  background: var(--color-canvas-bg);
+  position: relative;
+  overflow: hidden;
+}
