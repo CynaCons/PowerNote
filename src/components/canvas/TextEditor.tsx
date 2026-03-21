@@ -13,15 +13,26 @@ export function TextEditor({ node, stageScale, onFinish, onCancel }: TextEditorP
   const data = node.data as TextNodeData;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Focus the textarea reliably — the Html portal renders async,
+  // so we retry until it's in the DOM and focusable
   useEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
+    const focusTextarea = () => {
+      const textarea = textareaRef.current;
+      if (!textarea) return false;
+      textarea.focus();
+      textarea.select();
+      textarea.style.height = 'auto';
+      textarea.style.height = textarea.scrollHeight + 'px';
+      return document.activeElement === textarea;
+    };
 
-    textarea.focus();
-    textarea.select();
+    if (focusTextarea()) return;
 
-    textarea.style.height = 'auto';
-    textarea.style.height = textarea.scrollHeight + 'px';
+    // Retry with increasing delays for async portal rendering
+    const t1 = setTimeout(focusTextarea, 10);
+    const t2 = setTimeout(focusTextarea, 50);
+    const t3 = setTimeout(focusTextarea, 150);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

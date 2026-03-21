@@ -157,6 +157,7 @@
 ### v0.2.8 — UX Hardening (user feedback)
 - [x] Fix: text tool strictly one-shot, no accidental text creation on canvas clicks
 - [ ] UX assessment and improvements
+- [x] Fix: double-click on text must immediately focus textarea for typing
 
 ---
 
