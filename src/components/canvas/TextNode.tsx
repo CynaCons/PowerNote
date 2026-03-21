@@ -8,11 +8,24 @@ import { TextEditor } from './TextEditor';
 import { calculateSnap, type SnapLine } from './SnapGuides';
 import { marked } from 'marked';
 
-// Configure marked for inline rendering
+// Configure marked for GFM + task lists
 marked.setOptions({
   breaks: true,
   gfm: true,
 });
+
+// Toggle a checkbox in raw markdown text by its index
+function toggleCheckbox(text: string, checkboxIndex: number): string {
+  let count = 0;
+  return text.replace(/- \[([ x])\]/g, (match, state) => {
+    if (count === checkboxIndex) {
+      count++;
+      return state === 'x' ? '- [ ]' : '- [x]';
+    }
+    count++;
+    return match;
+  });
+}
 
 interface TextNodeProps {
   node: CanvasNode;
@@ -173,6 +186,21 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
         <div
           ref={htmlRef}
           className="powernote-markdown"
+          onClick={(e) => {
+            // Handle checkbox clicks
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'INPUT' && target.getAttribute('type') === 'checkbox') {
+              e.stopPropagation();
+              const checkboxes = htmlRef.current?.querySelectorAll('input[type="checkbox"]');
+              if (checkboxes) {
+                const idx = Array.from(checkboxes).indexOf(target as HTMLInputElement);
+                if (idx >= 0) {
+                  const newText = toggleCheckbox(data.text, idx);
+                  updateNode(node.id, { data: { ...data, text: newText } });
+                }
+              }
+            }
+          }}
           style={{
             width: node.width,
             fontSize: data.fontSize,

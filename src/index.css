@@ -116,6 +116,12 @@ button:disabled {
   border-top: 1px solid #e5e7eb;
   margin: 0.5em 0;
 }
+.powernote-markdown input[type="checkbox"] {
+  pointer-events: auto;
+  cursor: pointer;
+  margin-right: 4px;
+  accent-color: #2563eb;
+}
 .powernote-markdown a {
   color: #2563eb;
   text-decoration: none;
