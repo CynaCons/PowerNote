@@ -170,6 +170,14 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onMouseDown={handleMouseDown}
+      onMouseEnter={(e) => {
+        const stage = e.target.getStage();
+        if (stage) stage.container().style.cursor = 'pointer';
+      }}
+      onMouseLeave={(e) => {
+        const stage = e.target.getStage();
+        if (stage) stage.container().style.cursor = 'default';
+      }}
     >
       {/* Invisible hit area for click/dblclick — sized generously to catch clicks */}
       <Rect

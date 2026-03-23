@@ -504,8 +504,21 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
   }, []);
 
   const handleDrawMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (e.target !== stageRef.current) return;
     const tool = useToolStore.getState().activeTool;
+    // For shape tool: allow clicks on background elements (PageGuides, Stage)
+    // For draw/erase/lasso: only trigger on Stage itself
+    if (tool !== 'shape' && e.target !== stageRef.current) return;
+    // For shape tool: don't start if clicking on an interactive node
+    if (tool === 'shape') {
+      let target: Konva.Node | null = e.target;
+      while (target && target !== stageRef.current) {
+        const rect = target.findOne?.('Rect');
+        if (rect?.id?.() && useCanvasStore.getState().nodes.find(n => n.id === rect.id())) {
+          return; // Clicked on an existing node — don't start shape
+        }
+        target = target.parent;
+      }
+    }
     const pt = getCanvasPoint(e);
 
     if (tool === 'draw') {
@@ -575,20 +588,27 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
 
     if (tool === 'shape' && shapeStart.current) {
       const start = shapeStart.current;
+      const shapeType = useToolStore.getState().shapeOptions.shapeType;
       let w = pt.x - start.x;
       let h = pt.y - start.y;
       // Shift constrains to square/circle
-      if (e.evt.shiftKey) {
+      if (e.evt.shiftKey && shapeType !== 'arrow' && shapeType !== 'line') {
         const size = Math.max(Math.abs(w), Math.abs(h));
-        w = Math.sign(w) * size;
-        h = Math.sign(h) * size;
+        w = Math.sign(w || 1) * size;
+        h = Math.sign(h || 1) * size;
       }
-      setShapePreview({
-        x: w >= 0 ? start.x : start.x + w,
-        y: h >= 0 ? start.y : start.y + h,
-        w: Math.abs(w),
-        h: Math.abs(h),
-      });
+      if (shapeType === 'arrow' || shapeType === 'line') {
+        // Arrows/lines: store start point and signed delta
+        setShapePreview({ x: start.x, y: start.y, w, h });
+      } else {
+        // Other shapes: normalize to positive width/height with top-left origin
+        setShapePreview({
+          x: w >= 0 ? start.x : start.x + w,
+          y: h >= 0 ? start.y : start.y + h,
+          w: Math.abs(w),
+          h: Math.abs(h),
+        });
+      }
     }
 
     if (tool === 'lasso' && lassoStart.current) {
@@ -613,25 +633,31 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
         color: drawOpts.color,
         strokeWidth: drawOpts.strokeWidth,
       });
-    } else if (tool === 'shape' && shapePreview && shapePreview.w > 5 && shapePreview.h > 5) {
-      // Commit shape node
+    } else if (tool === 'shape' && shapePreview) {
+      // Commit shape node — different min size for shapes vs arrows/lines
       const shapeOpts = useToolStore.getState().shapeOptions;
-      useCanvasStore.getState().addNode({
-        id: generateId(),
-        type: 'shape',
-        x: shapePreview.x,
-        y: shapePreview.y,
-        width: shapePreview.w,
-        height: shapePreview.h,
-        layer: 3,
-        data: {
-          shapeType: shapeOpts.shapeType,
-          fill: shapeOpts.fill,
-          stroke: shapeOpts.stroke,
-          strokeWidth: shapeOpts.strokeWidth,
-          strokeDash: [...shapeOpts.strokeDash],
-        },
-      });
+      const isLine = shapeOpts.shapeType === 'arrow' || shapeOpts.shapeType === 'line';
+      const dragDist = Math.sqrt(shapePreview.w * shapePreview.w + shapePreview.h * shapePreview.h);
+      const minSize = isLine ? 5 : (Math.abs(shapePreview.w) > 5 && Math.abs(shapePreview.h) > 5);
+
+      if (isLine ? dragDist > 5 : minSize) {
+        useCanvasStore.getState().addNode({
+          id: generateId(),
+          type: 'shape',
+          x: shapePreview.x,
+          y: shapePreview.y,
+          width: shapePreview.w,
+          height: shapePreview.h,
+          layer: 3,
+          data: {
+            shapeType: shapeOpts.shapeType,
+            fill: shapeOpts.fill,
+            stroke: shapeOpts.stroke,
+            strokeWidth: shapeOpts.strokeWidth,
+            strokeDash: [...shapeOpts.strokeDash],
+          },
+        });
+      }
     } else if (tool === 'lasso' && lassoRect && lassoRect.w > 5 && lassoRect.h > 5) {
       // Find strokes within lasso rect
       const rect = lassoRect;
@@ -849,7 +875,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
   const cursorClass =
     activeTool === 'text' ? 'infinite-canvas--crosshair'
     : activeTool === 'draw' ? 'infinite-canvas--none'
-    : activeTool === 'shape' ? 'infinite-canvas--crosshair'
+    : activeTool === 'shape' ? ''
     : activeTool === 'lasso' ? 'infinite-canvas--crosshair'
     : '';
 

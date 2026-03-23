@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Group, Rect, Ellipse, Line, Arrow } from 'react-konva';
 import type Konva from 'konva';
 import type { CanvasNode, ShapeNodeData } from '../../types/data';
@@ -17,6 +17,7 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
   const data = node.data as ShapeNodeData;
   const groupRef = useRef<Konva.Group>(null);
   const updateNode = useCanvasStore((s) => s.updateNode);
+  const [hovered, setHovered] = useState(false);
 
   const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
     if (!e.evt.shiftKey) {
@@ -67,6 +68,16 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
       onDragEnd={handleDragEnd}
       onClick={handleClick}
       onTap={handleClick}
+      onMouseEnter={(e) => {
+        setHovered(true);
+        const stage = e.target.getStage();
+        if (stage) stage.container().style.cursor = 'pointer';
+      }}
+      onMouseLeave={(e) => {
+        setHovered(false);
+        const stage = e.target.getStage();
+        if (stage) stage.container().style.cursor = 'default';
+      }}
     >
       {/* Invisible hit area for easier selection */}
       <Rect
@@ -137,6 +148,18 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
           strokeWidth={strokeWidth}
           dash={dash}
           lineCap="round"
+          listening={false}
+        />
+      )}
+
+      {/* Hover highlight */}
+      {hovered && !isSelected && (
+        <Rect
+          width={w}
+          height={h}
+          fill="transparent"
+          stroke="#93c5fd"
+          strokeWidth={1.5 / stageScale}
           listening={false}
         />
       )}
