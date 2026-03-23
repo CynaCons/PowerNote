@@ -10,7 +10,7 @@ import { PageGuides, type BackgroundMode } from './PageGuides';
 import { DrawingLayer } from './DrawingLayer';
 import { TrashButton } from './TrashButton';
 import { generateId } from '../../utils/ids';
-import type { CanvasNode as CanvasNodeType, ImageNodeData } from '../../types/data';
+import type { CanvasNode as CanvasNodeType, ImageNodeData, Stroke } from '../../types/data';
 import './InfiniteCanvas.css';
 
 // Track the most recently placed node so it auto-enters edit mode
@@ -636,22 +636,71 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
     }
   }
 
-  // Zone eraser: removes points within radius, splitting strokes if needed
-  function eraseZoneAt(x: number, y: number, radius: number) {
-    const strokes = useDrawStore.getState().strokes;
+  // Zone eraser: splits strokes at eraser radius, keeping segments outside
+  function eraseZoneAt(ex: number, ey: number, radius: number) {
+    const store = useDrawStore.getState();
+    const strokes = store.strokes;
+    const r2 = radius * radius;
     const toDelete: string[] = [];
+    const toAdd: Stroke[] = [];
+
     for (const stroke of strokes) {
+      // Check if any point is within the eraser circle
+      let hit = false;
       for (let i = 0; i < stroke.points.length; i += 2) {
-        const dx = stroke.points[i] - x;
-        const dy = stroke.points[i + 1] - y;
-        if (dx * dx + dy * dy < radius * radius) {
-          toDelete.push(stroke.id);
+        const dx = stroke.points[i] - ex;
+        const dy = stroke.points[i + 1] - ey;
+        if (dx * dx + dy * dy < r2) {
+          hit = true;
           break;
         }
       }
+      if (!hit) continue;
+
+      // Split the stroke into segments that are outside the eraser
+      toDelete.push(stroke.id);
+      const segments: number[][] = [];
+      let currentSeg: number[] = [];
+
+      for (let i = 0; i < stroke.points.length; i += 2) {
+        const px = stroke.points[i];
+        const py = stroke.points[i + 1];
+        const dx = px - ex;
+        const dy = py - ey;
+        const inside = dx * dx + dy * dy < r2;
+
+        if (!inside) {
+          currentSeg.push(px, py);
+        } else {
+          // Point is inside eraser — end current segment if it has points
+          if (currentSeg.length >= 4) {
+            segments.push(currentSeg);
+          }
+          currentSeg = [];
+        }
+      }
+      // Don't forget the last segment
+      if (currentSeg.length >= 4) {
+        segments.push(currentSeg);
+      }
+
+      // Create new strokes for each surviving segment
+      for (const seg of segments) {
+        toAdd.push({
+          id: generateId(),
+          points: seg,
+          color: stroke.color,
+          strokeWidth: stroke.strokeWidth,
+        });
+      }
     }
+
     if (toDelete.length > 0) {
-      useDrawStore.getState().deleteStrokes(toDelete);
+      store.deleteStrokes(toDelete);
+      // Add split segments
+      for (const s of toAdd) {
+        useDrawStore.getState().addStroke(s);
+      }
     }
   }
 
