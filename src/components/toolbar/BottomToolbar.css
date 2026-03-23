@@ -156,3 +156,16 @@
   border-color: var(--color-primary);
   background: var(--color-active);
 }
+
+/* ── Shape Toolbar ────────────────────────────── */
+.shape-toolbar__types {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.shape-toolbar__dashes {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
