@@ -1,0 +1,85 @@
+.context-menu {
+  position: absolute;
+  z-index: 100;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 4px;
+  min-width: 160px;
+  animation: context-menu-in 0.1s ease-out;
+}
+
+@keyframes context-menu-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.context-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--color-text);
+  transition: background 0.1s;
+}
+
+.context-menu__item:hover {
+  background: var(--color-hover);
+}
+
+.context-menu__item--danger:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.context-menu__divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px 2px;
+}
+
+.context-menu__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.context-menu__layers {
+  display: flex;
+  gap: 3px;
+  padding: 4px 8px 4px;
+}
+
+.context-menu__layer-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.1s;
+  border: 1px solid transparent;
+}
+
+.context-menu__layer-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.context-menu__layer-btn--active {
+  background: var(--color-active);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}

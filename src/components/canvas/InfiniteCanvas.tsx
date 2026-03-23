@@ -5,6 +5,7 @@ import { useCanvasStore, undoBatchStart } from '../../stores/useCanvasStore';
 import { useToolStore } from '../../stores/useToolStore';
 import { useDrawStore } from '../../stores/useDrawStore';
 import { CanvasNode } from './CanvasNode';
+import { ContextMenu } from './ContextMenu';
 import { SnapGuides, type SnapLine } from './SnapGuides';
 import { PageGuides, type BackgroundMode } from './PageGuides';
 import { DrawingLayer } from './DrawingLayer';
@@ -82,6 +83,9 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
   // Shape creation state
   const [shapePreview, setShapePreview] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const shapeStart = useRef<{ x: number; y: number } | null>(null);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
 
   const drawStrokes = useDrawStore((s) => s.strokes);
   const selectedStrokeIds = useDrawStore((s) => s.selectedStrokeIds);
@@ -806,6 +810,41 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
     }
   }
 
+  // Right-click context menu handler
+  const handleContextMenu = useCallback((e: Konva.KonvaEventObject<PointerEvent>) => {
+    e.evt.preventDefault();
+    // Find if we right-clicked on a node
+    const target = e.target;
+    if (target === stageRef.current) {
+      setContextMenu(null);
+      return;
+    }
+    // Walk up to find a Group with an element that has a node ID
+    let current: Konva.Node | null = target;
+    while (current && current !== stageRef.current) {
+      const rect = current.findOne?.('Rect');
+      const nodeId = rect?.id?.();
+      if (nodeId) {
+        const storeNode = useCanvasStore.getState().nodes.find((n) => n.id === nodeId);
+        if (storeNode) {
+          const stage = stageRef.current;
+          const container = stage?.container();
+          if (container) {
+            const rect = container.getBoundingClientRect();
+            setContextMenu({
+              x: e.evt.clientX - rect.left,
+              y: e.evt.clientY - rect.top,
+              nodeId,
+            });
+          }
+          return;
+        }
+      }
+      current = current.parent;
+    }
+    setContextMenu(null);
+  }, []);
+
   // Cursor style based on active tool
   const cursorClass =
     activeTool === 'text' ? 'infinite-canvas--crosshair'
@@ -832,8 +871,9 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
           draggable={!isDrawTool}
           onWheel={handleWheel}
           onDragEnd={handleDragEnd}
-          onClick={handleStageClick}
+          onClick={(e) => { setContextMenu(null); handleStageClick(e); }}
           onTap={handleStageClick}
+          onContextMenu={handleContextMenu}
           onMouseDown={isDrawTool ? handleDrawMouseDown : undefined}
           onMouseMove={isDrawTool ? handleDrawMouseMove : undefined}
           onMouseUp={isDrawTool ? handleDrawMouseUp : undefined}
@@ -904,6 +944,15 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
       {/* Floating trash button for selected nodes */}
       {selectedNodeIds.length > 0 && (
         <TrashButton />
+      )}
+      {/* Right-click context menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          nodeId={contextMenu.nodeId}
+          onClose={() => setContextMenu(null)}
+        />
       )}
     </div>
   );
