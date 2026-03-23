@@ -365,7 +365,58 @@
 | v0.4.x | **v0.4.0 tagged** |
 | v0.5.x | **v0.5.0 tagged** |
 | v0.6.x | **v0.6.0 tagged** |
+| v0.7.x | **v0.7.0 tagged** |
+| v0.8.x | **In progress** |
 
 ---
 
-**Last updated:** 2026-03-21
+## v0.8 — Shapes, Arrows & Z-Index Layers
+> Geometric shapes (rect, circle, triangle, arrow, line) with styling, resize, and z-ordering
+
+### v0.8.0 — Data Model + Shape Tool Button
+- [x] ShapeNodeData interface (shapeType, fill, stroke, strokeWidth, strokeDash)
+- [x] 'shape' added to ToolType, ShapeOptions in tool store
+- [x] Shape tool button in NavRail (Shapes icon, S shortcut)
+- [x] `layer` field on CanvasNode (1-5, default 3)
+
+### v0.8.1 — ShapeNode Component
+- [x] ShapeNode.tsx renders rect, circle, triangle via Konva primitives
+- [x] Standard Group wrapper, click to select, drag to move
+
+### v0.8.2 — Click+Drag Creation
+- [x] Mouse down sets origin, drag defines size, mouse up commits
+- [x] Shape preview ghost while dragging
+- [x] Shift constrains to square/circle
+- [x] Nodes sorted by layer for z-ordering
+
+### v0.8.3 — Arrow + Line Shapes
+- [x] Arrow with Konva Arrow (arrowhead)
+- [x] Line with Konva Line (round lineCap)
+- [x] Both stored as shape nodes with signed width/height
+
+### v0.8.4 — ShapeToolbar
+- [x] Shape type selector (5 icons)
+- [x] Fill toggle + ColorPopover
+- [x] Stroke ColorPopover + SizePopover
+- [x] Dash style toggle (solid/dashed/dotted)
+- [x] Works for tool defaults AND selected shape editing
+
+### v0.8.5 — Resize for Shapes
+- [x] SelectionTransformer enabled for shapes
+- [x] Free resize (no ratio lock)
+
+### v0.8.6 — 5-Layer Z-Index + Context Menu
+- [x] Right-click context menu on any node
+- [x] Layer selector (1=Back, 3=Default, 5=Front)
+- [x] Copy, Duplicate, Delete actions
+- [x] Nodes rendered in layer order
+
+### v0.8.7 — SRS + E2E Tests + Tag
+- [x] SRS_SHAPES.md (REQ-SHAPE-001..015)
+- [x] E2E tests 51-53: shape creation, toolbar, context menu
+- [ ] All tests pass
+- [ ] Tag v0.8.0
+
+---
+
+**Last updated:** 2026-03-22

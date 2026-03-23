@@ -1,0 +1,29 @@
+# SRS: Shapes
+
+**Project:** PowerNote
+**Version:** 0.8.0
+**Date:** 2026-03-22
+
+## Purpose
+
+Allow users to create, style, select, move, resize, and delete geometric shapes (rectangle, circle, triangle, arrow, line) on the canvas, with full persistence through save/load.
+
+## Requirements
+
+| ID | Description | Priority | Test Ref |
+|----|-------------|----------|----------|
+| REQ-SHAPE-001 | With the shape tool active, click+drag on the canvas shall create a shape of the selected type at the drag origin with dimensions matching the drag extent | Must | T51 |
+| REQ-SHAPE-002 | The app shall support five shape types: rect, circle, triangle, arrow, line | Must | T51 |
+| REQ-SHAPE-003 | A newly created shape shall use the current shape tool options (shapeType, fill, stroke, strokeWidth, strokeDash) | Must | T51 |
+| REQ-SHAPE-004 | Shapes shall have configurable fill color, including 'transparent' for no fill | Must | T52 |
+| REQ-SHAPE-005 | Shapes shall have configurable stroke color | Must | T52 |
+| REQ-SHAPE-006 | Shapes shall have configurable stroke width (1-10 px) | Must | T52 |
+| REQ-SHAPE-007 | Shapes shall have configurable stroke dash pattern (solid, dashed, dotted) | Must | T52 |
+| REQ-SHAPE-008 | Clicking a shape shall select it; Ctrl+Click shall toggle multi-selection | Must | T51 |
+| REQ-SHAPE-009 | Selected shapes shall be draggable to reposition on the canvas | Must | T51 |
+| REQ-SHAPE-010 | Selected shapes shall be resizable via Transformer handles | Must | T51 |
+| REQ-SHAPE-011 | Delete/Backspace key shall delete the selected shape(s) | Must | T51 |
+| REQ-SHAPE-012 | The ShapeToolbar shall appear in the bottom toolbar when the shape tool is active or a shape node is selected, providing shape type selector, fill/stroke color controls, stroke width, and dash style controls | Must | T52 |
+| REQ-SHAPE-013 | Ctrl+C / Ctrl+V shall copy and paste selected shapes with a position offset | Must | T51 |
+| REQ-SHAPE-014 | Shapes shall support a 5-layer z-index system (layers 1-5, default layer 3), controllable via right-click context menu | Must | T53 |
+| REQ-SHAPE-015 | Shape nodes shall persist through save/load round-trips (all properties preserved in exported HTML) | Must | T51 |
