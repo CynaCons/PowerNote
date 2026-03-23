@@ -73,6 +73,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
   // Drawing state
   const [inProgressPoints, setInProgressPoints] = useState<number[] | null>(null);
   const [eraserPos, setEraserPos] = useState<{ x: number; y: number; radius: number } | null>(null);
+  const [penCursorPos, setPenCursorPos] = useState<{ x: number; y: number } | null>(null);
   const [lassoRect, setLassoRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const isDrawing = useRef(false);
   const lassoStart = useRef<{ x: number; y: number } | null>(null);
@@ -506,6 +507,13 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
     const tool = useToolStore.getState().activeTool;
     const pt = getCanvasPoint(e);
 
+    // Always track pen cursor when draw tool is active
+    if (tool === 'draw') {
+      setPenCursorPos({ x: pt.x, y: pt.y });
+    } else {
+      setPenCursorPos(null);
+    }
+
     if (tool === 'draw' && isDrawing.current) {
       setInProgressPoints((prev) => prev ? [...prev, pt.x, pt.y] : null);
     } else if (tool === 'erase' && isDrawing.current) {
@@ -598,7 +606,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
   // Cursor style based on active tool
   const cursorClass =
     activeTool === 'text' ? 'infinite-canvas--crosshair'
-    : activeTool === 'draw' ? 'infinite-canvas--crosshair'
+    : activeTool === 'draw' ? 'infinite-canvas--none'
     : activeTool === 'erase' ? 'infinite-canvas--none'
     : activeTool === 'lasso' ? 'infinite-canvas--crosshair'
     : '';
@@ -641,6 +649,9 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
               inProgressColor={useToolStore.getState().drawOptions?.color ?? '#1a1a1a'}
               inProgressWidth={useToolStore.getState().drawOptions?.strokeWidth ?? 3}
               eraserPos={eraserPos}
+              penCursorPos={penCursorPos}
+              penColor={useToolStore.getState().drawOptions?.color ?? '#1a1a1a'}
+              penWidth={useToolStore.getState().drawOptions?.strokeWidth ?? 3}
               lassoRect={lassoRect}
             />
           </Layer>

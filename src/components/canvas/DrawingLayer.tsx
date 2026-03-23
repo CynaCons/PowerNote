@@ -8,6 +8,9 @@ interface DrawingLayerProps {
   inProgressColor: string;
   inProgressWidth: number;
   eraserPos: { x: number; y: number; radius: number } | null;
+  penCursorPos: { x: number; y: number } | null;
+  penColor: string;
+  penWidth: number;
   lassoRect: { x: number; y: number; w: number; h: number } | null;
 }
 
@@ -18,6 +21,9 @@ export function DrawingLayer({
   inProgressColor,
   inProgressWidth,
   eraserPos,
+  penCursorPos,
+  penColor,
+  penWidth,
   lassoRect,
 }: DrawingLayerProps) {
   const selectedSet = new Set(selectedStrokeIds);
@@ -78,6 +84,18 @@ export function DrawingLayer({
           fill="rgba(255,255,255,0.5)"
           stroke="#94a3b8"
           strokeWidth={1}
+          listening={false}
+        />
+      )}
+
+      {/* Pen cursor dot — matches stroke size and color */}
+      {penCursorPos && (
+        <Circle
+          x={penCursorPos.x}
+          y={penCursorPos.y}
+          radius={penWidth / 2}
+          fill={penColor}
+          opacity={0.7}
           listening={false}
         />
       )}
