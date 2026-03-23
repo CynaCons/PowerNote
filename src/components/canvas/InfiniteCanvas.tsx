@@ -636,7 +636,11 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
     }
   }
 
-  // Zone eraser: splits strokes at eraser radius, keeping segments outside
+  /**
+   * Zone eraser: precise pixel-level erasing using circle-segment intersection.
+   * Only the visual pixels under the eraser circle are removed.
+   * Strokes are split at exact intersection points with the eraser boundary.
+   */
   function eraseZoneAt(ex: number, ey: number, radius: number) {
     const store = useDrawStore.getState();
     const strokes = store.strokes;
@@ -644,51 +648,112 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
     const toDelete: string[] = [];
     const toAdd: Stroke[] = [];
 
+    // Lerp helper
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+    // Find t values where segment P1→P2 intersects circle (ex,ey,r)
+    // Returns sorted t values in [0,1] where the segment crosses the boundary
+    function circleSegmentIntersections(
+      x1: number, y1: number, x2: number, y2: number,
+    ): number[] {
+      const dx = x2 - x1, dy = y2 - y1;
+      const fx = x1 - ex, fy = y1 - ey;
+      const a = dx * dx + dy * dy;
+      if (a < 1e-10) return []; // degenerate segment
+      const b = 2 * (fx * dx + fy * dy);
+      const c = fx * fx + fy * fy - r2;
+      const disc = b * b - 4 * a * c;
+      if (disc < 0) return [];
+      const sqrtDisc = Math.sqrt(disc);
+      const t1 = (-b - sqrtDisc) / (2 * a);
+      const t2 = (-b + sqrtDisc) / (2 * a);
+      const results: number[] = [];
+      if (t1 > 1e-6 && t1 < 1 - 1e-6) results.push(t1);
+      if (t2 > 1e-6 && t2 < 1 - 1e-6) results.push(t2);
+      return results.sort((a, b) => a - b);
+    }
+
+    // Is a point inside the eraser circle?
+    function isInside(px: number, py: number) {
+      const dx = px - ex, dy = py - ey;
+      return dx * dx + dy * dy <= r2;
+    }
+
     for (const stroke of strokes) {
-      // Check if any point is within the eraser circle
-      let hit = false;
-      for (let i = 0; i < stroke.points.length; i += 2) {
-        const dx = stroke.points[i] - ex;
-        const dy = stroke.points[i + 1] - ey;
-        if (dx * dx + dy * dy < r2) {
-          hit = true;
-          break;
-        }
+      const pts = stroke.points;
+      if (pts.length < 4) continue;
+
+      // Quick bounding-box reject: skip strokes far from eraser
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (let i = 0; i < pts.length; i += 2) {
+        if (pts[i] < minX) minX = pts[i];
+        if (pts[i] > maxX) maxX = pts[i];
+        if (pts[i + 1] < minY) minY = pts[i + 1];
+        if (pts[i + 1] > maxY) maxY = pts[i + 1];
       }
-      if (!hit) continue;
+      if (ex + radius < minX || ex - radius > maxX ||
+          ey + radius < minY || ey - radius > maxY) continue;
 
-      // Split the stroke into segments that are outside the eraser
-      toDelete.push(stroke.id);
-      const segments: number[][] = [];
-      let currentSeg: number[] = [];
+      // Walk through segments, building "outside" runs
+      // For each segment P1→P2, classify the segment parts as inside/outside
+      const outsideRuns: number[][] = [];
+      let currentRun: number[] = [];
+      let modified = false;
 
-      for (let i = 0; i < stroke.points.length; i += 2) {
-        const px = stroke.points[i];
-        const py = stroke.points[i + 1];
-        const dx = px - ex;
-        const dy = py - ey;
-        const inside = dx * dx + dy * dy < r2;
+      for (let i = 0; i < pts.length - 2; i += 2) {
+        const x1 = pts[i], y1 = pts[i + 1];
+        const x2 = pts[i + 2], y2 = pts[i + 3];
+        const p1in = isInside(x1, y1);
+        const p2in = isInside(x2, y2);
 
-        if (!inside) {
-          currentSeg.push(px, py);
+        const crossings = circleSegmentIntersections(x1, y1, x2, y2);
+
+        if (!p1in && !p2in && crossings.length === 0) {
+          // Entire segment outside — add both endpoints
+          if (currentRun.length === 0) currentRun.push(x1, y1);
+          currentRun.push(x2, y2);
+        } else if (p1in && p2in && crossings.length === 0) {
+          // Entire segment inside — flush current run
+          modified = true;
+          if (currentRun.length >= 4) outsideRuns.push(currentRun);
+          currentRun = [];
         } else {
-          // Point is inside eraser — end current segment if it has points
-          if (currentSeg.length >= 4) {
-            segments.push(currentSeg);
+          // Segment crosses the boundary
+          modified = true;
+
+          // Build sub-segments with their inside/outside classification
+          const tValues = [0, ...crossings, 1];
+          for (let j = 0; j < tValues.length - 1; j++) {
+            const ta = tValues[j], tb = tValues[j + 1];
+            const midT = (ta + tb) / 2;
+            const midX = lerp(x1, x2, midT);
+            const midY = lerp(y1, y2, midT);
+            const midInside = isInside(midX, midY);
+
+            if (!midInside) {
+              // This sub-segment is outside
+              const ax = lerp(x1, x2, ta), ay = lerp(y1, y2, ta);
+              const bx = lerp(x1, x2, tb), by = lerp(y1, y2, tb);
+              if (currentRun.length === 0) currentRun.push(ax, ay);
+              currentRun.push(bx, by);
+            } else {
+              // This sub-segment is inside — flush
+              if (currentRun.length >= 4) outsideRuns.push(currentRun);
+              currentRun = [];
+            }
           }
-          currentSeg = [];
         }
       }
-      // Don't forget the last segment
-      if (currentSeg.length >= 4) {
-        segments.push(currentSeg);
-      }
+      // Flush last run
+      if (currentRun.length >= 4) outsideRuns.push(currentRun);
 
-      // Create new strokes for each surviving segment
-      for (const seg of segments) {
+      if (!modified) continue;
+
+      toDelete.push(stroke.id);
+      for (const run of outsideRuns) {
         toAdd.push({
           id: generateId(),
-          points: seg,
+          points: run,
           color: stroke.color,
           strokeWidth: stroke.strokeWidth,
         });
@@ -697,7 +762,6 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
 
     if (toDelete.length > 0) {
       store.deleteStrokes(toDelete);
-      // Add split segments
       for (const s of toAdd) {
         useDrawStore.getState().addStroke(s);
       }
