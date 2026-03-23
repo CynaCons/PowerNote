@@ -84,7 +84,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set((state) => {
       pushUndo(state.nodes);
       useWorkspaceStore.getState().markDirty();
-      return { nodes: [...state.nodes, node] };
+      // Ensure layer defaults to 3 if not specified
+      const withLayer = { ...node, layer: node.layer ?? 3 };
+      return { nodes: [...state.nodes, withLayer] };
     }),
 
   updateNode: (id, updates) =>

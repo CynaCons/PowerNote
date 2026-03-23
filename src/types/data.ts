@@ -25,7 +25,17 @@ export interface ImageNodeData {
   crop?: ImageCrop; // PowerPoint-style non-destructive crop
 }
 
-export type NodeData = TextNodeData | ImageNodeData;
+export type ShapeType = 'rect' | 'circle' | 'triangle' | 'arrow' | 'line';
+
+export interface ShapeNodeData {
+  shapeType: ShapeType;
+  fill: string;           // hex color or 'transparent'
+  stroke: string;         // hex color
+  strokeWidth: number;    // 1-10
+  strokeDash: number[];   // [] solid, [8,4] dashed, [2,2] dotted
+}
+
+export type NodeData = TextNodeData | ImageNodeData | ShapeNodeData;
 
 export interface CanvasNode {
   id: string;
@@ -34,6 +44,7 @@ export interface CanvasNode {
   y: number;
   width: number;
   height: number;
+  layer: number;          // z-index layer 1-5 (default: 3)
   data: NodeData;
 }
 
@@ -77,7 +88,15 @@ export interface WorkspaceData {
 
 // ── Tool types ──────────────────────────────────────────────
 
-export type ToolType = 'select' | 'text' | 'draw' | 'lasso';
+export type ToolType = 'select' | 'text' | 'draw' | 'lasso' | 'shape';
+
+export interface ShapeOptions {
+  shapeType: ShapeType;
+  fill: string;
+  stroke: string;
+  strokeWidth: number;
+  strokeDash: number[];
+}
 
 export interface TextOptions {
   fontSize: number;

@@ -406,6 +406,14 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
         toolStore.setTool(toolStore.activeTool === 'draw' ? 'select' : 'draw');
       }
 
+      // S: toggle shape tool
+      if (e.key === 's' || e.key === 'S') {
+        if (!e.ctrlKey && !e.metaKey) {
+          const toolStore = useToolStore.getState();
+          toolStore.setTool(toolStore.activeTool === 'shape' ? 'select' : 'shape');
+        }
+      }
+
       // E: toggle eraser mode in draw tool
       if (e.key === 'e' || e.key === 'E') {
         const toolStore = useToolStore.getState();
