@@ -1,4 +1,4 @@
-import { Eraser, CircleDot, Slash } from 'lucide-react';
+import { Eraser, PenLine } from 'lucide-react';
 import { useToolStore } from '../../stores/useToolStore';
 import { ColorPopover } from './ColorPopover';
 import { SizePopover } from './SizePopover';
@@ -18,7 +18,7 @@ export function DrawToolbar() {
         title="Pen"
         data-testid="draw-pen-btn"
       >
-        <CircleDot size={16} />
+        <PenLine size={16} />
       </button>
 
       {!drawOptions.isErasing && (
