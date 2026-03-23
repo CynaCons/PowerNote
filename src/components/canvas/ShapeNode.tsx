@@ -70,6 +70,7 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
     >
       {/* Invisible hit area for easier selection */}
       <Rect
+        id={node.id}
         width={w}
         height={h}
         fill="transparent"

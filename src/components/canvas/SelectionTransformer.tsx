@@ -13,14 +13,13 @@ export function SelectionTransformer({ selectedNodeIds, stageRef }: SelectionTra
   const nodes = useCanvasStore((s) => s.nodes);
   const updateNode = useCanvasStore((s) => s.updateNode);
 
-  // Check if any selected node is an image (images are resizable)
-  const hasImageSelected = selectedNodeIds.some((id) => {
+  // Check if any selected node is resizable (images and shapes)
+  const hasResizableSelected = selectedNodeIds.some((id) => {
     const n = nodes.find((n) => n.id === id);
-    return n?.type === 'image';
+    return n?.type === 'image' || n?.type === 'shape';
   });
 
-  // Only text selected = no resize; any image = allow resize
-  const resizeEnabled = hasImageSelected;
+  const resizeEnabled = hasResizableSelected;
 
   useEffect(() => {
     const transformer = transformerRef.current;
@@ -54,7 +53,12 @@ export function SelectionTransformer({ selectedNodeIds, stageRef }: SelectionTra
     if (!transformer) return;
 
     for (const konvaNode of transformer.nodes()) {
-      const id = konvaNode.findOne('Rect')?.id() || konvaNode.findOne('Image')?.id();
+      // Try to find the node ID from any child element
+      const id = konvaNode.findOne('Rect')?.id()
+        || konvaNode.findOne('Image')?.id()
+        || konvaNode.findOne('Ellipse')?.id()
+        || konvaNode.findOne('Line')?.id()
+        || konvaNode.findOne('Arrow')?.id();
       if (!id) continue;
 
       // Get the actual pixel dimensions after transform
@@ -93,7 +97,7 @@ export function SelectionTransformer({ selectedNodeIds, stageRef }: SelectionTra
       anchorStroke="#2563eb"
       anchorStrokeWidth={1}
       anchorCornerRadius={2}
-      keepRatio={true}
+      keepRatio={false}
       onTransformEnd={handleTransformEnd}
     />
   );
