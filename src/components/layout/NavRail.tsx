@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Layers, Type, Pen, ImageIcon, Eraser, BoxSelect, Settings } from 'lucide-react';
+import { Layers, Type, Pen, ImageIcon, BoxSelect, Settings } from 'lucide-react';
 import { useToolStore } from '../../stores/useToolStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { generateId } from '../../utils/ids';
@@ -107,16 +107,6 @@ export function NavRail({ onToggleHierarchy, isHierarchyOpen, onToggleSettings, 
           onClick={() => setTool(activeTool === 'draw' ? 'select' : 'draw')}
         >
           <Pen size={20} />
-        </button>
-
-        <button
-          className={`nav-rail__btn ${activeTool === 'erase' ? 'nav-rail__btn--active' : ''}`}
-          title="Eraser (E)"
-          aria-label="Eraser"
-          data-testid="nav-erase-tool"
-          onClick={() => setTool(activeTool === 'erase' ? 'select' : 'erase')}
-        >
-          <Eraser size={20} />
         </button>
 
         <button

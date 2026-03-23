@@ -406,10 +406,15 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
         toolStore.setTool(toolStore.activeTool === 'draw' ? 'select' : 'draw');
       }
 
-      // E: toggle eraser
+      // E: toggle eraser mode in draw tool
       if (e.key === 'e' || e.key === 'E') {
         const toolStore = useToolStore.getState();
-        toolStore.setTool(toolStore.activeTool === 'erase' ? 'select' : 'erase');
+        if (toolStore.activeTool === 'draw') {
+          toolStore.setDrawOptions({ isErasing: !toolStore.drawOptions.isErasing });
+        } else {
+          toolStore.setTool('draw');
+          toolStore.setDrawOptions({ isErasing: true });
+        }
       }
 
       // L: toggle lasso
@@ -445,7 +450,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         const tool = useToolStore.getState().activeTool;
-        if (tool === 'draw' || tool === 'erase' || tool === 'lasso') {
+        if (tool === 'draw' || tool === 'lasso') {
           useDrawStore.getState().undo();
         } else {
           useCanvasStore.getState().undo();
@@ -456,7 +461,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
       if ((e.ctrlKey || e.metaKey) && ((e.key === 'z' && e.shiftKey) || e.key === 'y')) {
         e.preventDefault();
         const tool = useToolStore.getState().activeTool;
-        if (tool === 'draw' || tool === 'erase' || tool === 'lasso') {
+        if (tool === 'draw' || tool === 'lasso') {
           useDrawStore.getState().redo();
         } else {
           useCanvasStore.getState().redo();
@@ -469,7 +474,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
   }, [clearSelection]);
 
   // ── Drawing tool event handlers ──────────────────────────
-  const isDrawTool = activeTool === 'draw' || activeTool === 'erase' || activeTool === 'lasso';
+  const isDrawTool = activeTool === 'draw' || activeTool === 'lasso';
 
   const getCanvasPoint = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = stageRef.current;
@@ -488,15 +493,24 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
     const pt = getCanvasPoint(e);
 
     if (tool === 'draw') {
-      isDrawing.current = true;
-      setInProgressPoints([pt.x, pt.y]);
-    } else if (tool === 'erase') {
-      isDrawing.current = true;
-      eraserState.current = { prevDir: null, shakeScore: 0, lastTime: Date.now() };
-      // Erase at initial position
-      const radius = 8;
-      setEraserPos({ ...pt, radius });
-      eraseAt(pt.x, pt.y, radius);
+      const drawOpts = useToolStore.getState().drawOptions;
+      if (drawOpts.isErasing) {
+        // Eraser mode
+        isDrawing.current = true;
+        if (drawOpts.eraserMode === 'stroke') {
+          eraseStrokeAt(pt.x, pt.y);
+          setEraserPos({ ...pt, radius: 8 });
+        } else {
+          eraserState.current = { prevDir: null, shakeScore: 0, lastTime: Date.now() };
+          const radius = drawOpts.eraserSize / 2;
+          setEraserPos({ ...pt, radius });
+          eraseZoneAt(pt.x, pt.y, radius);
+        }
+      } else {
+        // Pen mode
+        isDrawing.current = true;
+        setInProgressPoints([pt.x, pt.y]);
+      }
     } else if (tool === 'lasso') {
       lassoStart.current = pt;
       setLassoRect({ x: pt.x, y: pt.y, w: 0, h: 0 });
@@ -507,40 +521,56 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
     const tool = useToolStore.getState().activeTool;
     const pt = getCanvasPoint(e);
 
-    // Always track pen cursor when draw tool is active
+    // Track cursor for draw tool
     if (tool === 'draw') {
-      setPenCursorPos({ x: pt.x, y: pt.y });
+      const drawOpts = useToolStore.getState().drawOptions;
+      if (drawOpts.isErasing) {
+        // Eraser cursor
+        setPenCursorPos(null);
+        const radius = drawOpts.eraserMode === 'zone' ? drawOpts.eraserSize / 2 : 8;
+        setEraserPos({ x: pt.x, y: pt.y, radius });
+
+        if (isDrawing.current) {
+          if (drawOpts.eraserMode === 'stroke') {
+            eraseStrokeAt(pt.x, pt.y);
+          } else {
+            // Zone eraser with shake-to-grow
+            const now = Date.now();
+            const es = eraserState.current;
+            const dx = pt.x - (eraserPos?.x ?? pt.x);
+            const dy = pt.y - (eraserPos?.y ?? pt.y);
+            const dt = now - es.lastTime;
+
+            es.shakeScore *= Math.exp(-dt / 200);
+            const len = Math.sqrt(dx * dx + dy * dy);
+            if (len > 2 && es.prevDir) {
+              const nx = dx / len, ny = dy / len;
+              const dot = nx * es.prevDir.x + ny * es.prevDir.y;
+              if (dot < 0) es.shakeScore += Math.abs(dot) * 2;
+            }
+            if (len > 2) es.prevDir = { x: dx / len, y: dy / len };
+            es.lastTime = now;
+
+            const dynamicRadius = Math.min(60, (drawOpts.eraserSize / 2) + es.shakeScore * 10);
+            setEraserPos({ x: pt.x, y: pt.y, radius: dynamicRadius });
+            eraseZoneAt(pt.x, pt.y, dynamicRadius);
+          }
+        }
+      } else {
+        // Pen cursor
+        setPenCursorPos({ x: pt.x, y: pt.y });
+        setEraserPos(null);
+
+        if (isDrawing.current) {
+          setInProgressPoints((prev) => prev ? [...prev, pt.x, pt.y] : null);
+        }
+      }
     } else {
       setPenCursorPos(null);
+      setEraserPos(null);
     }
 
-    if (tool === 'draw' && isDrawing.current) {
-      setInProgressPoints((prev) => prev ? [...prev, pt.x, pt.y] : null);
-    } else if (tool === 'erase' && isDrawing.current) {
-      // Shake detection
-      const now = Date.now();
-      const es = eraserState.current;
-      const dx = pt.x - (eraserPos?.x ?? pt.x);
-      const dy = pt.y - (eraserPos?.y ?? pt.y);
-      const dt = now - es.lastTime;
-
-      es.shakeScore *= Math.exp(-dt / 200);
-      const len = Math.sqrt(dx * dx + dy * dy);
-      if (len > 2 && es.prevDir) {
-        const nx = dx / len, ny = dy / len;
-        const dot = nx * es.prevDir.x + ny * es.prevDir.y;
-        if (dot < 0) es.shakeScore += Math.abs(dot) * 2;
-      }
-      if (len > 2) es.prevDir = { x: dx / len, y: dy / len };
-      es.lastTime = now;
-
-      const radius = Math.min(50, 5 + es.shakeScore * 10);
-      setEraserPos({ x: pt.x, y: pt.y, radius });
-      eraseAt(pt.x, pt.y, radius);
-    } else if (tool === 'erase' && !isDrawing.current) {
-      // Show eraser cursor even when not pressing
-      setEraserPos({ x: pt.x, y: pt.y, radius: 8 });
-    } else if (tool === 'lasso' && lassoStart.current) {
+    if (tool === 'lasso' && lassoStart.current) {
       const start = lassoStart.current;
       setLassoRect({
         x: Math.min(start.x, pt.x),
@@ -554,8 +584,8 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
   const handleDrawMouseUp = useCallback(() => {
     const tool = useToolStore.getState().activeTool;
 
-    if (tool === 'draw' && isDrawing.current && inProgressPoints && inProgressPoints.length >= 4) {
-      const drawOpts = useToolStore.getState().drawOptions;
+    const drawOpts = useToolStore.getState().drawOptions;
+    if (tool === 'draw' && !drawOpts.isErasing && isDrawing.current && inProgressPoints && inProgressPoints.length >= 4) {
       useDrawStore.getState().addStroke({
         id: generateId(),
         points: inProgressPoints,
@@ -582,10 +612,32 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
     setInProgressPoints(null);
     lassoStart.current = null;
     setLassoRect(null);
-    if (tool !== 'erase') setEraserPos(null);
+    const opts = useToolStore.getState().drawOptions;
+    if (!(tool === 'draw' && opts.isErasing)) setEraserPos(null);
   }, [inProgressPoints, lassoRect]);
 
-  function eraseAt(x: number, y: number, radius: number) {
+  // Stroke eraser: deletes entire stroke if any point is within touch radius
+  function eraseStrokeAt(x: number, y: number) {
+    const strokes = useDrawStore.getState().strokes;
+    const touchRadius = 12; // fixed detection radius for stroke mode
+    const toDelete: string[] = [];
+    for (const stroke of strokes) {
+      for (let i = 0; i < stroke.points.length; i += 2) {
+        const dx = stroke.points[i] - x;
+        const dy = stroke.points[i + 1] - y;
+        if (dx * dx + dy * dy < touchRadius * touchRadius) {
+          toDelete.push(stroke.id);
+          break;
+        }
+      }
+    }
+    if (toDelete.length > 0) {
+      useDrawStore.getState().deleteStrokes(toDelete);
+    }
+  }
+
+  // Zone eraser: removes points within radius, splitting strokes if needed
+  function eraseZoneAt(x: number, y: number, radius: number) {
     const strokes = useDrawStore.getState().strokes;
     const toDelete: string[] = [];
     for (const stroke of strokes) {
@@ -607,7 +659,6 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
   const cursorClass =
     activeTool === 'text' ? 'infinite-canvas--crosshair'
     : activeTool === 'draw' ? 'infinite-canvas--none'
-    : activeTool === 'erase' ? 'infinite-canvas--none'
     : activeTool === 'lasso' ? 'infinite-canvas--crosshair'
     : '';
 

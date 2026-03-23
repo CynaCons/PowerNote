@@ -5,6 +5,9 @@ import { defaultTextOptions } from '../utils/defaults';
 const defaultDrawOptions: DrawOptions = {
   color: '#1a1a1a',
   strokeWidth: 3,
+  eraserMode: 'stroke',
+  eraserSize: 12,
+  isErasing: false,
 };
 
 interface ToolState {

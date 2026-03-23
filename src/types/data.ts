@@ -49,6 +49,9 @@ export interface Stroke {
 export interface DrawOptions {
   color: string;
   strokeWidth: number;
+  eraserMode: 'stroke' | 'zone';
+  eraserSize: number;
+  isErasing: boolean;
 }
 
 // ── Hierarchy types ─────────────────────────────────────────
@@ -74,7 +77,7 @@ export interface WorkspaceData {
 
 // ── Tool types ──────────────────────────────────────────────
 
-export type ToolType = 'select' | 'text' | 'draw' | 'erase' | 'lasso';
+export type ToolType = 'select' | 'text' | 'draw' | 'lasso';
 
 export interface TextOptions {
   fontSize: number;

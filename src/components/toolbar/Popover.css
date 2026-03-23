@@ -204,3 +204,53 @@
   color: var(--color-primary);
   border-color: var(--color-primary);
 }
+
+/* ── Eraser Popover ─────────────────────────── */
+.toolbar-popover--eraser {
+  min-width: 200px;
+}
+
+.eraser-popover__modes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.eraser-popover__mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.12s;
+  text-align: left;
+  border: 1px solid transparent;
+  color: var(--color-text);
+}
+
+.eraser-popover__mode-btn span {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.eraser-popover__mode-btn small {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  margin-left: auto;
+}
+
+.eraser-popover__mode-btn:hover {
+  background: var(--color-hover);
+}
+
+.eraser-popover__mode-btn--active {
+  background: var(--color-active);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.eraser-popover__mode-btn--active small {
+  color: var(--color-primary);
+  opacity: 0.7;
+}
