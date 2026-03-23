@@ -3,6 +3,7 @@ import { Group, Rect, Ellipse, Line, Arrow } from 'react-konva';
 import type Konva from 'konva';
 import type { CanvasNode, ShapeNodeData } from '../../types/data';
 import { useCanvasStore } from '../../stores/useCanvasStore';
+import { useToolStore } from '../../stores/useToolStore';
 import { calculateSnap, type SnapLine } from './SnapGuides';
 
 interface ShapeNodeProps {
@@ -48,7 +49,11 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
-    onSelect(node.id, e.evt.ctrlKey || e.evt.metaKey);
+    const tool = useToolStore.getState().activeTool;
+    // Only allow selection in select/shape/text modes, not in draw/lasso
+    if (tool === 'select' || tool === 'shape' || tool === 'text') {
+      onSelect(node.id, e.evt.ctrlKey || e.evt.metaKey);
+    }
   };
 
   const fill = data.fill === 'transparent' ? undefined : data.fill;

@@ -7,6 +7,7 @@ import { undoBatchEnd } from '../../stores/useCanvasStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useDrawStore } from '../../stores/useDrawStore';
+import { useToolStore } from '../../stores/useToolStore';
 import { TextEditor } from './TextEditor';
 import { calculateSnap, type SnapLine } from './SnapGuides';
 import { marked } from 'marked';
@@ -125,14 +126,20 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
-    const additive = e.evt.ctrlKey || e.evt.metaKey;
-    onSelect(node.id, additive);
+    const tool = useToolStore.getState().activeTool;
+    if (tool === 'select' || tool === 'text' || tool === 'shape') {
+      const additive = e.evt.ctrlKey || e.evt.metaKey;
+      onSelect(node.id, additive);
+    }
   };
 
   const handleDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
-    onSelect(node.id, false);
-    setIsEditing(true);
+    const tool = useToolStore.getState().activeTool;
+    if (tool === 'select' || tool === 'text') {
+      onSelect(node.id, false);
+      setIsEditing(true);
+    }
   };
 
   const handleFinishEdit = (newText: string) => {

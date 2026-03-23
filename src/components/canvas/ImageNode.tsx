@@ -3,6 +3,7 @@ import { Group, Rect, Image as KonvaImage } from 'react-konva';
 import type Konva from 'konva';
 import type { CanvasNode, ImageNodeData } from '../../types/data';
 import { useCanvasStore } from '../../stores/useCanvasStore';
+import { useToolStore } from '../../stores/useToolStore';
 import { calculateSnap, type SnapLine } from './SnapGuides';
 
 interface ImageNodeProps {
@@ -55,8 +56,11 @@ export function ImageNode({ node, isSelected, onSelect, stageScale, onSnapChange
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
-    const additive = e.evt.ctrlKey || e.evt.metaKey;
-    onSelect(node.id, additive);
+    const tool = useToolStore.getState().activeTool;
+    if (tool === 'select' || tool === 'text' || tool === 'shape') {
+      const additive = e.evt.ctrlKey || e.evt.metaKey;
+      onSelect(node.id, additive);
+    }
   };
 
   const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {

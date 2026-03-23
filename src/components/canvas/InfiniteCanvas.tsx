@@ -328,7 +328,12 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
   // ── Stage click (place text or deselect) ──────────────────
   const handleStageClick = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
-      if (e.target !== stageRef.current) return;
+      // Allow clicks on the Stage itself AND on non-interactive background elements
+      // (like PageGuide rects which have listening={false} or no node ID)
+      const target = e.target;
+      const isStage = target === stageRef.current;
+      const isBackgroundElement = !isStage && !target.id();
+      if (!isStage && !isBackgroundElement) return;
 
       const stage = stageRef.current;
       if (!stage) return;
@@ -925,8 +930,8 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
             />
           </Layer>
           <Layer>
-            {/* Shape preview ghost while dragging */}
-            {shapePreview && shapePreview.w > 0 && shapePreview.h > 0 && (() => {
+            {/* Shape preview ghost while dragging — uses same coordinate system as ShapeNode */}
+            {shapePreview && (Math.abs(shapePreview.w) > 2 || Math.abs(shapePreview.h) > 2) && (() => {
               const opts = useToolStore.getState().shapeOptions;
               const sp = shapePreview;
               const commonProps = {
@@ -937,11 +942,13 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
                 opacity: 0.6,
                 listening: false as const,
               };
+              // Render at (sp.x, sp.y) with children at (0,0) — same as ShapeNode's Group pattern
               if (opts.shapeType === 'rect') return <KonvaRect x={sp.x} y={sp.y} width={sp.w} height={sp.h} {...commonProps} />;
-              if (opts.shapeType === 'circle') return <Ellipse x={sp.x + sp.w / 2} y={sp.y + sp.h / 2} radiusX={sp.w / 2} radiusY={sp.h / 2} {...commonProps} />;
+              if (opts.shapeType === 'circle') return <Ellipse x={sp.x + sp.w / 2} y={sp.y + sp.h / 2} radiusX={Math.abs(sp.w) / 2} radiusY={Math.abs(sp.h) / 2} {...commonProps} />;
               if (opts.shapeType === 'triangle') return <KonvaLine points={[sp.x + sp.w / 2, sp.y, sp.x + sp.w, sp.y + sp.h, sp.x, sp.y + sp.h]} closed {...commonProps} />;
-              if (opts.shapeType === 'arrow') return <KonvaLine points={[sp.x, sp.y, sp.x + sp.w, sp.y + sp.h]} {...commonProps} />;
-              if (opts.shapeType === 'line') return <KonvaLine points={[sp.x, sp.y, sp.x + sp.w, sp.y + sp.h]} {...commonProps} />;
+              // Arrow/line: start at (sp.x, sp.y), end at (sp.x+sp.w, sp.y+sp.h) — matches ShapeNode's [0,0,w,h] offset by Group position
+              if (opts.shapeType === 'arrow') return <KonvaLine points={[sp.x, sp.y, sp.x + sp.w, sp.y + sp.h]} stroke={opts.stroke} strokeWidth={opts.strokeWidth} opacity={0.6} listening={false} />;
+              if (opts.shapeType === 'line') return <KonvaLine points={[sp.x, sp.y, sp.x + sp.w, sp.y + sp.h]} stroke={opts.stroke} strokeWidth={opts.strokeWidth} lineCap="round" opacity={0.6} listening={false} />;
               return null;
             })()}
 
