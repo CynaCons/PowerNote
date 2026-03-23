@@ -2,6 +2,7 @@ import type { CanvasNode as CanvasNodeType } from '../../types/data';
 import type { SnapLine } from './SnapGuides';
 import { TextNode } from './TextNode';
 import { ImageNode } from './ImageNode';
+import { ShapeNode } from './ShapeNode';
 
 interface CanvasNodeProps {
   node: CanvasNodeType;
@@ -28,6 +29,16 @@ export function CanvasNode({ node, isSelected, onSelect, stageScale, autoEdit, o
     case 'image':
       return (
         <ImageNode
+          node={node}
+          isSelected={isSelected}
+          onSelect={onSelect}
+          stageScale={stageScale}
+          onSnapChange={onSnapChange}
+        />
+      );
+    case 'shape':
+      return (
+        <ShapeNode
           node={node}
           isSelected={isSelected}
           onSelect={onSelect}

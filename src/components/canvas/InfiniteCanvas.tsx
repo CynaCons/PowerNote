@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Stage, Layer } from 'react-konva';
+import { Stage, Layer, Rect as KonvaRect, Ellipse, Line as KonvaLine } from 'react-konva';
 import type Konva from 'konva';
 import { useCanvasStore, undoBatchStart } from '../../stores/useCanvasStore';
 import { useToolStore } from '../../stores/useToolStore';
@@ -78,6 +78,10 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
   const isDrawing = useRef(false);
   const lassoStart = useRef<{ x: number; y: number } | null>(null);
   const eraserState = useRef({ prevDir: null as { x: number; y: number } | null, shakeScore: 0, lastTime: 0 });
+
+  // Shape creation state
+  const [shapePreview, setShapePreview] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const shapeStart = useRef<{ x: number; y: number } | null>(null);
 
   const drawStrokes = useDrawStore((s) => s.strokes);
   const selectedStrokeIds = useDrawStore((s) => s.selectedStrokeIds);
@@ -482,7 +486,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
   }, [clearSelection]);
 
   // ── Drawing tool event handlers ──────────────────────────
-  const isDrawTool = activeTool === 'draw' || activeTool === 'lasso';
+  const isDrawTool = activeTool === 'draw' || activeTool === 'lasso' || activeTool === 'shape';
 
   const getCanvasPoint = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = stageRef.current;
@@ -519,6 +523,9 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
         isDrawing.current = true;
         setInProgressPoints([pt.x, pt.y]);
       }
+    } else if (tool === 'shape') {
+      shapeStart.current = pt;
+      setShapePreview({ x: pt.x, y: pt.y, w: 0, h: 0 });
     } else if (tool === 'lasso') {
       lassoStart.current = pt;
       setLassoRect({ x: pt.x, y: pt.y, w: 0, h: 0 });
@@ -562,6 +569,24 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
       setEraserPos(null);
     }
 
+    if (tool === 'shape' && shapeStart.current) {
+      const start = shapeStart.current;
+      let w = pt.x - start.x;
+      let h = pt.y - start.y;
+      // Shift constrains to square/circle
+      if (e.evt.shiftKey) {
+        const size = Math.max(Math.abs(w), Math.abs(h));
+        w = Math.sign(w) * size;
+        h = Math.sign(h) * size;
+      }
+      setShapePreview({
+        x: w >= 0 ? start.x : start.x + w,
+        y: h >= 0 ? start.y : start.y + h,
+        w: Math.abs(w),
+        h: Math.abs(h),
+      });
+    }
+
     if (tool === 'lasso' && lassoStart.current) {
       const start = lassoStart.current;
       setLassoRect({
@@ -584,6 +609,25 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
         color: drawOpts.color,
         strokeWidth: drawOpts.strokeWidth,
       });
+    } else if (tool === 'shape' && shapePreview && shapePreview.w > 5 && shapePreview.h > 5) {
+      // Commit shape node
+      const shapeOpts = useToolStore.getState().shapeOptions;
+      useCanvasStore.getState().addNode({
+        id: generateId(),
+        type: 'shape',
+        x: shapePreview.x,
+        y: shapePreview.y,
+        width: shapePreview.w,
+        height: shapePreview.h,
+        layer: 3,
+        data: {
+          shapeType: shapeOpts.shapeType,
+          fill: shapeOpts.fill,
+          stroke: shapeOpts.stroke,
+          strokeWidth: shapeOpts.strokeWidth,
+          strokeDash: [...shapeOpts.strokeDash],
+        },
+      });
     } else if (tool === 'lasso' && lassoRect && lassoRect.w > 5 && lassoRect.h > 5) {
       // Find strokes within lasso rect
       const rect = lassoRect;
@@ -602,6 +646,8 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
 
     isDrawing.current = false;
     setInProgressPoints(null);
+    shapeStart.current = null;
+    setShapePreview(null);
     lassoStart.current = null;
     setLassoRect(null);
     const opts = useToolStore.getState().drawOptions;
@@ -764,6 +810,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
   const cursorClass =
     activeTool === 'text' ? 'infinite-canvas--crosshair'
     : activeTool === 'draw' ? 'infinite-canvas--none'
+    : activeTool === 'shape' ? 'infinite-canvas--crosshair'
     : activeTool === 'lasso' ? 'infinite-canvas--crosshair'
     : '';
 
@@ -812,7 +859,28 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
             />
           </Layer>
           <Layer>
-            {nodes.map((node) => {
+            {/* Shape preview ghost while dragging */}
+            {shapePreview && shapePreview.w > 0 && shapePreview.h > 0 && (() => {
+              const opts = useToolStore.getState().shapeOptions;
+              const sp = shapePreview;
+              const commonProps = {
+                stroke: opts.stroke,
+                strokeWidth: opts.strokeWidth,
+                dash: opts.strokeDash.length > 0 ? opts.strokeDash : undefined,
+                fill: opts.fill === 'transparent' ? 'rgba(37,99,235,0.05)' : opts.fill,
+                opacity: 0.6,
+                listening: false as const,
+              };
+              if (opts.shapeType === 'rect') return <KonvaRect x={sp.x} y={sp.y} width={sp.w} height={sp.h} {...commonProps} />;
+              if (opts.shapeType === 'circle') return <Ellipse x={sp.x + sp.w / 2} y={sp.y + sp.h / 2} radiusX={sp.w / 2} radiusY={sp.h / 2} {...commonProps} />;
+              if (opts.shapeType === 'triangle') return <KonvaLine points={[sp.x + sp.w / 2, sp.y, sp.x + sp.w, sp.y + sp.h, sp.x, sp.y + sp.h]} closed {...commonProps} />;
+              if (opts.shapeType === 'arrow') return <KonvaLine points={[sp.x, sp.y, sp.x + sp.w, sp.y + sp.h]} {...commonProps} />;
+              if (opts.shapeType === 'line') return <KonvaLine points={[sp.x, sp.y, sp.x + sp.w, sp.y + sp.h]} {...commonProps} />;
+              return null;
+            })()}
+
+            {/* Sort nodes by layer for z-ordering */}
+            {[...nodes].sort((a, b) => (a.layer ?? 3) - (b.layer ?? 3)).map((node) => {
               const isAutoEdit = autoEditNodeId === node.id;
               if (isAutoEdit) {
                 autoEditNodeId = null;
