@@ -43,9 +43,12 @@ test.describe('11 - Toolbar Format (REQ-TOOL-002..005)', () => {
     let store = await getCanvasStore(page);
     const initialFontSize = store.nodes[0].data.fontSize;
 
-    // Change font size via select dropdown
-    const fontSelect = page.locator('.text-toolbar__select');
-    await fontSelect.selectOption('24');
+    // Open size popover and pick a preset
+    await page.click('[data-testid="size-trigger"]');
+    await expect(page.locator('[data-testid="size-popover"]')).toBeVisible();
+
+    // Use the slider to change size to 24
+    await page.locator('[data-testid="size-slider"]').fill('24');
     await page.waitForTimeout(200);
 
     store = await getCanvasStore(page);
@@ -71,9 +74,12 @@ test.describe('11 - Toolbar Format (REQ-TOOL-002..005)', () => {
     let store = await getCanvasStore(page);
     const initialFill = store.nodes[0].data.fill;
 
-    // Click the Red color swatch (second color button)
-    const colorButtons = page.locator('.text-toolbar__color');
-    await colorButtons.nth(1).click(); // Red (#dc2626)
+    // Open color popover
+    await page.click('[data-testid="color-trigger"]');
+    await expect(page.locator('[data-testid="color-popover"]')).toBeVisible();
+
+    // Click the red swatch (row 2, col 1 = #dc2626)
+    await page.locator('.color-popover__swatch').nth(4).click(); // 5th swatch = red
     await page.waitForTimeout(200);
 
     store = await getCanvasStore(page);

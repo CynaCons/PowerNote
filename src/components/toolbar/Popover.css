@@ -1,0 +1,206 @@
+/* ── Popover Anchor ──────────────────────────── */
+.popover-anchor {
+  position: relative;
+}
+
+/* ── Trigger Button ─────────────────────────── */
+.toolbar-popover-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.toolbar-popover-trigger:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.toolbar-popover-trigger__swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.toolbar-popover-trigger__value {
+  font-size: 11px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* ── Popover Panel ──────────────────────────── */
+.toolbar-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  padding: 10px;
+  z-index: 50;
+  min-width: 180px;
+  animation: popover-in 0.12s ease-out;
+}
+
+.toolbar-popover--size {
+  min-width: 200px;
+}
+
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.toolbar-popover__title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.toolbar-popover__divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 8px 0;
+}
+
+/* ── Color Grid ─────────────────────────────── */
+.color-popover__grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.color-popover__row {
+  display: flex;
+  gap: 4px;
+}
+
+.color-popover__swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.color-popover__swatch:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.color-popover__swatch--active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-active);
+}
+
+/* ── Custom Color Input ─────────────────────── */
+.color-popover__custom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.color-popover__native-picker {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0;
+  cursor: pointer;
+  background: none;
+  flex-shrink: 0;
+}
+
+.color-popover__native-picker::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.color-popover__native-picker::-webkit-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+
+.color-popover__hex-input {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: monospace;
+  background: var(--color-surface);
+  color: var(--color-text);
+  outline: none;
+}
+
+.color-popover__hex-input:focus {
+  border-color: var(--color-primary);
+}
+
+/* ── Size Slider ────────────────────────────── */
+.size-popover__slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.size-popover__range {
+  flex: 1;
+  height: 4px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.size-popover__readout {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ── Size Presets ────────────────────────────── */
+.size-popover__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.size-popover__preset {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.12s;
+  border: 1px solid transparent;
+}
+
+.size-popover__preset:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.size-popover__preset--active {
+  background: var(--color-active);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}

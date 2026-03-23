@@ -1,21 +1,13 @@
 import { Bold, Italic } from 'lucide-react';
 import type { TextOptions } from '../../types/data';
+import { ColorPopover } from './ColorPopover';
+import { SizePopover } from './SizePopover';
 import './BottomToolbar.css';
 
 interface TextToolbarProps {
   options: TextOptions;
   onChange: (updates: Partial<TextOptions>) => void;
 }
-
-const FONT_SIZES = [12, 14, 16, 20, 24, 32, 48];
-const COLORS = [
-  { value: '#1a1a1a', label: 'Black' },
-  { value: '#dc2626', label: 'Red' },
-  { value: '#2563eb', label: 'Blue' },
-  { value: '#16a34a', label: 'Green' },
-  { value: '#9333ea', label: 'Purple' },
-  { value: '#737373', label: 'Gray' },
-];
 
 export function TextToolbar({ options, onChange }: TextToolbarProps) {
   const isBold = options.fontStyle.includes('bold');
@@ -43,18 +35,15 @@ export function TextToolbar({ options, onChange }: TextToolbarProps) {
 
   return (
     <div className="text-toolbar">
-      <select
-        className="text-toolbar__select"
+      <SizePopover
         value={options.fontSize}
-        onChange={(e) => onChange({ fontSize: Number(e.target.value) })}
-        title="Font size"
-      >
-        {FONT_SIZES.map((size) => (
-          <option key={size} value={size}>
-            {size}px
-          </option>
-        ))}
-      </select>
+        onChange={(fontSize) => onChange({ fontSize })}
+        min={8}
+        max={72}
+        label="Font Size"
+        icon="text"
+        unit="px"
+      />
 
       <div className="text-toolbar__divider" />
 
@@ -76,25 +65,11 @@ export function TextToolbar({ options, onChange }: TextToolbarProps) {
 
       <div className="text-toolbar__divider" />
 
-      <div className="text-toolbar__colors">
-        {COLORS.map((color) => (
-          <button
-            key={color.value}
-            className={`text-toolbar__color ${options.fill === color.value ? 'text-toolbar__color--active' : ''}`}
-            style={{ backgroundColor: color.value }}
-            onClick={() => onChange({ fill: color.value })}
-            title={color.label}
-          />
-        ))}
-        <input
-          type="color"
-          className="text-toolbar__color-picker"
-          value={options.fill}
-          onChange={(e) => onChange({ fill: e.target.value })}
-          title="Custom color"
-          data-testid="color-picker"
-        />
-      </div>
+      <ColorPopover
+        value={options.fill}
+        onChange={(fill) => onChange({ fill })}
+        label="Text Color"
+      />
     </div>
   );
 }
