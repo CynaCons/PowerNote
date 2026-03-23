@@ -534,26 +534,10 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
           if (drawOpts.eraserMode === 'stroke') {
             eraseStrokeAt(pt.x, pt.y);
           } else {
-            // Zone eraser with shake-to-grow
-            const now = Date.now();
-            const es = eraserState.current;
-            const dx = pt.x - (eraserPos?.x ?? pt.x);
-            const dy = pt.y - (eraserPos?.y ?? pt.y);
-            const dt = now - es.lastTime;
-
-            es.shakeScore *= Math.exp(-dt / 200);
-            const len = Math.sqrt(dx * dx + dy * dy);
-            if (len > 2 && es.prevDir) {
-              const nx = dx / len, ny = dy / len;
-              const dot = nx * es.prevDir.x + ny * es.prevDir.y;
-              if (dot < 0) es.shakeScore += Math.abs(dot) * 2;
-            }
-            if (len > 2) es.prevDir = { x: dx / len, y: dy / len };
-            es.lastTime = now;
-
-            const dynamicRadius = Math.min(60, (drawOpts.eraserSize / 2) + es.shakeScore * 10);
-            setEraserPos({ x: pt.x, y: pt.y, radius: dynamicRadius });
-            eraseZoneAt(pt.x, pt.y, dynamicRadius);
+            // Zone eraser — constant size from settings
+            const r = drawOpts.eraserSize / 2;
+            setEraserPos({ x: pt.x, y: pt.y, radius: r });
+            eraseZoneAt(pt.x, pt.y, r);
           }
         }
       } else {
