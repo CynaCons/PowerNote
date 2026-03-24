@@ -366,7 +366,7 @@
 | v0.5.x | **v0.5.0 tagged** |
 | v0.6.x | **v0.6.0 tagged** |
 | v0.7.x | **v0.7.0 tagged** |
-| v0.8.x | **In progress** |
+| v0.8.x | **v0.8.1 tagged** |
 
 ---
 
@@ -426,7 +426,7 @@
 - [x] Shape toolbar live updates verified (already working)
 - [x] E2E tests 54-56: click+drag creation, mode isolation, styling (17 tests)
 - [x] All 155 tests pass
-- [ ] Tag v0.8.0
+- [x] Tag v0.8.1
 
 ---
 
