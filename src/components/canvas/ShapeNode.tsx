@@ -82,6 +82,8 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
       ref={groupRef}
       x={node.x}
       y={node.y}
+      width={isLinear ? hitW : w}
+      height={isLinear ? hitH : h}
       draggable={isInteractive}
       listening={isInteractive}
       onDragMove={handleDragMove}
