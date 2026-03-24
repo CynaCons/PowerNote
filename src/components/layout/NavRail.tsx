@@ -48,6 +48,7 @@ export function NavRail({ onToggleHierarchy, isHierarchyOpen, onToggleSettings, 
             type: 'image',
             x: 200, y: yPos,
             width: w, height: h,
+            layer: 3,
             data: {
               src,
               alt: file.name || 'image',

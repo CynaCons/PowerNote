@@ -54,11 +54,11 @@ export function SelectionTransformer({ selectedNodeIds, stageRef }: SelectionTra
 
     for (const konvaNode of transformer.nodes()) {
       // Try to find the node ID from any child element
-      const id = konvaNode.findOne('Rect')?.id()
-        || konvaNode.findOne('Image')?.id()
-        || konvaNode.findOne('Ellipse')?.id()
-        || konvaNode.findOne('Line')?.id()
-        || konvaNode.findOne('Arrow')?.id();
+      const id = (konvaNode as any).findOne('Rect')?.id()
+        || (konvaNode as any).findOne('Image')?.id()
+        || (konvaNode as any).findOne('Ellipse')?.id()
+        || (konvaNode as any).findOne('Line')?.id()
+        || (konvaNode as any).findOne('Arrow')?.id();
       if (!id) continue;
 
       // Get the actual pixel dimensions after transform

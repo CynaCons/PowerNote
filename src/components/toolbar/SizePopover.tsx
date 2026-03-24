@@ -91,7 +91,7 @@ export function SizePopover({
   );
 }
 
-function getPresets(min: number, max: number, icon: string): number[] {
+function getPresets(_min: number, _max: number, icon: string): number[] {
   if (icon === 'stroke') {
     return [1, 2, 4, 8, 12, 20];
   }

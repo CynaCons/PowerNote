@@ -39,6 +39,7 @@ function addImageFromFile(file: File, x: number, y: number) {
         x, y,
         width: w,
         height: h,
+        layer: 3,
         data: {
           src,
           alt: file.name || 'image',
@@ -357,6 +358,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
           y: stageY,
           width: 120,
           height: 30,
+          layer: 4,
           data: {
             text: '',
             fontSize: currentTextOptions.fontSize,
@@ -497,7 +499,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
   // ── Drawing tool event handlers ──────────────────────────
   const isDrawTool = activeTool === 'draw' || activeTool === 'lasso' || activeTool === 'shape';
 
-  const getCanvasPoint = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+  const getCanvasPoint = useCallback((_e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = stageRef.current;
     if (!stage) return { x: 0, y: 0 };
     const pos = stage.getPointerPosition();
@@ -517,7 +519,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
     if (tool === 'shape') {
       let target: Konva.Node | null = e.target;
       while (target && target !== stageRef.current) {
-        const rect = target.findOne?.('Rect');
+        const rect = (target as any).findOne?.('Rect');
         if (rect?.id?.() && useCanvasStore.getState().nodes.find(n => n.id === rect.id())) {
           return; // Clicked on an existing node — don't start shape
         }
@@ -853,7 +855,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
     // Walk up to find a Group with an element that has a node ID
     let current: Konva.Node | null = target;
     while (current && current !== stageRef.current) {
-      const rect = current.findOne?.('Rect');
+      const rect = (current as any).findOne?.('Rect');
       const nodeId = rect?.id?.();
       if (nodeId) {
         const storeNode = useCanvasStore.getState().nodes.find((n) => n.id === nodeId);

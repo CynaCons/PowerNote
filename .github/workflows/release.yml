@@ -1,0 +1,41 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build:template
+
+      - name: Copy release artifact
+        run: cp dist-template/index.html PowerNote.html
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: PowerNote.html
+          generate_release_notes: true
+          body: |
+            ## PowerNote ${{ github.ref_name }}
+
+            **Download `PowerNote.html`** below — open it in any browser to start taking notes.
+
+            No install. No account. No server. Just open and write.
+
+            Your notes are saved inside the file itself — Ctrl+S to download your personalized copy.

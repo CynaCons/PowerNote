@@ -14,7 +14,7 @@ interface ImageNodeProps {
   onSnapChange: (lines: SnapLine[]) => void;
 }
 
-export function ImageNode({ node, isSelected, onSelect, stageScale, onSnapChange }: ImageNodeProps) {
+export function ImageNode({ node, isSelected, onSelect, stageScale: _stageScale, onSnapChange }: ImageNodeProps) {
   const data = node.data as ImageNodeData;
   const groupRef = useRef<Konva.Group>(null);
   const updateNode = useCanvasStore((s) => s.updateNode);
