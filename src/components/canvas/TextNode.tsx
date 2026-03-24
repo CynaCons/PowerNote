@@ -67,7 +67,12 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
   const updateNode = useCanvasStore((s) => s.updateNode);
   const updateNodeSilent = useCanvasStore((s) => s.updateNodeSilent);
   const [isEditing, setIsEditing] = useState(!!autoEdit);
+  const [hovered, setHovered] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+
+  // Only allow drag/hover in interactive modes (not draw or lasso)
+  const activeTool = useToolStore((s) => s.activeTool);
+  const isInteractive = activeTool === 'select' || activeTool === 'text' || activeTool === 'shape';
 
   // Parse markdown to HTML
   const renderedHtml = useMemo(() => {
@@ -173,15 +178,20 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
       ref={groupRef}
       x={node.x}
       y={node.y}
-      draggable
+      draggable={isInteractive}
+      listening={isInteractive}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onMouseDown={handleMouseDown}
       onMouseEnter={(e) => {
+        if (!isInteractive) return;
+        setHovered(true);
         const stage = e.target.getStage();
         if (stage) stage.container().style.cursor = 'pointer';
       }}
       onMouseLeave={(e) => {
+        if (!isInteractive) return;
+        setHovered(false);
         const stage = e.target.getStage();
         if (stage) stage.container().style.cursor = 'default';
       }}
@@ -209,7 +219,7 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
       >
         <div
           ref={htmlRef}
-          className={`powernote-markdown ${isSelected ? 'powernote-markdown--selected' : ''}`}
+          className={`powernote-markdown ${isSelected ? 'powernote-markdown--selected' : ''} ${hovered && !isSelected ? 'powernote-markdown--hovered' : ''}`}
           onClick={(e) => {
             const target = e.target as HTMLElement;
             // Handle checkbox clicks

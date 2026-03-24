@@ -84,8 +84,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set((state) => {
       pushUndo(state.nodes);
       useWorkspaceStore.getState().markDirty();
-      // Ensure layer defaults to 3 if not specified
-      const withLayer = { ...node, layer: node.layer ?? 3 };
+      // Default layers: text=4 (above shapes), shapes/images=3
+      const defaultLayer = node.type === 'text' ? 4 : 3;
+      const withLayer = { ...node, layer: node.layer ?? defaultLayer };
       return { nodes: [...state.nodes, withLayer] };
     }),
 

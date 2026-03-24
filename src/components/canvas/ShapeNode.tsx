@@ -63,32 +63,51 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
   const w = node.width;
   const h = node.height;
 
+  // For arrows/lines: w and h are signed (direction vector).
+  // Compute bounding box for hit area and highlight overlays.
+  const isLinear = data.shapeType === 'arrow' || data.shapeType === 'line';
+  const hitX = isLinear ? Math.min(0, w) : 0;
+  const hitY = isLinear ? Math.min(0, h) : 0;
+  const hitW = isLinear ? Math.abs(w) : w;
+  const hitH = isLinear ? Math.abs(h) : h;
+  // Pad linear hit area so thin lines are clickable
+  const hitPad = isLinear ? Math.max(10, strokeWidth * 3) : 0;
+
+  // Only allow drag/hover in interactive modes (not draw or lasso)
+  const activeTool = useToolStore((s) => s.activeTool);
+  const isInteractive = activeTool === 'select' || activeTool === 'text' || activeTool === 'shape';
+
   return (
     <Group
       ref={groupRef}
       x={node.x}
       y={node.y}
-      draggable
+      draggable={isInteractive}
+      listening={isInteractive}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onClick={handleClick}
       onTap={handleClick}
       onMouseEnter={(e) => {
+        if (!isInteractive) return;
         setHovered(true);
         const stage = e.target.getStage();
         if (stage) stage.container().style.cursor = 'pointer';
       }}
       onMouseLeave={(e) => {
+        if (!isInteractive) return;
         setHovered(false);
         const stage = e.target.getStage();
         if (stage) stage.container().style.cursor = 'default';
       }}
     >
-      {/* Invisible hit area for easier selection */}
+      {/* Invisible hit area — padded for lines/arrows */}
       <Rect
         id={node.id}
-        width={w}
-        height={h}
+        x={hitX - hitPad}
+        y={hitY - hitPad}
+        width={hitW + hitPad * 2}
+        height={hitH + hitPad * 2}
         fill="transparent"
         listening={true}
       />
@@ -157,11 +176,13 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
         />
       )}
 
-      {/* Hover highlight */}
+      {/* Hover highlight — uses bounding box for linear shapes */}
       {hovered && !isSelected && (
         <Rect
-          width={w}
-          height={h}
+          x={hitX}
+          y={hitY}
+          width={hitW}
+          height={hitH}
           fill="transparent"
           stroke="#93c5fd"
           strokeWidth={1.5 / stageScale}
@@ -172,8 +193,10 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
       {/* Selection highlight */}
       {isSelected && (
         <Rect
-          width={w}
-          height={h}
+          x={hitX}
+          y={hitY}
+          width={hitW}
+          height={hitH}
           fill="transparent"
           stroke="#2563eb"
           strokeWidth={2 / stageScale}

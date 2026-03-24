@@ -687,7 +687,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
     setLassoRect(null);
     const opts = useToolStore.getState().drawOptions;
     if (!(tool === 'draw' && opts.isErasing)) setEraserPos(null);
-  }, [inProgressPoints, lassoRect]);
+  }, [inProgressPoints, lassoRect, shapePreview]);
 
   // Stroke eraser: deletes entire stroke if any point is within touch radius
   function eraseStrokeAt(x: number, y: number) {
@@ -877,10 +877,9 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
   }, []);
 
   // Cursor style based on active tool
+  // No crosshair anywhere — use default pointer, draw uses none (custom dot)
   const cursorClass =
-    activeTool === 'text' ? 'infinite-canvas--crosshair'
-    : activeTool === 'draw' ? 'infinite-canvas--none'
-    : activeTool === 'shape' ? ''
+    activeTool === 'draw' ? 'infinite-canvas--none'
     : activeTool === 'lasso' ? 'infinite-canvas--crosshair'
     : '';
 
