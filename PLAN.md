@@ -411,12 +411,23 @@
 - [x] Copy, Duplicate, Delete actions
 - [x] Nodes rendered in layer order
 
-### v0.8.7 — SRS + E2E Tests + Tag
+### v0.8.7 — SRS + E2E Tests
 - [x] SRS_SHAPES.md (REQ-SHAPE-001..015)
 - [x] E2E tests 51-53: shape creation, toolbar, context menu
-- [ ] All tests pass
+
+### v0.8.8 — UX Fixes (9 items)
+- [x] Shape click+drag creation fixed (stale closure in handleDrawMouseUp)
+- [x] Crosshair cursor removed — normal pointer everywhere
+- [x] Hover highlight added to TextNode and ShapeNode
+- [x] Arrow/line hit area fixed for signed width/height (bounding box)
+- [x] Mode isolation: nodes not draggable/selectable in draw mode
+- [x] Z-index: text defaults to layer 4 (above shapes at layer 3)
+- [x] Keyboard shortcuts verified (already guarded against input fields)
+- [x] Shape toolbar live updates verified (already working)
+- [x] E2E tests 54-56: click+drag creation, mode isolation, styling (17 tests)
+- [x] All 155 tests pass
 - [ ] Tag v0.8.0
 
 ---
 
-**Last updated:** 2026-03-22
+**Last updated:** 2026-03-24
