@@ -5,6 +5,7 @@ import { useCanvasStore, undoBatchStart } from '../../stores/useCanvasStore';
 import { useToolStore } from '../../stores/useToolStore';
 import { useDrawStore } from '../../stores/useDrawStore';
 import { CanvasNode } from './CanvasNode';
+import { SelectionTransformer } from './SelectionTransformer';
 import { ContextMenu } from './ContextMenu';
 import { SnapGuides, type SnapLine } from './SnapGuides';
 import { PageGuides, type BackgroundMode } from './PageGuides';
@@ -972,6 +973,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
               );
             })}
             <SnapGuides lines={snapLines} />
+            <SelectionTransformer selectedNodeIds={selectedNodeIds} stageRef={stageRef} />
           </Layer>
         </Stage>
       )}
