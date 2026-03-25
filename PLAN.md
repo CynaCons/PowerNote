@@ -90,7 +90,7 @@
 - [x] T shortcut for text tool
 - [x] Guard: always >= 1 section and page (in workspace store)
 - [x] Full end-to-end smoke test
-- [ ] Git tag v0.1.0
+- [x] Git tag v0.1.0
 
 ---
 
@@ -156,7 +156,7 @@
 
 ### v0.2.8 — UX Hardening (user feedback)
 - [x] Fix: text tool strictly one-shot, no accidental text creation on canvas clicks
-- [ ] UX assessment and improvements
+- [x] UX assessment and improvements (addressed in v0.2.7 + v0.8.8)
 - [x] Fix: double-click on text must immediately focus textarea for typing
 
 ---
@@ -214,7 +214,7 @@
 - [x] New E2E tests for all v0.3 features (tests 22-33, 39 tests, all green)
 - [x] SRS documents updated
 - [x] Full test suite green
-- [ ] Git tag v0.3.0
+- [x] Git tag v0.3.0
 
 ---
 
@@ -226,8 +226,8 @@
 - [x] Download button in TopBar (right side) + Ctrl+S shortcut
 - [x] `<script id="powernote-data" type="application/json">{ ... }</script>`
 - [x] File downloads as `<notebook-name>.html`
-- [ ] Generate HTML file using Vite production bundle (not dev server HTML)
-- [ ] Build system: `vite build` produces self-contained app, export injects data
+- [x] Generate HTML file using Vite production bundle (vite-plugin-singlefile)
+- [x] Build system: `npm run build:template` produces self-contained 568KB HTML
 
 ### v0.4.1 — Load / Hydrate from HTML
 - [x] On app start, check for embedded `#powernote-data` script tag
@@ -292,8 +292,8 @@
 ### v0.5.5 — Zoom to Fit
 - [x] Maximize button in TopBar
 - [x] Calculate bounding box of all nodes on current page
-- [ ] Animate camera to fit all content with padding
-- [ ] SRS: REQ-CANVAS-012
+- [x] Zoom to fit (instant jump to bounding box)
+- [x] SRS: REQ-CANVAS-012
 
 ### v0.5.6 — Settings Panel
 - [x] Settings gear icon anchored at bottom of NavRail
@@ -303,8 +303,8 @@
 ### v0.5.7 — E2E Tests + Polish + Tag v0.5.0
 - [x] E2E test 39: standalone HTML export (file:// round-trip)
 - [x] Full test suite green (101 tests)
-- [ ] Rebuild export template
-- [ ] Git tag v0.5.0
+- [x] Rebuild export template (vite.export.config.ts)
+- [x] Git tag v0.5.0
 
 ---
 
@@ -347,26 +347,19 @@
 
 ---
 
-## v0.7 — Drawing + Shapes (planned)
-> Freehand drawing, rectangles, arrows, basic shape tools
-
-## v0.8 — Cloud Sync (planned)
-> Paid tier, multi-device sync
-
----
-
 ## Current Status
 
 | Iteration | Status |
 |-----------|--------|
-| v0.1.x | **v0.1.0 tagged** |
-| v0.2.x | **v0.2.0 tagged** |
-| v0.3.x | **v0.3.0 tagged** |
-| v0.4.x | **v0.4.0 tagged** |
-| v0.5.x | **v0.5.0 tagged** |
-| v0.6.x | **v0.6.0 tagged** |
-| v0.7.x | **v0.7.0 tagged** |
-| v0.8.x | **v0.8.1 tagged** |
+| v0.1.x | **v0.1.0 tagged** — Text on Canvas (Foundation) |
+| v0.2.x | **v0.2.0 tagged** — Testing, CRUD, Interaction Overhaul |
+| v0.3.x | **v0.3.0 tagged** — Core UX Maturity (undo, search, reorder) |
+| v0.4.x | **v0.4.0 tagged** — Save/Load Self-Contained HTML |
+| v0.5.x | **v0.5.0 tagged** — Standalone Export, Links, Settings |
+| v0.6.x | **v0.6.0 tagged** — Images on Canvas |
+| v0.7.x | **v0.7.0 tagged** — Drawing + Eraser Tools |
+| v0.8.x | **v0.8.1 tagged** — Shapes, Arrows & Z-Index |
+| v0.9.x | **v0.9.1 tagged** — Production Build + GitHub Release |
 
 ---
 
@@ -428,6 +421,195 @@
 - [x] All 155 tests pass
 - [x] Tag v0.8.1
 
+## v0.9 — Production Build + GitHub Release
+> TS fixes, CI/CD, README, automated release pipeline
+
+### v0.9.0 — Build + Release Infrastructure
+- [x] Fix all TypeScript compilation errors for clean `tsc -b`
+- [x] `npm run build:template` produces 568KB standalone HTML
+- [x] GitHub Actions workflow: auto-build + attach PowerNote.html on tag push
+- [x] README.md with download link, feature list, dev instructions
+- [x] .gitignore updated for build artifacts
+- [x] Git tag v0.9.0, published release
+
+### v0.9.1 — Shape Resize Fix
+- [x] Wire up SelectionTransformer for shapes (explicit Group dimensions)
+- [x] All 155 tests pass
+- [x] Git tag v0.9.1, published release
+
 ---
 
-**Last updated:** 2026-03-24
+## v0.10 — Production Polish
+> Auto-save, export quality, code decomposition, test hardening
+
+### v0.10.0 — Auto-Save to localStorage
+- [ ] Periodic auto-save every 30s to localStorage
+- [ ] Restore from localStorage on app start (if no embedded data)
+- [ ] Clear localStorage after successful file export
+- [ ] SRS: REQ-FILE-009..011
+- [ ] E2E tests
+
+### v0.10.1 — In-App Export Uses Production Bundle
+- [ ] Dev mode: fetch dist-template HTML, inject data, trigger download
+- [ ] Prod mode (standalone): serialize into self, trigger download
+- [ ] Ctrl+S always produces a truly standalone HTML file
+- [ ] E2E test: export from dev mode, open as file://, verify content
+- [ ] SRS: REQ-FILE-012
+
+### v0.10.2 — Decompose InfiniteCanvas.tsx
+- [ ] Extract shape creation logic → useShapeCreation.ts hook
+- [ ] Extract text placement logic → useTextPlacement.ts hook
+- [ ] Extract keyboard shortcuts → useCanvasKeyboard.ts hook
+- [ ] Extract context menu logic → useContextMenu.ts hook
+- [ ] InfiniteCanvas.tsx under 400 lines
+- [ ] All existing tests still pass
+
+### v0.10.3 — Centralized Tool State Machine
+- [ ] Define explicit tool transitions (select↔text↔draw↔shape↔eraser)
+- [ ] Guard: what's selectable/draggable per tool mode
+- [ ] Guard: what canvas clicks do per tool mode
+- [ ] Remove ad-hoc mode checks scattered through components
+- [ ] E2E tests for mode transitions
+
+### v0.10.4 — Test Coverage Hardening
+- [ ] Enhance SRS_CANVAS.md with new requirements from v0.3-v0.9 features
+- [ ] Enhance SRS_TEXT.md with markdown rendering, auto-width, checkbox reqs
+- [ ] Enhance SRS_FILE.md with standalone export, auto-save reqs
+- [ ] Add SRS_DRAW.md (drawing + eraser requirements)
+- [ ] Add SRS_SEARCH.md (search requirements — currently in SRS_CANVAS)
+- [ ] Add SRS_SETTINGS.md (background modes, page guides)
+- [ ] Fill test gaps: undo/redo edge cases, multi-select operations, zoom-to-fit
+- [ ] Target: 200+ tests
+- [ ] All tests green, tag v0.10.0
+
+---
+
+## v0.11 — UX Refinement
+> Keyboard shortcuts, cursor polish, empty state, tool feedback
+
+### v0.11.0 — Keyboard Shortcut Overlay
+- [ ] Press `?` to show a modal listing all shortcuts
+- [ ] Grouped by category: navigation, tools, editing, file
+- [ ] Dismissable with Escape or click outside
+- [ ] SRS: REQ-UI-001
+
+### v0.11.1 — Cursor Improvements
+- [ ] Per-tool cursors: crosshair for shape creation, text cursor for text, pen for draw
+- [ ] Resize cursors on shape handles (nw-resize, etc.)
+- [ ] Grab/grabbing cursor for panning
+- [ ] SRS: REQ-UI-002
+
+### v0.11.2 — Empty State Guidance
+- [ ] When canvas is empty: show centered hint text ("Click T or press T to add text")
+- [ ] When hierarchy is empty: show "Create a section" prompt
+- [ ] Hints disappear once first element is added
+- [ ] SRS: REQ-UI-003
+
+### v0.11.3 — Zoom Controls (visual)
+- [ ] Zoom percentage display in TopBar or bottom-right corner
+- [ ] Zoom in/out buttons (+/- icons)
+- [ ] Scroll to zoom indicator on first use
+
+### v0.11.4 — Pinch-to-Zoom (Touch)
+- [ ] Multi-touch pinch zoom on canvas
+- [ ] Two-finger pan
+- [ ] Touch-friendly selection (long-press = select)
+- [ ] SRS: REQ-CANVAS-013..015
+- [ ] E2E tests, tag v0.11.0
+
+---
+
+## v0.12 — File Management
+> Open files, recent files, file system integration
+
+### v0.12.0 — Open Existing PowerNote Files
+- [ ] Drag-drop `.html` file onto the app to open it
+- [ ] File picker button ("Open" in TopBar or File menu)
+- [ ] Uses File System Access API in supported browsers
+- [ ] Falls back to `<input type="file">` in others
+- [ ] Warns if current notebook has unsaved changes
+- [ ] SRS: REQ-FILE-013..015
+
+### v0.12.1 — Recent Files List
+- [ ] Store recent file names + last-opened timestamp in localStorage
+- [ ] "Recent" section in a welcome screen or File menu
+- [ ] Click recent entry → file picker pre-filtered (user must re-select due to browser security)
+- [ ] Clear recent files option
+- [ ] SRS: REQ-FILE-016..017
+
+### v0.12.2 — Save-in-Place (File System Access API)
+- [ ] If browser supports `showSaveFilePicker()`: save directly to same path
+- [ ] No re-download needed — true Ctrl+S save behavior
+- [ ] Fallback: download as before in unsupported browsers
+- [ ] SRS: REQ-FILE-018
+
+### v0.12.3 — E2E Tests + Tag v0.12.0
+- [ ] Tests for open, recent, save-in-place
+- [ ] All tests green, tag v0.12.0
+
+---
+
+## v0.13 — Advanced Text
+> Heading sizes, link navigation, find-and-replace
+
+### v0.13.0 — Visual Heading Sizes
+- [ ] `# H1` renders at 28px, `## H2` at 22px, `### H3` at 18px on canvas
+- [ ] Heading size affects text block auto-width
+- [ ] Bold/italic rendering matches markdown spec
+- [ ] SRS: REQ-TEXT-023..025
+
+### v0.13.1 — Clickable Links on Canvas
+- [ ] External links: Ctrl+Click or single-click opens in new tab
+- [ ] Internal page links: click navigates to linked page
+- [ ] Link hover: tooltip showing destination
+- [ ] SRS: REQ-TEXT-026..028
+
+### v0.13.2 — Find and Replace
+- [ ] Ctrl+H opens find-and-replace panel
+- [ ] Search across current page text nodes
+- [ ] Replace one / replace all
+- [ ] Highlight matches in real-time
+- [ ] SRS: REQ-SEARCH-006..008
+- [ ] E2E tests, tag v0.13.0
+
+---
+
+## v0.14 — Export & Sharing
+> PDF export, image export, print support
+
+### v0.14.0 — PDF Export
+- [ ] Export current page as PDF (via browser print API or html2canvas + jsPDF)
+- [ ] A4 page boundaries guide the page breaks
+- [ ] Include all visible elements: text, images, shapes, drawings
+- [ ] SRS: REQ-EXPORT-001..003
+
+### v0.14.1 — Image Export (PNG/SVG)
+- [ ] Export current page as PNG (Konva Stage toDataURL)
+- [ ] Optional: SVG export for vector quality
+- [ ] Configurable resolution/scale
+- [ ] SRS: REQ-EXPORT-004..005
+
+### v0.14.2 — Print Support
+- [ ] Ctrl+P triggers browser print with proper styling
+- [ ] Print CSS: hide nav rail, toolbar, hierarchy panel
+- [ ] Content laid out for A4 pages
+- [ ] SRS: REQ-EXPORT-006
+- [ ] E2E tests, tag v0.14.0
+
+---
+
+## Future (Backlog)
+> Not yet planned — will be prioritized when earlier iterations are complete
+
+- **Cloud Sync** — Paid tier (€2-5/month), multi-device sync, backup, version history
+- **Collaboration** — Real-time co-editing, comments, presence indicators
+- **Collapsible Containers** — Canvas-in-canvas grouping (deferred from v0.2)
+- **Template Gallery** — Pre-built page templates (meeting notes, project plan, etc.)
+- **Advanced Diagram Tools** — Connectors, flowcharts, mind maps
+- **Mobile App** — React Native or PWA for tablet/phone
+- **Plugin System** — Community extensions
+- **Database/Table Blocks** — Notion-style structured data on canvas
+
+---
+
+**Last updated:** 2026-03-25
