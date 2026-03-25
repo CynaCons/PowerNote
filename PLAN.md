@@ -596,6 +596,50 @@
 - [ ] SRS: REQ-EXPORT-006
 - [ ] E2E tests, tag v0.14.0
 
+## v0.15 — Advanced Image Tools
+> Full image editing toolbar: import, crop, rotate, lossless resize
+
+### v0.15.0 — Image Toolbar (Bottom Bar)
+- [ ] Clicking image tool in NavRail opens ImageToolbar in bottom bar
+- [ ] Import/Open file button with file icon (opens file picker, accepts multiple)
+- [ ] Toolbar adapts: import-mode when no image selected, edit-mode when image selected
+- [ ] SRS: REQ-IMAGE-001..003
+
+### v0.15.1 — Image Crop (PowerPoint-style)
+- [ ] Crop mode: click "Crop" button in toolbar when image is selected
+- [ ] Dark overlay shows cropped-out area, drag handles adjust crop region
+- [ ] Confirm crops the image (updates base64 src with cropped data)
+- [ ] Cancel restores original
+- [ ] Non-destructive: store original src + crop rect, re-crop anytime
+- [ ] SRS: REQ-IMAGE-004..007
+- [ ] E2E tests
+
+### v0.15.2 — Image Rotate
+- [ ] Rotate button in toolbar (90° CW/CCW increments)
+- [ ] Free rotation via drag handle (like shapes)
+- [ ] Rotation stored in node data, applied via CSS transform on Konva Image
+- [ ] SRS: REQ-IMAGE-008..009
+
+### v0.15.3 — Lossless Image Resize
+- [ ] Resize handles on selected image (already works via SelectionTransformer)
+- [ ] Maintain aspect ratio by default (Shift to free-resize)
+- [ ] Store original naturalWidth/Height, render at display size
+- [ ] No re-encoding on resize — only display scale changes
+- [ ] Zoom into image shows full resolution (no pixelation until past original size)
+- [ ] SRS: REQ-IMAGE-010..012
+
+### v0.15.4 — Multi-Image Import
+- [ ] File picker accepts multiple files at once
+- [ ] Images placed in a grid layout on canvas (auto-arranged, no overlap)
+- [ ] Drag-drop multiple files from OS file explorer
+- [ ] Paste multiple images from clipboard (if supported)
+- [ ] SRS: REQ-IMAGE-013..014
+
+### v0.15.5 — E2E Tests + Tag v0.15.0
+- [ ] Tests for crop, rotate, resize, multi-import
+- [ ] Add SRS_IMAGE.md with all REQ-IMAGE requirements
+- [ ] All tests green, tag v0.15.0
+
 ---
 
 ## Future (Backlog)
