@@ -2,7 +2,7 @@ import { ChevronRight, Download, FolderOpen, Maximize } from 'lucide-react';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
-import { buildExportHtml, downloadFile, extractDataFromHtml } from '../../utils/serialization';
+import { buildExportHtml, downloadFile, extractDataFromHtml, clearAutoSave } from '../../utils/serialization';
 import { useRef, useState, useEffect } from 'react';
 import { showToast } from './Toast';
 import './TopBar.css';
@@ -43,6 +43,7 @@ export function TopBar() {
       const filename = freshWorkspace.filename.replace(/[^a-zA-Z0-9_\- ]/g, '_') + '.html';
       downloadFile(html, filename);
       markClean();
+      clearAutoSave();
       showToast('Notebook saved successfully', 'success');
     } catch (err) {
       showToast('Failed to save notebook', 'error');

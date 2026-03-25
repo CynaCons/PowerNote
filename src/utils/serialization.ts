@@ -1,6 +1,8 @@
 import type { WorkspaceData } from '../types/data';
 
 const DATA_SCRIPT_ID = 'powernote-data';
+const AUTOSAVE_KEY = 'powernote-autosave';
+const AUTOSAVE_INTERVAL_MS = 30_000; // 30 seconds
 
 /**
  * Serialize workspace data to a JSON string
@@ -102,4 +104,60 @@ export function extractDataFromHtml(htmlContent: string): WorkspaceData | null {
   );
   if (!match) return null;
   return deserializeWorkspace(match[1].trim());
+}
+
+// ─── Auto-Save to localStorage ───────────────────────────────
+
+/**
+ * Save workspace to localStorage
+ */
+export function autoSaveToLocalStorage(workspace: WorkspaceData): void {
+  try {
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(workspace));
+  } catch (e) {
+    console.warn('Auto-save failed (storage full?):', e);
+  }
+}
+
+/**
+ * Load workspace from localStorage (if available)
+ */
+export function loadFromLocalStorage(): WorkspaceData | null {
+  try {
+    const json = localStorage.getItem(AUTOSAVE_KEY);
+    if (!json) return null;
+    return deserializeWorkspace(json);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Clear auto-save from localStorage (call after successful file export)
+ */
+export function clearAutoSave(): void {
+  localStorage.removeItem(AUTOSAVE_KEY);
+}
+
+/**
+ * Start the auto-save interval. Returns a cleanup function to stop it.
+ * flushAndGetWorkspace should flush active page nodes/strokes to workspace
+ * and return the full workspace data.
+ */
+export function startAutoSave(
+  flushAndGetWorkspace: () => WorkspaceData,
+  getIsDirty: () => boolean,
+): () => void {
+  const interval = setInterval(() => {
+    if (!getIsDirty()) return;
+    const workspace = flushAndGetWorkspace();
+    autoSaveToLocalStorage(workspace);
+    // Don't markClean — only file export clears dirty flag
+    // But we can log for debugging
+    if (import.meta.env?.DEV) {
+      console.log('[PowerNote] Auto-saved to localStorage');
+    }
+  }, AUTOSAVE_INTERVAL_MS);
+
+  return () => clearInterval(interval);
 }
