@@ -8,6 +8,7 @@ import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useDrawStore } from '../../stores/useDrawStore';
 import { useToolStore } from '../../stores/useToolStore';
+import { isNodeInteractive } from '../../utils/toolConfig';
 import { TextEditor } from './TextEditor';
 import { calculateSnap, type SnapLine } from './SnapGuides';
 import { marked } from 'marked';
@@ -72,7 +73,7 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
 
   // Only allow drag/hover in interactive modes (not draw or lasso)
   const activeTool = useToolStore((s) => s.activeTool);
-  const isInteractive = activeTool === 'select' || activeTool === 'text' || activeTool === 'shape';
+  const isInteractive = isNodeInteractive(activeTool);
 
   // Parse markdown to HTML
   const renderedHtml = useMemo(() => {

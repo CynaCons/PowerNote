@@ -4,6 +4,7 @@ import type Konva from 'konva';
 import type { CanvasNode, ShapeNodeData } from '../../types/data';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useToolStore } from '../../stores/useToolStore';
+import { isNodeInteractive } from '../../utils/toolConfig';
 import { calculateSnap, type SnapLine } from './SnapGuides';
 
 interface ShapeNodeProps {
@@ -75,7 +76,7 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
 
   // Only allow drag/hover in interactive modes (not draw or lasso)
   const activeTool = useToolStore((s) => s.activeTool);
-  const isInteractive = activeTool === 'select' || activeTool === 'text' || activeTool === 'shape';
+  const isInteractive = isNodeInteractive(activeTool);
 
   return (
     <Group
