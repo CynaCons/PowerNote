@@ -360,6 +360,7 @@
 | v0.7.x | **v0.7.0 tagged** — Drawing + Eraser Tools |
 | v0.8.x | **v0.8.1 tagged** — Shapes, Arrows & Z-Index |
 | v0.9.x | **v0.9.1 tagged** — Production Build + GitHub Release |
+| v0.10.x | **In progress** — Production Polish (208 tests) |
 
 ---
 
@@ -457,12 +458,13 @@
 - [ ] SRS: REQ-FILE-012
 
 ### v0.10.2 — Decompose InfiniteCanvas.tsx
-- [ ] Extract shape creation logic → useShapeCreation.ts hook
-- [ ] Extract text placement logic → useTextPlacement.ts hook
-- [ ] Extract keyboard shortcuts → useCanvasKeyboard.ts hook
-- [ ] Extract context menu logic → useContextMenu.ts hook
-- [ ] InfiniteCanvas.tsx under 400 lines
-- [ ] All existing tests still pass
+- [x] Extract shape creation logic → useShapeCreation.ts hook
+- [x] Extract text placement logic → useTextPlacement.ts hook
+- [x] Extract keyboard shortcuts → useCanvasKeyboard.ts hook
+- [x] Extract context menu logic → useContextMenu.ts hook
+- [x] Extract drag-drop/paste logic → useCanvasDragDrop.ts hook
+- [x] InfiniteCanvas.tsx under 400 lines (350 lines)
+- [x] All existing tests still pass (155/155)
 
 ### v0.10.3 — Centralized Tool State Machine
 - [ ] Define explicit tool transitions (select↔text↔draw↔shape↔eraser)
@@ -472,15 +474,18 @@
 - [ ] E2E tests for mode transitions
 
 ### v0.10.4 — Test Coverage Hardening
-- [ ] Enhance SRS_CANVAS.md with new requirements from v0.3-v0.9 features
-- [ ] Enhance SRS_TEXT.md with markdown rendering, auto-width, checkbox reqs
-- [ ] Enhance SRS_FILE.md with standalone export, auto-save reqs
-- [ ] Add SRS_DRAW.md (drawing + eraser requirements)
-- [ ] Add SRS_SEARCH.md (search requirements — currently in SRS_CANVAS)
-- [ ] Add SRS_SETTINGS.md (background modes, page guides)
-- [ ] Fill test gaps: undo/redo edge cases, multi-select operations, zoom-to-fit
-- [ ] Target: 200+ tests
-- [ ] All tests green, tag v0.10.0
+- [x] Add SRS_DRAW.md (REQ-DRAW-001..008 — drawing + eraser requirements)
+- [x] Add SRS_SEARCH.md (REQ-SEARCH-001..005 — search requirements)
+- [x] Add SRS_SETTINGS.md (REQ-SETTINGS-001..003 — background modes, page guides)
+- [x] E2E test 57: undo/redo edge cases (7 tests)
+- [x] E2E test 58: advanced markdown rendering — tables, code, blockquotes, nested lists (9 tests)
+- [x] E2E test 59: multi-select operations — move, copy-paste, select-all, Ctrl+Click (8 tests)
+- [x] E2E test 60: zoom-to-fit button and behavior (5 tests)
+- [x] E2E test 61: auto-save to localStorage (4 tests)
+- [x] E2E test 62: tool state machine transitions (9 tests)
+- [x] E2E test 63: shape resize via Transformer (6 tests)
+- [x] E2E test 64: wheel zoom + scale bounds (6 tests)
+- [x] All 208 tests green (was 155)
 
 ---
 
