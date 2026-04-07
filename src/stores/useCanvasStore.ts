@@ -34,6 +34,7 @@ interface CanvasState {
   // Clipboard
   copySelectedNodes: () => void;
   pasteNodes: (offsetX?: number, offsetY?: number) => void;
+  hasClipboard: () => boolean;
 
   // Undo/Redo
   undo: () => void;
@@ -243,6 +244,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       };
     });
   },
+
+  hasClipboard: () => clipboard.length > 0,
 
   undo: () => {
     if (undoStack.length === 0) return;

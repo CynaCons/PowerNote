@@ -23,6 +23,8 @@ export interface ImageNodeData {
   naturalWidth: number;
   naturalHeight: number;
   crop?: ImageCrop; // PowerPoint-style non-destructive crop
+  note?: string; // Optional caption/legend text
+  rotation?: number; // Degrees (0, 90, 180, 270)
 }
 
 export type ShapeType = 'rect' | 'circle' | 'triangle' | 'arrow' | 'line';
@@ -88,7 +90,7 @@ export interface WorkspaceData {
 
 // ── Tool types ──────────────────────────────────────────────
 
-export type ToolType = 'select' | 'text' | 'draw' | 'lasso' | 'shape';
+export type ToolType = 'select' | 'text' | 'draw' | 'lasso' | 'shape' | 'image';
 
 export interface ShapeOptions {
   shapeType: ShapeType;

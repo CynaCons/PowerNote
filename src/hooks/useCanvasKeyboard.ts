@@ -77,10 +77,15 @@ export function useCanvasKeyboard(
         }
       }
 
-      // Ctrl+V: paste
+      // Ctrl+V: paste internal nodes if clipboard non-empty,
+      // otherwise let the browser paste event fire for external images
       if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-        e.preventDefault();
-        useCanvasStore.getState().pasteNodes();
+        if (useCanvasStore.getState().hasClipboard()) {
+          e.preventDefault();
+          useCanvasStore.getState().pasteNodes();
+        }
+        // When internal clipboard is empty, don't preventDefault —
+        // the browser paste event will fire and useCanvasDragDrop handles images
       }
 
       // Ctrl+A: select all

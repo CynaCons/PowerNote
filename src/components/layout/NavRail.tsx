@@ -1,9 +1,5 @@
-import { useRef } from 'react';
 import { Layers, Type, Pen, ImageIcon, BoxSelect, Shapes, Settings } from 'lucide-react';
 import { useToolStore } from '../../stores/useToolStore';
-import { useCanvasStore } from '../../stores/useCanvasStore';
-import { generateId } from '../../utils/ids';
-import type { CanvasNode, ImageNodeData } from '../../types/data';
 import './NavRail.css';
 
 interface NavRailProps {
@@ -16,54 +12,6 @@ interface NavRailProps {
 export function NavRail({ onToggleHierarchy, isHierarchyOpen, onToggleSettings, isSettingsOpen }: NavRailProps) {
   const activeTool = useToolStore((s) => s.activeTool);
   const setTool = useToolStore((s) => s.setTool);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleImagePick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    let offsetY = 0;
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith('image/')) return;
-      const reader = new FileReader();
-      const yPos = 200 + offsetY;
-      offsetY += 20; // stagger multiple images
-      reader.onload = () => {
-        const src = reader.result as string;
-        const img = new Image();
-        img.onload = () => {
-          const maxW = 600;
-          let w = img.naturalWidth;
-          let h = img.naturalHeight;
-          if (w > maxW) {
-            h = h * (maxW / w);
-            w = maxW;
-          }
-          const node: CanvasNode = {
-            id: generateId(),
-            type: 'image',
-            x: 200, y: yPos,
-            width: w, height: h,
-            layer: 3,
-            data: {
-              src,
-              alt: file.name || 'image',
-              naturalWidth: img.naturalWidth,
-              naturalHeight: img.naturalHeight,
-            } as ImageNodeData,
-          };
-          useCanvasStore.getState().addNode(node);
-        };
-        img.src = src;
-      };
-      reader.readAsDataURL(file);
-    });
-    e.target.value = '';
-  };
 
   return (
     <nav className="nav-rail" data-testid="nav-rail">
@@ -91,11 +39,11 @@ export function NavRail({ onToggleHierarchy, isHierarchyOpen, onToggleSettings, 
         </button>
 
         <button
-          className="nav-rail__btn"
-          title="Insert image"
-          aria-label="Insert image"
+          className={`nav-rail__btn ${activeTool === 'image' ? 'nav-rail__btn--active' : ''}`}
+          title="Image tool (I)"
+          aria-label="Image tool"
           data-testid="nav-image-tool"
-          onClick={handleImagePick}
+          onClick={() => setTool(activeTool === 'image' ? 'select' : 'image')}
         >
           <ImageIcon size={20} />
         </button>
@@ -130,15 +78,6 @@ export function NavRail({ onToggleHierarchy, isHierarchyOpen, onToggleSettings, 
           <BoxSelect size={20} />
         </button>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          style={{ display: 'none' }}
-          onChange={handleFileSelected}
-          data-testid="image-file-input"
-        />
       </div>
 
       <div className="nav-rail__bottom">

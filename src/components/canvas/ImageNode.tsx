@@ -1,9 +1,11 @@
 import { useRef, useEffect, useState } from 'react';
-import { Group, Rect, Image as KonvaImage } from 'react-konva';
+import { Group, Rect, Circle, Text, Image as KonvaImage } from 'react-konva';
+import { Html } from 'react-konva-utils';
 import type Konva from 'konva';
 import type { CanvasNode, ImageNodeData } from '../../types/data';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useToolStore } from '../../stores/useToolStore';
+import { isNodeInteractive } from '../../utils/toolConfig';
 import { calculateSnap, type SnapLine } from './SnapGuides';
 
 interface ImageNodeProps {
@@ -14,11 +16,15 @@ interface ImageNodeProps {
   onSnapChange: (lines: SnapLine[]) => void;
 }
 
-export function ImageNode({ node, isSelected, onSelect, stageScale: _stageScale, onSnapChange }: ImageNodeProps) {
+export function ImageNode({ node, isSelected, onSelect, stageScale, onSnapChange }: ImageNodeProps) {
   const data = node.data as ImageNodeData;
   const groupRef = useRef<Konva.Group>(null);
   const updateNode = useCanvasStore((s) => s.updateNode);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const [hovered, setHovered] = useState(false);
+  const [editingNote, setEditingNote] = useState(false);
+  const activeTool = useToolStore((s) => s.activeTool);
+  const isInteractive = isNodeInteractive(activeTool);
 
   useEffect(() => {
     const img = new window.Image();
@@ -83,10 +89,16 @@ export function ImageNode({ node, isSelected, onSelect, stageScale: _stageScale,
       ref={groupRef}
       x={node.x}
       y={node.y}
-      draggable
+      rotation={data.rotation || 0}
+      offsetX={data.rotation ? node.width / 2 : 0}
+      offsetY={data.rotation ? node.height / 2 : 0}
+      draggable={isInteractive}
+      listening={isInteractive}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onMouseDown={handleMouseDown}
+      onMouseEnter={() => { if (isInteractive) setHovered(true); }}
+      onMouseLeave={() => { if (isInteractive) setHovered(false); }}
     >
       {/* Hit area */}
       <Rect
@@ -214,6 +226,93 @@ export function ImageNode({ node, isSelected, onSelect, stageScale: _stageScale,
             />
           ))}
         </>
+      )}
+
+      {/* Note "T" icon — shown when image has a note OR is selected/hovered */}
+      {(data.note !== undefined || isSelected || hovered) && data.note !== undefined && (
+        <Group
+          x={node.width + 4}
+          y={node.height / 2 - 10}
+        >
+          <Circle
+            radius={10 / stageScale}
+            fill={editingNote ? '#2563eb' : 'rgba(37, 99, 235, 0.6)'}
+            stroke="#ffffff"
+            strokeWidth={1 / stageScale}
+            onClick={(e) => {
+              e.cancelBubble = true;
+              if (isSelected) setEditingNote(!editingNote);
+            }}
+          />
+          <Text
+            x={-4 / stageScale}
+            y={-5 / stageScale}
+            text="T"
+            fontSize={10 / stageScale}
+            fill="#ffffff"
+            fontStyle="bold"
+            listening={false}
+          />
+        </Group>
+      )}
+
+      {/* Note popup — shown on hover or when selected */}
+      {data.note && (isSelected || hovered) && !editingNote && (
+        <Html groupProps={{ x: node.width + 20, y: node.height / 2 - 15 }}>
+          <div
+            style={{
+              background: '#1e293b',
+              color: '#f8fafc',
+              padding: '6px 10px',
+              borderRadius: 6,
+              fontSize: 12,
+              maxWidth: 200,
+              whiteSpace: 'pre-wrap',
+              pointerEvents: 'none',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            }}
+          >
+            {data.note}
+          </div>
+        </Html>
+      )}
+
+      {/* Note inline editor */}
+      {editingNote && isSelected && (
+        <Html groupProps={{ x: node.width + 20, y: node.height / 2 - 20 }}>
+          <textarea
+            autoFocus
+            defaultValue={data.note || ''}
+            style={{
+              background: '#ffffff',
+              border: '1px solid #2563eb',
+              borderRadius: 6,
+              padding: '6px 8px',
+              fontSize: 12,
+              width: 180,
+              minHeight: 60,
+              resize: 'vertical',
+              outline: 'none',
+              fontFamily: 'inherit',
+            }}
+            onBlur={(e) => {
+              const val = e.target.value.trim();
+              updateNode(node.id, {
+                data: { ...data, note: val || undefined },
+              });
+              setEditingNote(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                (e.target as HTMLTextAreaElement).blur();
+              }
+              if (e.key === 'Escape') {
+                setEditingNote(false);
+              }
+            }}
+          />
+        </Html>
       )}
     </Group>
   );

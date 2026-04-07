@@ -28,7 +28,7 @@ export function BottomToolbar() {
   const selectedShapeNode = selectedNode?.type === 'shape' ? selectedNode : null;
 
   const isTextContext = activeTool === 'text' || !!selectedTextNode;
-  const isImageContext = !!selectedImageNode;
+  const isImageContext = activeTool === 'image' || !!selectedImageNode;
   const isDrawContext = activeTool === 'draw';
   const isShapeContext = activeTool === 'shape' || !!selectedShapeNode;
 
@@ -70,10 +70,10 @@ export function BottomToolbar() {
     );
   }
 
-  if (isImageContext && selectedImageNode) {
+  if (isImageContext) {
     return (
       <div className="bottom-toolbar" data-testid="bottom-toolbar">
-        <ImageToolbar node={selectedImageNode} />
+        <ImageToolbar node={selectedImageNode ?? undefined} />
       </div>
     );
   }
