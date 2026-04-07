@@ -647,6 +647,16 @@
 
 ---
 
+### v0.10.2 — Arrow/Line Vertex Handles
+- [ ] Custom two-vertex handles for arrows and lines (start + end)
+- [ ] Disable standard rectangle Transformer for arrow/line shapes
+- [ ] Dragging a vertex updates position/direction independently
+- [ ] Moving the whole arrow still moves both vertices together
+- [ ] E2E tests for vertex handle interactions
+- [ ] Fix bold/italic toolbar not applying to selected text (CSS fontWeight/fontStyle)
+
+---
+
 ## Future (Backlog)
 > Not yet planned — will be prioritized when earlier iterations are complete
 

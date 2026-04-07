@@ -34,6 +34,15 @@ export function SelectionTransformer({ selectedNodeIds, stageRef }: SelectionTra
 
     const selectedKonvaNodes: Konva.Node[] = [];
     for (const nodeId of selectedNodeIds) {
+      // Skip arrows/lines — they use custom vertex handles in ShapeNode
+      const storeNode = nodes.find((n) => n.id === nodeId);
+      if (storeNode?.type === 'shape') {
+        const shapeData = storeNode.data as any;
+        if (shapeData.shapeType === 'arrow' || shapeData.shapeType === 'line') {
+          continue;
+        }
+      }
+
       const found: Konva.Node | undefined = stage.findOne(`#${nodeId}`);
       if (found) {
         const group: Konva.Node | null = found.parent;

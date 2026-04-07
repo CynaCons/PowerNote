@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Group, Rect, Ellipse, Line, Arrow } from 'react-konva';
+import { Group, Rect, Ellipse, Line, Arrow, Circle } from 'react-konva';
 import type Konva from 'konva';
 import type { CanvasNode, ShapeNodeData } from '../../types/data';
 import { useCanvasStore } from '../../stores/useCanvasStore';
@@ -194,7 +194,7 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
       )}
 
       {/* Selection highlight */}
-      {isSelected && (
+      {isSelected && !isLinear && (
         <Rect
           x={hitX}
           y={hitY}
@@ -206,6 +206,82 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
           dash={[6 / stageScale, 4 / stageScale]}
           listening={false}
         />
+      )}
+
+      {/* Vertex handles for arrows/lines — replaces standard Transformer */}
+      {isSelected && isLinear && isInteractive && (
+        <>
+          {/* Start vertex handle (at 0,0 relative to Group) */}
+          <Circle
+            x={0}
+            y={0}
+            radius={6 / stageScale}
+            fill="#ffffff"
+            stroke="#2563eb"
+            strokeWidth={2 / stageScale}
+            draggable
+            onMouseEnter={(e) => {
+              const stage = e.target.getStage();
+              if (stage) stage.container().style.cursor = 'grab';
+            }}
+            onMouseLeave={(e) => {
+              const stage = e.target.getStage();
+              if (stage) stage.container().style.cursor = 'default';
+            }}
+            onDragMove={(e) => {
+              // Move the start point: adjust Group position and extend width/height
+              e.cancelBubble = true;
+            }}
+            onDragEnd={(e) => {
+              e.cancelBubble = true;
+              const dx = e.target.x();
+              const dy = e.target.y();
+              // Reset handle back to origin
+              e.target.x(0);
+              e.target.y(0);
+              // Move start point: Group shifts by dx/dy, width/height shrink by same amount
+              updateNode(node.id, {
+                x: node.x + dx,
+                y: node.y + dy,
+                width: node.width - dx,
+                height: node.height - dy,
+              });
+            }}
+          />
+
+          {/* End vertex handle (at w,h relative to Group) */}
+          <Circle
+            x={w}
+            y={h}
+            radius={6 / stageScale}
+            fill="#ffffff"
+            stroke="#2563eb"
+            strokeWidth={2 / stageScale}
+            draggable
+            onMouseEnter={(e) => {
+              const stage = e.target.getStage();
+              if (stage) stage.container().style.cursor = 'grab';
+            }}
+            onMouseLeave={(e) => {
+              const stage = e.target.getStage();
+              if (stage) stage.container().style.cursor = 'default';
+            }}
+            onDragMove={(e) => {
+              e.cancelBubble = true;
+            }}
+            onDragEnd={(e) => {
+              e.cancelBubble = true;
+              // End handle moves: just update width/height
+              updateNode(node.id, {
+                width: e.target.x(),
+                height: e.target.y(),
+              });
+              // Reset handle position (it will re-render at new w,h)
+              e.target.x(w);
+              e.target.y(h);
+            }}
+          />
+        </>
       )}
     </Group>
   );
