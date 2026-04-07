@@ -12,6 +12,7 @@ import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
 import { buildExportHtml, downloadFile } from '../../utils/serialization';
+import { APP_VERSION } from '../../version';
 import { showToast } from './Toast';
 import './AppShell.css';
 
@@ -30,13 +31,22 @@ export function AppShell() {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         const canvasNodes = useCanvasStore.getState().nodes;
-        useWorkspaceStore.getState().savePageNodes(canvasNodes);
-        useWorkspaceStore.getState().savePageStrokes(useDrawStore.getState().strokes);
+        const wsStore = useWorkspaceStore.getState();
+        wsStore.savePageNodes(canvasNodes);
+        wsStore.savePageStrokes(useDrawStore.getState().strokes);
+
+        // Increment save revision and stamp editor version
+        const revision = (wsStore.workspace.saveRevision || 0) + 1;
+        wsStore.updateWorkspace({ editorVersion: APP_VERSION, saveRevision: revision });
+
         const ws = useWorkspaceStore.getState().workspace;
+        const safeName = ws.filename.replace(/[^a-zA-Z0-9_\- ]/g, '_');
+        const versionedFilename = `${safeName} (v${APP_VERSION}-r${revision}).html`;
+
         buildExportHtml(ws).then((html) => {
-          downloadFile(html, ws.filename.replace(/[^a-zA-Z0-9_\- ]/g, '_') + '.html');
+          downloadFile(html, versionedFilename);
           useWorkspaceStore.getState().markClean();
-          showToast('Notebook saved successfully', 'success');
+          showToast(`Saved as ${versionedFilename}`, 'success');
         }).catch(() => {
           showToast('Failed to save notebook', 'error');
         });

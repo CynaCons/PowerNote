@@ -1,5 +1,6 @@
 import type { WorkspaceData, Section, Page, TextOptions, ShapeOptions } from '../types/data';
 import { generateId } from './ids';
+import { APP_VERSION } from '../version';
 
 export function createPage(title = 'Untitled Page'): Page {
   return {
@@ -22,6 +23,8 @@ export function createWorkspace(): WorkspaceData {
     version: '0.2.0',
     filename: 'Untitled Notebook',
     sections: [createSection('Section 1')],
+    editorVersion: APP_VERSION,
+    saveRevision: 0,
   };
 }
 

@@ -9,6 +9,7 @@ interface WorkspaceState {
   isDirty: boolean;
   markDirty: () => void;
   markClean: () => void;
+  updateWorkspace: (updates: Partial<WorkspaceData>) => void;
 
   // Getters
   getActiveSection: () => Section | undefined;
@@ -50,6 +51,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     isDirty: false,
     markDirty: () => set({ isDirty: true }),
     markClean: () => set({ isDirty: false }),
+    updateWorkspace: (updates) =>
+      set((state) => ({ workspace: { ...state.workspace, ...updates } })),
 
     getActiveSection: () => {
       const { workspace, activeSectionId } = get();

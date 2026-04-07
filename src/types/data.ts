@@ -86,6 +86,8 @@ export interface WorkspaceData {
   version: string;
   filename: string;
   sections: Section[];
+  editorVersion?: string; // App version that created/last updated this file
+  saveRevision?: number;  // Incremented on each Ctrl+S save
 }
 
 // ── Tool types ──────────────────────────────────────────────

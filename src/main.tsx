@@ -5,13 +5,18 @@ import { getEmbeddedData, loadFromLocalStorage, startAutoSave } from './utils/se
 import { useWorkspaceStore } from './stores/useWorkspaceStore';
 import { useCanvasStore } from './stores/useCanvasStore';
 import { useDrawStore } from './stores/useDrawStore';
+import { migrateWorkspace } from './utils/migrations';
+import { checkForUpdate } from './utils/updateChecker';
+import { APP_VERSION } from './version';
 
 // Hydrate: priority is embedded data > localStorage > fresh workspace
 const embeddedData = getEmbeddedData();
 const autoSavedData = loadFromLocalStorage();
-const hydrateData = embeddedData || autoSavedData;
+let hydrateData = embeddedData || autoSavedData;
 
+// Migrate old data to current version if needed
 if (hydrateData) {
+  hydrateData = migrateWorkspace(hydrateData);
   useWorkspaceStore.setState({
     workspace: hydrateData,
     activeSectionId: hydrateData.sections[0]?.id,
@@ -21,6 +26,14 @@ if (hydrateData) {
   useCanvasStore.getState().loadPageNodes(firstPage?.nodes ?? []);
   useDrawStore.getState().loadPageStrokes(firstPage?.strokes ?? []);
 }
+
+// Check for updates (non-blocking, silent on failure)
+checkForUpdate(APP_VERSION).then((result) => {
+  if (result?.available && result.latestVersion) {
+    // Store update info on window for the UI to pick up
+    (window as any).__POWERNOTE_UPDATE__ = result;
+  }
+});
 
 // Start auto-save interval (every 30s when dirty)
 startAutoSave(
