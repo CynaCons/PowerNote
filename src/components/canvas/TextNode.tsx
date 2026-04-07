@@ -258,6 +258,8 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
             width: 'max-content',
             fontSize: data.fontSize,
             fontFamily: data.fontFamily,
+            fontWeight: data.fontStyle?.includes('bold') ? 'bold' : 'normal',
+            fontStyle: data.fontStyle?.includes('italic') ? 'italic' : 'normal',
             color: hasContent ? data.fill : '#999999',
             padding: 4,
             lineHeight: '1.4',
