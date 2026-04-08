@@ -63,7 +63,7 @@ export function ImageNode({ node, isSelected, onSelect, stageScale, onSnapChange
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
     const tool = useToolStore.getState().activeTool;
-    if (tool === 'select' || tool === 'text' || tool === 'shape') {
+    if (tool === 'select' || tool === 'text' || tool === 'image') {
       const additive = e.evt.ctrlKey || e.evt.metaKey;
       onSelect(node.id, additive);
     }

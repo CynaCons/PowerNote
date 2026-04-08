@@ -26,9 +26,20 @@ export function useCanvasKeyboard(
         }
       }
 
-      // Escape: clear selection
+      // Escape: return to select mode + clear selection
       if (e.key === 'Escape') {
+        const toolStore = useToolStore.getState();
+        if (toolStore.activeTool !== 'select') {
+          toolStore.setTool('select');
+        }
         clearSelection();
+      }
+
+      // V: select tool
+      if (e.key === 'v' || e.key === 'V') {
+        if (!e.ctrlKey && !e.metaKey) {
+          useToolStore.getState().setTool('select');
+        }
       }
 
       // T: toggle text tool

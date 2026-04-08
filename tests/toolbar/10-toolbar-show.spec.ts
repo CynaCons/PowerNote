@@ -30,16 +30,18 @@ test.describe('10 - Toolbar Show (REQ-TOOL-001)', () => {
     await expect(toolbar).toBeVisible();
   });
 
-  test('deactivating text tool hides the bottom toolbar', async ({ page }) => {
+  test('deactivating text tool keeps toolbar visible (toolbar persistence)', async ({ page }) => {
     const toolbar = page.locator('[data-testid="bottom-toolbar"]');
 
     // Activate text tool
     await activateTool(page, 'text');
     await expect(toolbar).toBeVisible();
 
-    // Deactivate text tool (click it again to toggle)
+    // Deactivate text tool (click it again to toggle → select mode)
     await activateTool(page, 'text');
-    await expect(toolbar).not.toBeVisible();
+
+    // Toolbar should STILL be visible (persists from last tool)
+    await expect(toolbar).toBeVisible();
   });
 
   test('selecting a text node shows the bottom toolbar', async ({ page }) => {
@@ -56,15 +58,10 @@ test.describe('10 - Toolbar Show (REQ-TOOL-001)', () => {
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.waitForTimeout(300);
 
-    // Tool auto-reverted to select after placing. Deselect by clicking empty canvas
-    await clickCanvas(page, 200, 200);
-    await page.waitForTimeout(200);
+    // Tool auto-reverted to select after placing. Toolbar persists from text tool.
+    await expect(toolbar).toBeVisible();
 
-    // Toolbar should be hidden (no tool, no selection)
-    await expect(toolbar).not.toBeVisible();
-
-    // Click on the text node to select it (slightly right and down from its origin
-    // to ensure we hit inside the text bounding box, not on the edge)
+    // Click on the text node to select it
     await clickCanvas(page, 420, 310);
     await page.waitForTimeout(200);
 

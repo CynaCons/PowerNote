@@ -52,7 +52,7 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
     e.cancelBubble = true;
     const tool = useToolStore.getState().activeTool;
     // Only allow selection in select/shape/text modes, not in draw/lasso
-    if (tool === 'select' || tool === 'shape' || tool === 'text') {
+    if (tool === 'select' || tool === 'text' || tool === 'image') {
       onSelect(node.id, e.evt.ctrlKey || e.evt.metaKey);
     }
   };

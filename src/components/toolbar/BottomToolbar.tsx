@@ -7,6 +7,9 @@ import { ShapeToolbar } from './ShapeToolbar';
 import type { TextOptions, ShapeOptions, ShapeNodeData } from '../../types/data';
 import './BottomToolbar.css';
 
+// Remember the last creation tool so we can show its toolbar in select mode
+let lastToolbarTool: string | null = null;
+
 export function BottomToolbar() {
   const activeTool = useToolStore((s) => s.activeTool);
   const textOptions = useToolStore((s) => s.textOptions);
@@ -18,6 +21,11 @@ export function BottomToolbar() {
   const nodes = useCanvasStore((s) => s.nodes);
   const updateNode = useCanvasStore((s) => s.updateNode);
 
+  // Track last creation tool (not select/lasso)
+  if (activeTool !== 'select' && activeTool !== 'lasso') {
+    lastToolbarTool = activeTool;
+  }
+
   // Find the first selected node
   const selectedNode = selectedNodeIds.length === 1
     ? nodes.find((n) => n.id === selectedNodeIds[0])
@@ -27,14 +35,18 @@ export function BottomToolbar() {
   const selectedImageNode = selectedNode?.type === 'image' ? selectedNode : null;
   const selectedShapeNode = selectedNode?.type === 'shape' ? selectedNode : null;
 
-  const isTextContext = activeTool === 'text' || !!selectedTextNode;
-  const isImageContext = activeTool === 'image' || !!selectedImageNode;
-  const isDrawContext = activeTool === 'draw';
-  const isShapeContext = activeTool === 'shape' || !!selectedShapeNode;
+  // In select mode: show toolbar for selected node type, or last creation tool's toolbar
+  const effectiveTool = activeTool === 'select' ? lastToolbarTool : activeTool;
+
+  // Determine context — selected node takes priority
+  const isDrawContext = effectiveTool === 'draw';
+  const isShapeContext = effectiveTool === 'shape' || !!selectedShapeNode;
+  const isImageContext = effectiveTool === 'image' || !!selectedImageNode;
+  const isTextContext = effectiveTool === 'text' || !!selectedTextNode;
 
   if (!isTextContext && !isImageContext && !isDrawContext && !isShapeContext) return null;
 
-  if (isDrawContext) {
+  if (isDrawContext && !selectedShapeNode && !selectedImageNode && !selectedTextNode) {
     return (
       <div className="bottom-toolbar" data-testid="bottom-toolbar">
         <DrawToolbar />

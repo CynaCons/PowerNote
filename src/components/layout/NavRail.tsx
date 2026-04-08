@@ -1,4 +1,4 @@
-import { Layers, Type, Pen, ImageIcon, BoxSelect, Shapes, Settings } from 'lucide-react';
+import { Layers, MousePointer2, Type, Pen, ImageIcon, BoxSelect, Shapes, Settings } from 'lucide-react';
 import { useToolStore } from '../../stores/useToolStore';
 import './NavRail.css';
 
@@ -28,6 +28,16 @@ export function NavRail({ onToggleHierarchy, isHierarchyOpen, onToggleSettings, 
       </div>
 
       <div className="nav-rail__tools">
+        <button
+          className={`nav-rail__btn ${activeTool === 'select' ? 'nav-rail__btn--active' : ''}`}
+          title="Select (V)"
+          aria-label="Select tool"
+          data-testid="nav-select-tool"
+          onClick={() => setTool('select')}
+        >
+          <MousePointer2 size={20} />
+        </button>
+
         <button
           className={`nav-rail__btn ${activeTool === 'text' ? 'nav-rail__btn--active' : ''}`}
           title="Text tool (T)"

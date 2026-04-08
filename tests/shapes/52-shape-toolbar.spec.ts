@@ -109,7 +109,7 @@ test.describe('52 - Shape Toolbar (REQ-SHAPE-004..007, 012)', () => {
     await expect(page.locator('[data-testid="shape-toolbar"]')).toBeVisible();
   });
 
-  test('toggling shape tool off hides toolbar', async ({ page }) => {
+  test('toggling shape tool off keeps toolbar visible (persistence)', async ({ page }) => {
     // Activate shape tool
     await page.click('[data-testid="nav-shape-tool"]');
     await page.waitForTimeout(200);
@@ -118,7 +118,9 @@ test.describe('52 - Shape Toolbar (REQ-SHAPE-004..007, 012)', () => {
     // Click shape tool again to toggle off (back to select)
     await page.click('[data-testid="nav-shape-tool"]');
     await page.waitForTimeout(200);
-    await expect(page.locator('[data-testid="shape-toolbar"]')).not.toBeVisible();
+
+    // Toolbar persists in select mode (shows last creation tool's toolbar)
+    await expect(page.locator('[data-testid="shape-toolbar"]')).toBeVisible();
   });
 
   test('shape type buttons cycle through all types correctly', async ({ page }) => {

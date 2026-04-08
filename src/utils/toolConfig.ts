@@ -43,9 +43,9 @@ const TOOL_CONFIG: Record<ToolType, ToolModeConfig> = {
     canvasClickAction: 'startDraw',
   },
   shape: {
-    allowNodeSelection: true,
-    allowNodeDrag: true,
-    allowNodeHover: true,
+    allowNodeSelection: false,
+    allowNodeDrag: false,
+    allowNodeHover: false,
     cursorClass: '',
     canvasClickAction: 'startShape',
   },
