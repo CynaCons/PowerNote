@@ -24,7 +24,11 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
     });
     console.log(`[PowerNote Update] Response status: ${resp.status}`);
     if (!resp.ok) {
-      console.warn(`[PowerNote Update] GitHub API returned ${resp.status}`);
+      if (resp.status === 403) {
+        console.warn('[PowerNote Update] GitHub API rate limited (403). Try again in a few minutes.');
+      } else {
+        console.warn(`[PowerNote Update] GitHub API returned ${resp.status}`);
+      }
       return null;
     }
 

@@ -145,7 +145,7 @@ export function SettingsPanel({ backgroundMode, onChangeBackgroundMode, bgColor,
           {updateStatus === 'updating' && <span style={{ fontSize: 12, color: '#2563eb' }}>Updating...</span>}
           {updateStatus === 'failed' && (
             <>
-              <span style={{ fontSize: 12, color: '#dc2626' }}>Check failed</span>
+              <span style={{ fontSize: 12, color: '#dc2626' }}>Check failed (rate limited or offline)</span>
               <button className="settings-panel__btn" onClick={handleCheckUpdate}>Retry</button>
             </>
           )}
