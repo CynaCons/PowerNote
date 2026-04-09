@@ -81,6 +81,26 @@ export function TextEditor({ node, stageScale, onFinish, onCancel }: TextEditorP
       const lineStart = value.lastIndexOf('\n', start - 1) + 1;
       const currentLine = value.substring(lineStart, start);
 
+      // Check for checkbox pattern: "- [ ] text" or "- [x] text"
+      const checkboxMatch = currentLine.match(/^(\s*)- \[[ x]\]\s/);
+      if (checkboxMatch) {
+        e.preventDefault();
+        const indent = checkboxMatch[0].length > 6 ? checkboxMatch[1] : '';
+        const contentAfter = currentLine.substring(checkboxMatch[0].length).trim();
+        if (contentAfter === '') {
+          textarea.value = value.substring(0, lineStart) + value.substring(start);
+          textarea.selectionStart = lineStart;
+          textarea.selectionEnd = lineStart;
+        } else {
+          const insert = `\n${indent}- [ ] `;
+          textarea.value = value.substring(0, start) + insert + value.substring(start);
+          textarea.selectionStart = start + insert.length;
+          textarea.selectionEnd = start + insert.length;
+        }
+        autoHeight(textarea);
+        return;
+      }
+
       // Check for bullet point pattern: "  • text" or "  - text" or "  * text"
       const bulletMatch = currentLine.match(/^(\s*)([-*•])\s/);
       if (bulletMatch) {

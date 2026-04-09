@@ -175,11 +175,13 @@ export async function performUpdate(
     }
 
     console.log(`[PowerNote Update] Final HTML size: ${finalHtml.length} bytes`);
-    console.log('[PowerNote Update] Performing document.write() hot-swap...');
+    console.log('[PowerNote Update] Performing hot-swap via Blob URL navigation...');
 
-    document.open();
-    document.write(finalHtml);
-    document.close();
+    // Use Blob URL + location.replace instead of document.write()
+    // document.write() fails on large minified JS due to HTML parser issues
+    const blob = new Blob([finalHtml], { type: 'text/html;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
+    window.location.replace(blobUrl);
     return true;
   } catch (err) {
     console.error('[PowerNote Update] Hot-swap failed:', err);
