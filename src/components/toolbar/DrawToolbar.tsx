@@ -6,15 +6,28 @@ import { EraserPopover } from './EraserPopover';
 import './BottomToolbar.css';
 
 export function DrawToolbar() {
+  const activeTool = useToolStore((s) => s.activeTool);
+  const setTool = useToolStore((s) => s.setTool);
   const drawOptions = useToolStore((s) => s.drawOptions);
   const setDrawOptions = useToolStore((s) => s.setDrawOptions);
+  const isDrawActive = activeTool === 'draw';
+
+  const handlePenClick = () => {
+    setDrawOptions({ isErasing: false });
+    if (!isDrawActive) setTool('draw');
+  };
+
+  const handleEraserClick = () => {
+    setDrawOptions({ isErasing: true });
+    if (!isDrawActive) setTool('draw');
+  };
 
   return (
     <div className="text-toolbar" data-testid="draw-toolbar">
       {/* Pen section */}
       <button
-        className={`text-toolbar__btn ${!drawOptions.isErasing ? 'text-toolbar__btn--active' : ''}`}
-        onClick={() => setDrawOptions({ isErasing: false })}
+        className={`text-toolbar__btn ${isDrawActive && !drawOptions.isErasing ? 'text-toolbar__btn--active' : ''}`}
+        onClick={handlePenClick}
         title="Pen"
         data-testid="draw-pen-btn"
       >
@@ -48,8 +61,8 @@ export function DrawToolbar() {
 
       {/* Eraser section */}
       <button
-        className={`text-toolbar__btn ${drawOptions.isErasing ? 'text-toolbar__btn--active' : ''}`}
-        onClick={() => setDrawOptions({ isErasing: true })}
+        className={`text-toolbar__btn ${isDrawActive && drawOptions.isErasing ? 'text-toolbar__btn--active' : ''}`}
+        onClick={handleEraserClick}
         title="Eraser"
         data-testid="draw-eraser-btn"
       >

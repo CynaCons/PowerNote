@@ -1,5 +1,6 @@
 import { Square, Circle, Triangle, ArrowUpRight, Minus, Ban } from 'lucide-react';
 import type { ShapeOptions, ShapeType } from '../../types/data';
+import { useToolStore } from '../../stores/useToolStore';
 import { ColorPopover } from './ColorPopover';
 import { SizePopover } from './SizePopover';
 import './BottomToolbar.css';
@@ -24,17 +25,28 @@ const DASH_PRESETS: { dash: number[]; label: string }[] = [
 ];
 
 export function ShapeToolbar({ options, onChange }: ShapeToolbarProps) {
+  const activeTool = useToolStore((s) => s.activeTool);
+  const setTool = useToolStore((s) => s.setTool);
+  const isShapeToolActive = activeTool === 'shape';
   const hasFill = options.fill !== 'transparent';
+
+  const handleShapeTypeClick = (type: ShapeType) => {
+    onChange({ shapeType: type });
+    // If in select mode, switch to shape tool to start creating
+    if (!isShapeToolActive) {
+      setTool('shape');
+    }
+  };
 
   return (
     <div className="text-toolbar" data-testid="shape-toolbar">
-      {/* Shape type selector */}
+      {/* Shape type selector — only highlight when shape tool is active */}
       <div className="shape-toolbar__types">
         {SHAPE_TYPES.map(({ type, icon: Icon, label }) => (
           <button
             key={type}
-            className={`text-toolbar__btn ${options.shapeType === type ? 'text-toolbar__btn--active' : ''}`}
-            onClick={() => onChange({ shapeType: type })}
+            className={`text-toolbar__btn ${isShapeToolActive && options.shapeType === type ? 'text-toolbar__btn--active' : ''}`}
+            onClick={() => handleShapeTypeClick(type)}
             title={label}
             data-testid={`shape-type-${type}`}
           >
