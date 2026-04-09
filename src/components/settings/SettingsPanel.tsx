@@ -52,10 +52,12 @@ export function SettingsPanel({ backgroundMode, onChangeBackgroundMode, bgColor,
     wsStore.savePageNodes(useCanvasStore.getState().nodes);
     wsStore.savePageStrokes(useDrawStore.getState().strokes);
     const ws = wsStore.workspace;
-    const success = await performUpdate(updateInfo.url, ws);
-    if (!success) {
+    const success = await performUpdate(updateInfo.url, ws, APP_VERSION, updateInfo.version);
+    if (success) {
+      setUpdateStatus('idle');
+      setUpdateInfo(null);
+    } else {
       setUpdateStatus('failed');
-      // Fallback: open release page
       if (updateInfo.releaseUrl) window.open(updateInfo.releaseUrl, '_blank');
     }
   };
@@ -142,7 +144,7 @@ export function SettingsPanel({ backgroundMode, onChangeBackgroundMode, bgColor,
               </button>
             </>
           )}
-          {updateStatus === 'updating' && <span style={{ fontSize: 12, color: '#2563eb' }}>Updating...</span>}
+          {updateStatus === 'updating' && <span style={{ fontSize: 12, color: '#2563eb' }}>Downloading backup + update...</span>}
           {updateStatus === 'failed' && (
             <>
               <span style={{ fontSize: 12, color: '#dc2626' }}>Check failed (rate limited or offline)</span>

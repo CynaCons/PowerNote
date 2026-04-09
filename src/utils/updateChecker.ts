@@ -145,21 +145,50 @@ async function fetchAssetHtml(downloadUrl: string): Promise<string | null> {
 }
 
 /**
- * Hot-swap the current page with a new version of PowerNote.
+ * Download a file to the user's machine.
+ */
+function triggerDownload(content: string, filename: string) {
+  const blob = new Blob([content], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Perform update: saves a backup of current notebook, then downloads
+ * the new version with user data injected. User opens the downloaded file.
+ *
+ * Hot-swap via document.write/Blob URL doesn't work because browsers'
+ * HTML parsers choke on the minified JS bundle. Download is the only
+ * reliable approach for self-contained HTML files.
  */
 export async function performUpdate(
   downloadUrl: string,
-  workspace: WorkspaceData
+  workspace: WorkspaceData,
+  currentVersion: string,
+  newVersion: string,
 ): Promise<boolean> {
-  console.log(`[PowerNote Update] Starting hot-swap update...`);
+  console.log(`[PowerNote Update] Starting update ${currentVersion} → ${newVersion}...`);
   try {
+    // Step 1: Save backup of current notebook
+    console.log('[PowerNote Update] Saving backup...');
+    const { buildExportHtml } = await import('./serialization');
+    const backupHtml = await buildExportHtml(workspace);
+    const safeName = workspace.filename.replace(/[^a-zA-Z0-9_\- ]/g, '_');
+    triggerDownload(backupHtml, `${safeName} (v${currentVersion}_update-backup).html`);
+
+    // Step 2: Download new template
+    console.log('[PowerNote Update] Downloading new version...');
     const newHtml = await fetchAssetHtml(downloadUrl);
     if (!newHtml) {
       console.error('[PowerNote Update] Could not download new version');
       return false;
     }
 
-    // Inject current workspace data into new template
+    // Step 3: Inject user data into new template
     const json = JSON.stringify(workspace, null, 2);
     console.log(`[PowerNote Update] Workspace JSON size: ${json.length} bytes`);
     const dataScript = `<script id="powernote-data" type="application/json">\n${json}\n</script>`;
@@ -167,24 +196,19 @@ export async function performUpdate(
     let finalHtml: string;
     const existingPattern = /<script id="powernote-data"[^>]*>[\s\S]*?<\/script>/;
     if (existingPattern.test(newHtml)) {
-      console.log('[PowerNote Update] Replacing existing data script');
       finalHtml = newHtml.replace(existingPattern, dataScript);
     } else {
-      console.log('[PowerNote Update] Injecting data script before </head>');
       finalHtml = newHtml.replace('</head>', `${dataScript}\n</head>`);
     }
 
-    console.log(`[PowerNote Update] Final HTML size: ${finalHtml.length} bytes`);
-    console.log('[PowerNote Update] Performing hot-swap via Blob URL navigation...');
+    // Step 4: Download the updated notebook
+    console.log(`[PowerNote Update] Downloading updated notebook (${finalHtml.length} bytes)...`);
+    triggerDownload(finalHtml, `${safeName} (v${newVersion}).html`);
 
-    // Use Blob URL + location.replace instead of document.write()
-    // document.write() fails on large minified JS due to HTML parser issues
-    const blob = new Blob([finalHtml], { type: 'text/html;charset=utf-8' });
-    const blobUrl = URL.createObjectURL(blob);
-    window.location.replace(blobUrl);
+    console.log('[PowerNote Update] Update complete — open the downloaded file to use the new version');
     return true;
   } catch (err) {
-    console.error('[PowerNote Update] Hot-swap failed:', err);
+    console.error('[PowerNote Update] Update failed:', err);
     return false;
   }
 }
