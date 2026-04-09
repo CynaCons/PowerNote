@@ -46,6 +46,20 @@ button:disabled {
   opacity: 0.35;
 }
 
+/* ── Markdown HTML overlay — enable clicks on checkboxes and links ── */
+.powernote-markdown input[type="checkbox"],
+.powernote-markdown a {
+  pointer-events: auto !important;
+  cursor: pointer;
+}
+.powernote-markdown input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  accent-color: #2563eb;
+  vertical-align: middle;
+}
+
 /* ── Markdown rendering (Jupyter-style) ──────────── */
 .powernote-markdown--hovered {
   outline: 1.5px solid #93c5fd;

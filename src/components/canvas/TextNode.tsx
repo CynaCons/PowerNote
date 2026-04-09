@@ -216,6 +216,7 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
         groupProps={{ x: 0, y: 0 }}
         divProps={{
           style: { pointerEvents: 'none' },
+          className: 'powernote-html-overlay',
         }}
       >
         <div
