@@ -19,6 +19,7 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
   const data = node.data as ShapeNodeData;
   const groupRef = useRef<Konva.Group>(null);
   const updateNode = useCanvasStore((s) => s.updateNode);
+  const updateNodeSilent = useCanvasStore((s) => s.updateNodeSilent);
   const [hovered, setHovered] = useState(false);
 
   const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -238,23 +239,25 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
               if (stage) stage.container().style.cursor = 'default';
             }}
             onDragMove={(e) => {
-              // Move the start point: adjust Group position and extend width/height
-              e.cancelBubble = true;
-            }}
-            onDragEnd={(e) => {
               e.cancelBubble = true;
               const dx = e.target.x();
               const dy = e.target.y();
-              // Reset handle back to origin
               e.target.x(0);
               e.target.y(0);
-              // Move start point: Group shifts by dx/dy, width/height shrink by same amount
-              updateNode(node.id, {
+              // Live update: move start point, adjust direction vector
+              updateNodeSilent(node.id, {
                 x: node.x + dx,
                 y: node.y + dy,
                 width: node.width - dx,
                 height: node.height - dy,
               });
+            }}
+            onDragEnd={(e) => {
+              e.cancelBubble = true;
+              e.target.x(0);
+              e.target.y(0);
+              // Final update with undo entry (already moved via onDragMove)
+              updateNode(node.id, { x: node.x, y: node.y, width: node.width, height: node.height });
             }}
           />
 
@@ -277,17 +280,18 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
             }}
             onDragMove={(e) => {
               e.cancelBubble = true;
-            }}
-            onDragEnd={(e) => {
-              e.cancelBubble = true;
-              // End handle moves: just update width/height
-              updateNode(node.id, {
+              // Live update: end point changes direction vector
+              updateNodeSilent(node.id, {
                 width: e.target.x(),
                 height: e.target.y(),
               });
-              // Reset handle position (it will re-render at new w,h)
-              e.target.x(w);
-              e.target.y(h);
+            }}
+            onDragEnd={(e) => {
+              e.cancelBubble = true;
+              // Final update with undo entry
+              updateNode(node.id, { width: e.target.x(), height: e.target.y() });
+              e.target.x(node.width);
+              e.target.y(node.height);
             }}
           />
         </>
