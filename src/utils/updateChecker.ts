@@ -15,22 +15,39 @@ interface UpdateInfo {
  * Returns null if the check fails (offline, CORS blocked, etc.)
  */
 export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo | null> {
+  console.log(`[PowerNote Update] Checking for updates... current version: ${currentVersion}`);
   try {
-    const resp = await fetch(
-      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
-      { headers: { Accept: 'application/vnd.github.v3+json' } }
-    );
-    if (!resp.ok) return null;
+    const url = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
+    console.log(`[PowerNote Update] Fetching: ${url}`);
+    const resp = await fetch(url, {
+      headers: { Accept: 'application/vnd.github.v3+json' },
+    });
+    console.log(`[PowerNote Update] Response status: ${resp.status}`);
+    if (!resp.ok) {
+      console.warn(`[PowerNote Update] GitHub API returned ${resp.status}`);
+      return null;
+    }
 
     const data = await resp.json();
     const latest = (data.tag_name || '').replace(/^v/, '');
-    if (!latest) return null;
+    console.log(`[PowerNote Update] Latest release tag: ${data.tag_name} → version: ${latest}`);
+    console.log(`[PowerNote Update] Assets found: ${data.assets?.length ?? 0}`);
+    data.assets?.forEach((a: any) => console.log(`[PowerNote Update]   - ${a.name}: ${a.browser_download_url}`));
+
+    if (!latest) {
+      console.warn('[PowerNote Update] No version found in tag_name');
+      return null;
+    }
 
     if (latest === currentVersion) {
+      console.log('[PowerNote Update] Already up to date');
       return { available: false };
     }
 
     const asset = data.assets?.find((a: any) => a.name === ASSET_NAME);
+    console.log(`[PowerNote Update] Update available: ${currentVersion} → ${latest}`);
+    console.log(`[PowerNote Update] Download URL: ${asset?.browser_download_url ?? 'NOT FOUND'}`);
+    console.log(`[PowerNote Update] Release URL: ${data.html_url}`);
 
     return {
       available: true,
@@ -38,46 +55,62 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
       downloadUrl: asset?.browser_download_url,
       releaseUrl: data.html_url,
     };
-  } catch {
-    return null; // Offline or fetch blocked
+  } catch (err) {
+    console.error('[PowerNote Update] Check failed:', err);
+    return null;
   }
 }
 
 /**
  * Hot-swap the current page with a new version of PowerNote.
- * Fetches the new PowerNote.html, injects the user's workspace data,
- * and replaces the entire document.
- *
- * Returns false if the update fails (user stays on current version).
  */
 export async function performUpdate(
   downloadUrl: string,
   workspace: WorkspaceData
 ): Promise<boolean> {
+  console.log(`[PowerNote Update] Starting hot-swap update...`);
+  console.log(`[PowerNote Update] Downloading: ${downloadUrl}`);
   try {
     const resp = await fetch(downloadUrl);
-    if (!resp.ok) return false;
+    console.log(`[PowerNote Update] Download status: ${resp.status}`);
+    if (!resp.ok) {
+      console.error(`[PowerNote Update] Download failed: ${resp.status} ${resp.statusText}`);
+      return false;
+    }
 
     let newHtml = await resp.text();
-    if (!newHtml.includes('<div id="root">')) return false; // sanity check
+    console.log(`[PowerNote Update] Downloaded HTML size: ${newHtml.length} bytes`);
+
+    if (!newHtml.includes('<div id="root">')) {
+      console.error('[PowerNote Update] Downloaded file does not contain <div id="root"> — not a valid PowerNote.html');
+      console.log(`[PowerNote Update] First 500 chars: ${newHtml.substring(0, 500)}`);
+      return false;
+    }
 
     // Inject current workspace data into new template
     const json = JSON.stringify(workspace, null, 2);
+    console.log(`[PowerNote Update] Workspace JSON size: ${json.length} bytes`);
     const dataScript = `<script id="powernote-data" type="application/json">\n${json}\n</script>`;
 
     const existingPattern = /<script id="powernote-data"[^>]*>[\s\S]*?<\/script>/;
     if (existingPattern.test(newHtml)) {
+      console.log('[PowerNote Update] Replacing existing data script in new HTML');
       newHtml = newHtml.replace(existingPattern, dataScript);
     } else {
+      console.log('[PowerNote Update] Injecting data script before </head>');
       newHtml = newHtml.replace('</head>', `${dataScript}\n</head>`);
     }
 
-    // Hot-swap the page — new editor boots with user's data
+    console.log(`[PowerNote Update] Final HTML size: ${newHtml.length} bytes`);
+    console.log('[PowerNote Update] Performing document.write() hot-swap...');
+
+    // Hot-swap the page
     document.open();
     document.write(newHtml);
     document.close();
     return true;
-  } catch {
+  } catch (err) {
+    console.error('[PowerNote Update] Hot-swap failed:', err);
     return false;
   }
 }

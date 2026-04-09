@@ -29,10 +29,13 @@ if (hydrateData) {
 
 // Check for updates (non-blocking, silent on failure)
 checkForUpdate(APP_VERSION).then((result) => {
+  console.log('[PowerNote] Update check result:', result);
   if (result?.available && result.latestVersion) {
-    // Store update info on window for the UI to pick up
     (window as any).__POWERNOTE_UPDATE__ = result;
+    console.log(`[PowerNote] Update available: v${result.latestVersion}`);
   }
+}).catch((err) => {
+  console.error('[PowerNote] Update check error:', err);
 });
 
 // Start auto-save interval (every 30s when dirty)
