@@ -179,8 +179,8 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
         />
       )}
 
-      {/* Hover highlight — uses bounding box for linear shapes */}
-      {hovered && !isSelected && (
+      {/* Hover highlight */}
+      {hovered && !isSelected && !isLinear && (
         <Rect
           x={hitX}
           y={hitY}
@@ -189,6 +189,15 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
           fill="transparent"
           stroke="#93c5fd"
           strokeWidth={1.5 / stageScale}
+          listening={false}
+        />
+      )}
+      {hovered && !isSelected && isLinear && (
+        <Line
+          points={[0, 0, w, h]}
+          stroke="#93c5fd"
+          strokeWidth={Math.max(strokeWidth + 4, 6) / stageScale}
+          lineCap="round"
           listening={false}
         />
       )}
