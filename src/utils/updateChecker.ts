@@ -46,13 +46,19 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
 
     const asset = data.assets?.find((a: any) => a.name === ASSET_NAME);
     console.log(`[PowerNote Update] Update available: ${currentVersion} → ${latest}`);
-    console.log(`[PowerNote Update] Download URL: ${asset?.browser_download_url ?? 'NOT FOUND'}`);
+    console.log(`[PowerNote Update] Asset ID: ${asset?.id ?? 'NOT FOUND'}`);
     console.log(`[PowerNote Update] Release URL: ${data.html_url}`);
+
+    // Use the GitHub API asset endpoint (supports CORS) instead of browser_download_url (no CORS)
+    const apiDownloadUrl = asset?.id
+      ? `https://api.github.com/repos/${GITHUB_REPO}/releases/assets/${asset.id}`
+      : undefined;
+    console.log(`[PowerNote Update] API download URL: ${apiDownloadUrl ?? 'NONE'}`);
 
     return {
       available: true,
       latestVersion: latest,
-      downloadUrl: asset?.browser_download_url,
+      downloadUrl: apiDownloadUrl,
       releaseUrl: data.html_url,
     };
   } catch (err) {
@@ -69,9 +75,12 @@ export async function performUpdate(
   workspace: WorkspaceData
 ): Promise<boolean> {
   console.log(`[PowerNote Update] Starting hot-swap update...`);
-  console.log(`[PowerNote Update] Downloading: ${downloadUrl}`);
+  console.log(`[PowerNote Update] Downloading via API: ${downloadUrl}`);
   try {
-    const resp = await fetch(downloadUrl);
+    // Use Accept: application/octet-stream to get the raw file content from the API
+    const resp = await fetch(downloadUrl, {
+      headers: { Accept: 'application/octet-stream' },
+    });
     console.log(`[PowerNote Update] Download status: ${resp.status}`);
     if (!resp.ok) {
       console.error(`[PowerNote Update] Download failed: ${resp.status} ${resp.statusText}`);
