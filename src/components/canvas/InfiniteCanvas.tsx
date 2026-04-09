@@ -103,39 +103,54 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
     return () => observer.disconnect();
   }, []);
 
-  // ── Zoom (Ctrl + wheel) ───────────────────────────────────
+  // ── Wheel: scroll (pan) + Ctrl+wheel (zoom) ─────────────
   const handleWheel = useCallback(
     (e: Konva.KonvaEventObject<WheelEvent>) => {
       e.evt.preventDefault();
       const stage = stageRef.current;
       if (!stage) return;
 
-      if (!e.evt.ctrlKey && !e.evt.metaKey) return;
+      // Ctrl/Meta + wheel = zoom
+      if (e.evt.ctrlKey || e.evt.metaKey) {
+        const oldScale = stage.scaleX();
+        const pointer = stage.getPointerPosition();
+        if (!pointer) return;
 
-      const oldScale = stage.scaleX();
-      const pointer = stage.getPointerPosition();
-      if (!pointer) return;
+        const mousePointTo = {
+          x: (pointer.x - stage.x()) / oldScale,
+          y: (pointer.y - stage.y()) / oldScale,
+        };
 
-      const mousePointTo = {
-        x: (pointer.x - stage.x()) / oldScale,
-        y: (pointer.y - stage.y()) / oldScale,
-      };
+        const direction = e.evt.deltaY > 0 ? -1 : 1;
+        const newScale = Math.min(
+          MAX_SCALE,
+          Math.max(MIN_SCALE, oldScale * ZOOM_FACTOR ** direction),
+        );
 
-      const direction = e.evt.deltaY > 0 ? -1 : 1;
-      const newScale = Math.min(
-        MAX_SCALE,
-        Math.max(MIN_SCALE, oldScale * ZOOM_FACTOR ** direction),
-      );
+        const newPos = {
+          x: pointer.x - mousePointTo.x * newScale,
+          y: pointer.y - mousePointTo.y * newScale,
+        };
+
+        stage.scale({ x: newScale, y: newScale });
+        stage.position(newPos);
+        setViewport({ x: newPos.x, y: newPos.y, scale: newScale });
+        return;
+      }
+
+      // Shift + scroll = horizontal pan
+      // Normal scroll = vertical pan
+      // Two-finger swipe on trackpad sends deltaX/deltaY directly
+      const dx = e.evt.shiftKey ? -e.evt.deltaY : -e.evt.deltaX;
+      const dy = e.evt.shiftKey ? 0 : -e.evt.deltaY;
 
       const newPos = {
-        x: pointer.x - mousePointTo.x * newScale,
-        y: pointer.y - mousePointTo.y * newScale,
+        x: stage.x() + dx,
+        y: stage.y() + dy,
       };
 
-      stage.scale({ x: newScale, y: newScale });
       stage.position(newPos);
-
-      setViewport({ x: newPos.x, y: newPos.y, scale: newScale });
+      setViewport({ x: newPos.x, y: newPos.y });
     },
     [setViewport],
   );
