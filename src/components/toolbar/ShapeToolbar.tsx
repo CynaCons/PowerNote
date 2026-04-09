@@ -8,6 +8,7 @@ import './BottomToolbar.css';
 interface ShapeToolbarProps {
   options: ShapeOptions;
   onChange: (updates: Partial<ShapeOptions>) => void;
+  hasSelectedShape?: boolean; // true when a shape node is selected
 }
 
 const SHAPE_TYPES: { type: ShapeType; icon: typeof Square; label: string }[] = [
@@ -24,18 +25,18 @@ const DASH_PRESETS: { dash: number[]; label: string }[] = [
   { dash: [2, 2], label: 'Dotted' },
 ];
 
-export function ShapeToolbar({ options, onChange }: ShapeToolbarProps) {
+export function ShapeToolbar({ options, onChange, hasSelectedShape: _hasSelectedShape }: ShapeToolbarProps) {
   const activeTool = useToolStore((s) => s.activeTool);
   const setTool = useToolStore((s) => s.setTool);
+  const setShapeOptions = useToolStore((s) => s.setShapeOptions);
   const isShapeToolActive = activeTool === 'shape';
   const hasFill = options.fill !== 'transparent';
 
   const handleShapeTypeClick = (type: ShapeType) => {
-    onChange({ shapeType: type });
-    // If in select mode, switch to shape tool to start creating
-    if (!isShapeToolActive) {
-      setTool('shape');
-    }
+    // Shape type buttons ALWAYS set the tool option for next creation
+    // and switch to shape mode — never convert the selected shape
+    setShapeOptions({ shapeType: type });
+    setTool('shape');
   };
 
   return (

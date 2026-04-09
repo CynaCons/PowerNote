@@ -77,7 +77,7 @@ export function BottomToolbar() {
 
     return (
       <div className="bottom-toolbar" data-testid="bottom-toolbar">
-        <ShapeToolbar options={currentShapeOptions} onChange={handleShapeChange} />
+        <ShapeToolbar options={currentShapeOptions} onChange={handleShapeChange} hasSelectedShape={!!selectedShapeNode} />
       </div>
     );
   }
