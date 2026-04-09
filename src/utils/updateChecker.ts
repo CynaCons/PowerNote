@@ -32,7 +32,6 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
     const latest = (data.tag_name || '').replace(/^v/, '');
     console.log(`[PowerNote Update] Latest release tag: ${data.tag_name} → version: ${latest}`);
     console.log(`[PowerNote Update] Assets found: ${data.assets?.length ?? 0}`);
-    data.assets?.forEach((a: any) => console.log(`[PowerNote Update]   - ${a.name}: ${a.browser_download_url}`));
 
     if (!latest) {
       console.warn('[PowerNote Update] No version found in tag_name');
@@ -45,26 +44,100 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
     }
 
     const asset = data.assets?.find((a: any) => a.name === ASSET_NAME);
-    console.log(`[PowerNote Update] Update available: ${currentVersion} → ${latest}`);
     console.log(`[PowerNote Update] Asset ID: ${asset?.id ?? 'NOT FOUND'}`);
+    console.log(`[PowerNote Update] browser_download_url: ${asset?.browser_download_url ?? 'NONE'}`);
     console.log(`[PowerNote Update] Release URL: ${data.html_url}`);
-
-    // Use the GitHub API asset endpoint (supports CORS) instead of browser_download_url (no CORS)
-    const apiDownloadUrl = asset?.id
-      ? `https://api.github.com/repos/${GITHUB_REPO}/releases/assets/${asset.id}`
-      : undefined;
-    console.log(`[PowerNote Update] API download URL: ${apiDownloadUrl ?? 'NONE'}`);
 
     return {
       available: true,
       latestVersion: latest,
-      downloadUrl: apiDownloadUrl,
+      // Store both URLs — we'll try multiple download strategies
+      downloadUrl: asset?.browser_download_url,
       releaseUrl: data.html_url,
     };
   } catch (err) {
     console.error('[PowerNote Update] Check failed:', err);
     return null;
   }
+}
+
+/**
+ * Try to fetch the PowerNote.html asset using multiple strategies.
+ * GitHub's download URLs have CORS issues from file:// origins,
+ * so we try several approaches in order.
+ */
+async function fetchAssetHtml(downloadUrl: string): Promise<string | null> {
+  // Strategy 1: Direct fetch of browser_download_url
+  // Works from http:// origins, may fail from file://
+  console.log('[PowerNote Update] Strategy 1: direct fetch');
+  try {
+    const resp = await fetch(downloadUrl);
+    if (resp.ok) {
+      const text = await resp.text();
+      if (text.includes('<div id="root">')) {
+        console.log(`[PowerNote Update] Strategy 1 succeeded (${text.length} bytes)`);
+        return text;
+      }
+    }
+  } catch (err) {
+    console.log('[PowerNote Update] Strategy 1 failed:', err);
+  }
+
+  // Strategy 2: Use GitHub API asset endpoint with octet-stream
+  // The API itself has CORS, but it 302-redirects to a CDN that might not
+  try {
+    const match = downloadUrl.match(/repos\/([^/]+\/[^/]+)\/releases\/download/);
+    const assetMatch = downloadUrl.match(/\/([^/]+)$/);
+    if (match && assetMatch) {
+      const repo = match[1];
+      console.log('[PowerNote Update] Strategy 2: GitHub API asset endpoint');
+      // First get the release to find asset ID
+      const releaseResp = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
+        headers: { Accept: 'application/vnd.github.v3+json' },
+      });
+      if (releaseResp.ok) {
+        const releaseData = await releaseResp.json();
+        const asset = releaseData.assets?.find((a: any) => a.name === ASSET_NAME);
+        if (asset?.id) {
+          const assetResp = await fetch(
+            `https://api.github.com/repos/${repo}/releases/assets/${asset.id}`,
+            { headers: { Accept: 'application/octet-stream' } }
+          );
+          if (assetResp.ok) {
+            const text = await assetResp.text();
+            if (text.includes('<div id="root">')) {
+              console.log(`[PowerNote Update] Strategy 2 succeeded (${text.length} bytes)`);
+              return text;
+            }
+            console.log('[PowerNote Update] Strategy 2: response is not valid HTML');
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.log('[PowerNote Update] Strategy 2 failed:', err);
+  }
+
+  // Strategy 3: Use raw.githubusercontent.com to fetch dist-template from main branch
+  // This bypasses the release system but gets the latest built template
+  console.log('[PowerNote Update] Strategy 3: raw.githubusercontent.com');
+  try {
+    const resp = await fetch(
+      `https://raw.githubusercontent.com/${GITHUB_REPO}/main/dist-template/index.html`
+    );
+    if (resp.ok) {
+      const text = await resp.text();
+      if (text.includes('<div id="root">')) {
+        console.log(`[PowerNote Update] Strategy 3 succeeded (${text.length} bytes)`);
+        return text;
+      }
+    }
+  } catch (err) {
+    console.log('[PowerNote Update] Strategy 3 failed:', err);
+  }
+
+  console.error('[PowerNote Update] All download strategies failed');
+  return null;
 }
 
 /**
@@ -75,24 +148,10 @@ export async function performUpdate(
   workspace: WorkspaceData
 ): Promise<boolean> {
   console.log(`[PowerNote Update] Starting hot-swap update...`);
-  console.log(`[PowerNote Update] Downloading via API: ${downloadUrl}`);
   try {
-    // Use Accept: application/octet-stream to get the raw file content from the API
-    const resp = await fetch(downloadUrl, {
-      headers: { Accept: 'application/octet-stream' },
-    });
-    console.log(`[PowerNote Update] Download status: ${resp.status}`);
-    if (!resp.ok) {
-      console.error(`[PowerNote Update] Download failed: ${resp.status} ${resp.statusText}`);
-      return false;
-    }
-
-    let newHtml = await resp.text();
-    console.log(`[PowerNote Update] Downloaded HTML size: ${newHtml.length} bytes`);
-
-    if (!newHtml.includes('<div id="root">')) {
-      console.error('[PowerNote Update] Downloaded file does not contain <div id="root"> — not a valid PowerNote.html');
-      console.log(`[PowerNote Update] First 500 chars: ${newHtml.substring(0, 500)}`);
+    const newHtml = await fetchAssetHtml(downloadUrl);
+    if (!newHtml) {
+      console.error('[PowerNote Update] Could not download new version');
       return false;
     }
 
@@ -101,21 +160,21 @@ export async function performUpdate(
     console.log(`[PowerNote Update] Workspace JSON size: ${json.length} bytes`);
     const dataScript = `<script id="powernote-data" type="application/json">\n${json}\n</script>`;
 
+    let finalHtml: string;
     const existingPattern = /<script id="powernote-data"[^>]*>[\s\S]*?<\/script>/;
     if (existingPattern.test(newHtml)) {
-      console.log('[PowerNote Update] Replacing existing data script in new HTML');
-      newHtml = newHtml.replace(existingPattern, dataScript);
+      console.log('[PowerNote Update] Replacing existing data script');
+      finalHtml = newHtml.replace(existingPattern, dataScript);
     } else {
       console.log('[PowerNote Update] Injecting data script before </head>');
-      newHtml = newHtml.replace('</head>', `${dataScript}\n</head>`);
+      finalHtml = newHtml.replace('</head>', `${dataScript}\n</head>`);
     }
 
-    console.log(`[PowerNote Update] Final HTML size: ${newHtml.length} bytes`);
+    console.log(`[PowerNote Update] Final HTML size: ${finalHtml.length} bytes`);
     console.log('[PowerNote Update] Performing document.write() hot-swap...');
 
-    // Hot-swap the page
     document.open();
-    document.write(newHtml);
+    document.write(finalHtml);
     document.close();
     return true;
   } catch (err) {

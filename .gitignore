@@ -1,7 +1,7 @@
 node_modules
 dist
 dist-ssr
-dist-template
+# dist-template is committed for raw.githubusercontent.com update fallback
 PowerNote.html
 *.local
 .DS_Store
