@@ -5,6 +5,7 @@ import type { CanvasNode, ShapeNodeData } from '../../types/data';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useToolStore } from '../../stores/useToolStore';
 import { isNodeInteractive } from '../../utils/toolConfig';
+import { generateId } from '../../utils/ids';
 import { calculateSnap, type SnapLine } from './SnapGuides';
 
 interface ShapeNodeProps {
@@ -21,6 +22,18 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
   const updateNode = useCanvasStore((s) => s.updateNode);
   const updateNodeSilent = useCanvasStore((s) => s.updateNodeSilent);
   const [hovered, setHovered] = useState(false);
+
+  const handleDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
+    // Ctrl+Alt+drag: duplicate the node at original position, drag the duplicate
+    if ((e.evt.ctrlKey || e.evt.metaKey) && e.evt.altKey) {
+      const duplicate: CanvasNode = {
+        ...node,
+        id: generateId(),
+        data: { ...node.data },
+      };
+      useCanvasStore.getState().addNode(duplicate);
+    }
+  };
 
   const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
     if (!e.evt.shiftKey) {
@@ -88,6 +101,7 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
       height={isLinear ? hitH : h}
       draggable={isInteractive}
       listening={isInteractive}
+      onDragStart={handleDragStart}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onClick={handleClick}

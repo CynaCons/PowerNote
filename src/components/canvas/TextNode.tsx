@@ -9,6 +9,7 @@ import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useDrawStore } from '../../stores/useDrawStore';
 import { useToolStore } from '../../stores/useToolStore';
 import { isNodeInteractive } from '../../utils/toolConfig';
+import { generateId } from '../../utils/ids';
 import { TextEditor } from './TextEditor';
 import { calculateSnap, type SnapLine } from './SnapGuides';
 import { marked } from 'marked';
@@ -75,10 +76,12 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
   const activeTool = useToolStore((s) => s.activeTool);
   const isInteractive = isNodeInteractive(activeTool);
 
-  // Parse markdown to HTML
+  // Parse markdown to HTML (remove disabled from checkboxes so they're clickable)
   const renderedHtml = useMemo(() => {
     if (!data.text) return '';
-    return marked.parse(data.text) as string;
+    const html = marked.parse(data.text) as string;
+    return html.replace(/<input\s+disabled=""\s+type="checkbox"/g, '<input type="checkbox"')
+               .replace(/<input\s+checked=""\s+disabled=""\s+type="checkbox"/g, '<input checked="" type="checkbox"');
   }, [data.text]);
 
   // Measure the HTML content dimensions and sync back to store (silent — no undo push)
@@ -93,6 +96,18 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
     }, 60);
     return () => clearTimeout(timer);
   }, [renderedHtml, node.id, node.width, node.height, updateNodeSilent]);
+
+  const handleDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
+    // Ctrl+Alt+drag: duplicate the node, drag the duplicate
+    if ((e.evt.ctrlKey || e.evt.metaKey) && e.evt.altKey) {
+      const duplicate: CanvasNode = {
+        ...node,
+        id: generateId(),
+        data: { ...node.data },
+      };
+      useCanvasStore.getState().addNode(duplicate);
+    }
+  };
 
   const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
     // Only snap when Shift is held
@@ -181,6 +196,7 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
       y={node.y}
       draggable={isInteractive}
       listening={isInteractive}
+      onDragStart={handleDragStart}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onMouseDown={handleMouseDown}
