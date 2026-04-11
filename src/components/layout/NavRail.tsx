@@ -1,4 +1,4 @@
-import { Layers, MousePointer2, Type, Pen, ImageIcon, BoxSelect, Shapes, Settings } from 'lucide-react';
+import { Layers, Library, MousePointer2, Type, Pen, ImageIcon, BoxSelect, Shapes, Settings } from 'lucide-react';
 import { useToolStore } from '../../stores/useToolStore';
 import './NavRail.css';
 
@@ -7,9 +7,15 @@ interface NavRailProps {
   isHierarchyOpen: boolean;
   onToggleSettings: () => void;
   isSettingsOpen: boolean;
+  onToggleLibrary: () => void;
+  isLibraryOpen: boolean;
 }
 
-export function NavRail({ onToggleHierarchy, isHierarchyOpen, onToggleSettings, isSettingsOpen }: NavRailProps) {
+export function NavRail({
+  onToggleHierarchy, isHierarchyOpen,
+  onToggleSettings, isSettingsOpen,
+  onToggleLibrary, isLibraryOpen,
+}: NavRailProps) {
   const activeTool = useToolStore((s) => s.activeTool);
   const setTool = useToolStore((s) => s.setTool);
 
@@ -24,6 +30,15 @@ export function NavRail({ onToggleHierarchy, isHierarchyOpen, onToggleSettings, 
           onClick={onToggleHierarchy}
         >
           <Layers size={20} />
+        </button>
+        <button
+          className={`nav-rail__btn ${isLibraryOpen ? 'nav-rail__btn--active' : ''}`}
+          title="Notebook library"
+          aria-label="Notebook library"
+          data-testid="nav-library"
+          onClick={onToggleLibrary}
+        >
+          <Library size={20} />
         </button>
       </div>
 

@@ -143,6 +143,9 @@ export function clearAutoSave(): void {
  * Start the auto-save interval. Returns a cleanup function to stop it.
  * flushAndGetWorkspace should flush active page nodes/strokes to workspace
  * and return the full workspace data.
+ *
+ * Saves to BOTH `powernote-autosave` (single snapshot, restored on next load)
+ * AND the notebook library (up to 5 recent notebooks, user-browsable).
  */
 export function startAutoSave(
   flushAndGetWorkspace: () => WorkspaceData,
@@ -152,10 +155,14 @@ export function startAutoSave(
     if (!getIsDirty()) return;
     const workspace = flushAndGetWorkspace();
     autoSaveToLocalStorage(workspace);
-    // Don't markClean — only file export clears dirty flag
-    // But we can log for debugging
+
+    // Also save to notebook library (Word-style continuous autosave)
+    import('./notebookLibrary').then(({ saveToLibrary }) => {
+      saveToLibrary(workspace);
+    });
+
     if (import.meta.env?.DEV) {
-      console.log('[PowerNote] Auto-saved to localStorage');
+      console.log('[PowerNote] Auto-saved to localStorage + library');
     }
   }, AUTOSAVE_INTERVAL_MS);
 

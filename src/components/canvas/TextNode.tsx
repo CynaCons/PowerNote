@@ -13,6 +13,7 @@ import { generateId } from '../../utils/ids';
 import { TextEditor } from './TextEditor';
 import { calculateSnap, type SnapLine } from './SnapGuides';
 import { marked } from 'marked';
+import { preprocessMath, restoreMath } from '../../utils/mathParser';
 
 // Handle powernote:// internal links
 function handleInternalLink(href: string) {
@@ -76,10 +77,16 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
   const activeTool = useToolStore((s) => s.activeTool);
   const isInteractive = isNodeInteractive(activeTool);
 
-  // Parse markdown to HTML (remove disabled from checkboxes so they're clickable)
+  // Parse markdown to HTML (with math pre-processing and clickable checkboxes)
   const renderedHtml = useMemo(() => {
     if (!data.text) return '';
-    const html = marked.parse(data.text) as string;
+    // 1) Extract $$...$$ and $...$ math blocks, replace with placeholders
+    const { text: textWithoutMath, blocks } = preprocessMath(data.text);
+    // 2) Run marked on the cleaned text
+    let html = marked.parse(textWithoutMath) as string;
+    // 3) Restore math placeholders with KaTeX-rendered HTML
+    html = restoreMath(html, blocks);
+    // 4) Remove disabled attribute from task-list checkboxes so clicks work
     return html.replace(/<input\s+disabled=""\s+type="checkbox"/g, '<input type="checkbox"')
                .replace(/<input\s+checked=""\s+disabled=""\s+type="checkbox"/g, '<input checked="" type="checkbox"');
   }, [data.text]);

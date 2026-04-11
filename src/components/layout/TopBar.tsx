@@ -1,8 +1,9 @@
-import { ChevronRight, Download, FolderOpen, Maximize } from 'lucide-react';
+import { ChevronRight, Download, FolderOpen, Maximize, ChevronDown } from 'lucide-react';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
 import { buildExportHtml, downloadFile, extractDataFromHtml, clearAutoSave } from '../../utils/serialization';
+import { workspaceToMarkdown } from '../../utils/exportMarkdown';
 import { useRef, useState, useEffect } from 'react';
 import { showToast } from './Toast';
 import './TopBar.css';
@@ -17,6 +18,7 @@ export function TopBar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingFilename, setEditingFilename] = useState(false);
   const [filenameValue, setFilenameValue] = useState('');
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const activeSection = workspace.sections.find((s) => s.id === activeSectionId);
   const activePage = activeSection?.pages.find((p) => p.id === activePageId);
@@ -101,6 +103,26 @@ export function TopBar() {
     useCanvasStore.getState().zoomToFit();
   };
 
+  const handleExportMarkdown = () => {
+    // Flush active page content
+    const canvasNodes = useCanvasStore.getState().nodes;
+    savePageNodes(canvasNodes);
+    useWorkspaceStore.getState().savePageStrokes(useDrawStore.getState().strokes);
+
+    const ws = useWorkspaceStore.getState().workspace;
+    const md = workspaceToMarkdown(ws);
+    const filename = ws.filename.replace(/[^a-zA-Z0-9_\- ]/g, '_') + '.md';
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`Exported ${filename}`, 'success');
+    setShowExportMenu(false);
+  };
+
   return (
     <header className="top-bar" data-testid="topbar">
       <div className="top-bar__breadcrumb">
@@ -161,14 +183,41 @@ export function TopBar() {
         >
           <FolderOpen size={16} />
         </button>
-        <button
-          className="top-bar__action-btn top-bar__action-btn--primary"
-          onClick={handleSave}
-          title="Save as HTML (Ctrl+S)"
-          data-testid="save-btn"
-        >
-          <Download size={16} />
-        </button>
+        <div className="top-bar__save-group">
+          <button
+            className="top-bar__action-btn top-bar__action-btn--primary"
+            onClick={handleSave}
+            title="Save as HTML (Ctrl+S)"
+            data-testid="save-btn"
+          >
+            <Download size={16} />
+          </button>
+          <button
+            className="top-bar__action-btn top-bar__action-btn--primary top-bar__save-chevron"
+            onClick={() => setShowExportMenu((v) => !v)}
+            title="Export options"
+            data-testid="save-dropdown-btn"
+          >
+            <ChevronDown size={12} />
+          </button>
+          {showExportMenu && (
+            <div className="top-bar__export-menu" data-testid="export-menu">
+              <button
+                className="top-bar__export-item"
+                onClick={() => { handleSave(); setShowExportMenu(false); }}
+              >
+                Save as HTML
+              </button>
+              <button
+                className="top-bar__export-item"
+                onClick={handleExportMarkdown}
+                data-testid="export-markdown-btn"
+              >
+                Export as Markdown
+              </button>
+            </div>
+          )}
+        </div>
         <input
           ref={fileInputRef}
           type="file"

@@ -92,16 +92,19 @@ export function SelectionTransformer({ selectedNodeIds, stageRef }: SelectionTra
     }
   };
 
+  const isMultiSelect = selectedNodeIds.length > 1;
+
   return (
     <Transformer
       key={resizeEnabled ? 'resize' : 'no-resize'}
       ref={transformerRef}
       borderStroke="#2563eb"
-      borderStrokeWidth={1.5}
-      padding={2}
+      borderStrokeWidth={isMultiSelect ? 2.5 : 1.5}
+      borderDash={isMultiSelect ? [8, 4] : undefined}
+      padding={isMultiSelect ? 6 : 2}
       resizeEnabled={resizeEnabled}
       rotateEnabled={false}
-      anchorSize={resizeEnabled ? 8 : 0}
+      anchorSize={resizeEnabled && !isMultiSelect ? 8 : 0}
       anchorFill="#ffffff"
       anchorStroke="#2563eb"
       anchorStrokeWidth={1}

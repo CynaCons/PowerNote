@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X, Replace } from 'lucide-react';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import './SearchPanel.css';
@@ -23,9 +23,13 @@ interface SearchPanelProps {
 
 export function SearchPanel({ isOpen, isNotebookWide, onClose, onNavigateToResult }: SearchPanelProps) {
   const [query, setQuery] = useState('');
+  const [replaceMode, setReplaceMode] = useState(false);
+  const [replacement, setReplacement] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const nodes = useCanvasStore((s) => s.nodes);
+  const updateNode = useCanvasStore((s) => s.updateNode);
   const workspace = useWorkspaceStore((s) => s.workspace);
+  const setWorkspaceState = useWorkspaceStore.setState;
   const activeSectionId = useWorkspaceStore((s) => s.activeSectionId);
   const activePageId = useWorkspaceStore((s) => s.activePageId);
 
@@ -98,6 +102,43 @@ export function SearchPanel({ isOpen, isNotebookWide, onClose, onNavigateToResul
     return results;
   }, [query, isNotebookWide, nodes, workspace, activeSectionId, activePageId]);
 
+  const replaceAll = useCallback(() => {
+    if (!query.trim()) return;
+    const q = query;
+
+    // Replace in active page's canvas nodes (live store)
+    const activeNodesToUpdate = nodes.filter((n) => {
+      if (n.type !== 'text') return false;
+      const text = (n.data as any).text || '';
+      return text.includes(q);
+    });
+    for (const n of activeNodesToUpdate) {
+      const oldText = (n.data as any).text || '';
+      const newText = oldText.split(q).join(replacement);
+      updateNode(n.id, { data: { ...n.data, text: newText } as any });
+    }
+
+    // For notebook-wide replace, also update non-active pages via workspace store
+    if (isNotebookWide) {
+      const ws = workspace;
+      const updatedSections = ws.sections.map((section) => ({
+        ...section,
+        pages: section.pages.map((page) => {
+          const isActivePage = section.id === activeSectionId && page.id === activePageId;
+          if (isActivePage) return page; // already handled via canvas store above
+          const updatedNodes = page.nodes.map((node) => {
+            if (node.type !== 'text') return node;
+            const text = (node.data as any).text || '';
+            if (!text.includes(q)) return node;
+            return { ...node, data: { ...node.data, text: text.split(q).join(replacement) } };
+          });
+          return { ...page, nodes: updatedNodes };
+        }),
+      }));
+      setWorkspaceState({ workspace: { ...ws, sections: updatedSections }, isDirty: true });
+    }
+  }, [query, replacement, nodes, updateNode, workspace, activeSectionId, activePageId, isNotebookWide, setWorkspaceState]);
+
   if (!isOpen) return null;
 
   const results = getResults();
@@ -120,10 +161,40 @@ export function SearchPanel({ isOpen, isNotebookWide, onClose, onNavigateToResul
         <span className="search-panel__count">
           {query.trim() ? `${results.length} result${results.length !== 1 ? 's' : ''}` : ''}
         </span>
+        <button
+          className={`search-panel__toggle ${replaceMode ? 'search-panel__toggle--active' : ''}`}
+          onClick={() => setReplaceMode((v) => !v)}
+          title="Toggle Replace"
+          data-testid="search-replace-toggle"
+        >
+          <Replace size={14} />
+        </button>
         <button className="search-panel__close" onClick={onClose}>
           <X size={16} />
         </button>
       </div>
+      {replaceMode && (
+        <div className="search-panel__replace-row" data-testid="search-replace-row">
+          <input
+            className="search-panel__input"
+            placeholder="Replace with..."
+            value={replacement}
+            onChange={(e) => setReplacement(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') onClose();
+            }}
+            data-testid="search-replace-input"
+          />
+          <button
+            className="search-panel__btn"
+            onClick={replaceAll}
+            disabled={!query.trim()}
+            data-testid="search-replace-all"
+          >
+            Replace All
+          </button>
+        </div>
+      )}
       {query.trim() && (
         <div className="search-panel__results">
           {results.length === 0 && (

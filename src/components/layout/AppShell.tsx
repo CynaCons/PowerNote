@@ -6,6 +6,7 @@ import { HierarchyPanel } from '../sidebar/HierarchyPanel';
 import { BottomToolbar } from '../toolbar/BottomToolbar';
 import { SearchPanel } from '../search/SearchPanel';
 import { SettingsPanel } from '../settings/SettingsPanel';
+import { NotebookLibraryPanel } from './NotebookLibraryPanel';
 import type { BackgroundMode } from '../canvas/PageGuides';
 import type { CanvasBgColor } from '../canvas/InfiniteCanvas';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
@@ -19,6 +20,7 @@ import './AppShell.css';
 export function AppShell() {
   const [isHierarchyOpen, setIsHierarchyOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchNotebookWide, setSearchNotebookWide] = useState(false);
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('pages');
@@ -87,6 +89,8 @@ export function AppShell() {
         isHierarchyOpen={isHierarchyOpen}
         onToggleSettings={() => setIsSettingsOpen((prev) => !prev)}
         isSettingsOpen={isSettingsOpen}
+        onToggleLibrary={() => setIsLibraryOpen((prev) => !prev)}
+        isLibraryOpen={isLibraryOpen}
       />
       <TopBar />
       <div className="canvas-area">
@@ -110,6 +114,10 @@ export function AppShell() {
           onChangeBgColor={setBgColor}
         />
       )}
+      <NotebookLibraryPanel
+        isOpen={isLibraryOpen}
+        onClose={() => setIsLibraryOpen(false)}
+      />
     </div>
   );
 }

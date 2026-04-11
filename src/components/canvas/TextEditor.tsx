@@ -2,6 +2,32 @@ import { useEffect, useRef } from 'react';
 import { Html } from 'react-konva-utils';
 import type { CanvasNode, TextNodeData } from '../../types/data';
 
+/**
+ * Replace the textarea's selected range with new text using a native-compatible
+ * approach that integrates with the browser's undo stack.
+ *
+ * Falls back to direct value assignment if execCommand is not supported.
+ */
+function replaceSelection(
+  ta: HTMLTextAreaElement,
+  selStart: number,
+  selEnd: number,
+  newText: string,
+): void {
+  ta.focus();
+  ta.setSelectionRange(selStart, selEnd);
+  try {
+    const ok = document.execCommand('insertText', false, newText);
+    if (ok) return;
+  } catch {
+    // Ignore — fall through to fallback
+  }
+  // Fallback: direct mutation (no undo history)
+  const before = ta.value.substring(0, selStart);
+  const after = ta.value.substring(selEnd);
+  ta.value = before + newText + after;
+}
+
 interface TextEditorProps {
   node: CanvasNode;
   stageScale: number;
@@ -9,7 +35,7 @@ interface TextEditorProps {
   onCancel: () => void;
 }
 
-export function TextEditor({ node, stageScale, onFinish, onCancel }: TextEditorProps) {
+export function TextEditor({ node, stageScale: _stageScale, onFinish, onCancel }: TextEditorProps) {
   const data = node.data as TextNodeData;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -39,39 +65,58 @@ export function TextEditor({ node, stageScale, onFinish, onCancel }: TextEditorP
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    // Tab: indent current line
-    if (e.key === 'Tab' && !e.shiftKey) {
+    // Tab / Shift+Tab: indent / unindent (supports single-line + multi-line selection)
+    if (e.key === 'Tab') {
       e.preventDefault();
       const start = textarea.selectionStart;
       const end = textarea.selectionEnd;
       const value = textarea.value;
 
-      // Find the start of the current line
-      const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+      // First line's start (at or before the cursor/selection anchor)
+      const firstLineStart = value.lastIndexOf('\n', start - 1) + 1;
+      // If selection spans multiple lines, we indent every line in the range
+      const selectionSpansLines = value.substring(firstLineStart, end).includes('\n');
 
-      // Insert two spaces at the start of the line
-      textarea.value = value.substring(0, lineStart) + '  ' + value.substring(lineStart);
-      textarea.selectionStart = start + 2;
-      textarea.selectionEnd = end + 2;
-      autoHeight(textarea);
-    }
-
-    // Shift+Tab: unindent current line
-    if (e.key === 'Tab' && e.shiftKey) {
-      e.preventDefault();
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const value = textarea.value;
-
-      const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-      const lineContent = value.substring(lineStart);
-
-      if (lineContent.startsWith('  ')) {
-        textarea.value = value.substring(0, lineStart) + value.substring(lineStart + 2);
-        textarea.selectionStart = Math.max(lineStart, start - 2);
-        textarea.selectionEnd = Math.max(lineStart, end - 2);
+      if (!e.shiftKey) {
+        // ── INDENT (Tab) ─────────────────────────────────
+        if (selectionSpansLines) {
+          // Multi-line: prepend 2 spaces to every line in the selection range
+          const selected = value.substring(firstLineStart, end);
+          const indented = selected.replace(/^/gm, '  ');
+          replaceSelection(textarea, firstLineStart, end, indented);
+          textarea.selectionStart = firstLineStart;
+          textarea.selectionEnd = firstLineStart + indented.length;
+        } else {
+          // Single line: insert 2 spaces at line start
+          replaceSelection(textarea, firstLineStart, firstLineStart, '  ');
+          textarea.selectionStart = start + 2;
+          textarea.selectionEnd = end + 2;
+        }
+      } else {
+        // ── UNINDENT (Shift+Tab) ─────────────────────────
+        if (selectionSpansLines) {
+          const selected = value.substring(firstLineStart, end);
+          // Remove up to 2 leading spaces from every line
+          const unindented = selected.replace(/^( {1,2})/gm, '');
+          if (unindented !== selected) {
+            replaceSelection(textarea, firstLineStart, end, unindented);
+            textarea.selectionStart = firstLineStart;
+            textarea.selectionEnd = firstLineStart + unindented.length;
+          }
+        } else {
+          // Single line: remove up to 2 leading spaces from the current line
+          const lineContent = value.substring(firstLineStart);
+          const match = lineContent.match(/^( {1,2})/);
+          if (match) {
+            const removed = match[1].length;
+            replaceSelection(textarea, firstLineStart, firstLineStart + removed, '');
+            textarea.selectionStart = Math.max(firstLineStart, start - removed);
+            textarea.selectionEnd = Math.max(firstLineStart, end - removed);
+          }
+        }
       }
       autoHeight(textarea);
+      return;
     }
 
     // Enter: auto-continue bullet/numbered lists
@@ -174,11 +219,16 @@ export function TextEditor({ node, stageScale, onFinish, onCancel }: TextEditorP
     autoHeight(textarea);
   };
 
+  // Mirror TextNode's rendered div exactly so the editing experience
+  // visually matches the committed text. <Html> handles the stage-scale
+  // transform automatically — do NOT manually multiply by stageScale.
+  // Offset by -2 to compensate for the 2px border so the text baseline
+  // lines up pixel-perfect with where the rendered div showed it.
   return (
     <Html
       groupProps={{
-        x: node.x,
-        y: node.y,
+        x: node.x - 2,
+        y: node.y - 2,
       }}
       divProps={{
         style: {},
@@ -194,27 +244,29 @@ export function TextEditor({ node, stageScale, onFinish, onCancel }: TextEditorP
           position: 'absolute',
           top: 0,
           left: 0,
-          minWidth: Math.max(200, node.width) * stageScale,
-          maxWidth: 800 * stageScale,
-          minHeight: 24 * stageScale,
-          fontSize: data.fontSize * stageScale,
-          fontFamily: 'monospace',
+          minWidth: 60,
+          maxWidth: 800,
+          width: Math.max(node.width, 60),
+          minHeight: 24,
+          fontSize: data.fontSize,
+          fontFamily: data.fontFamily,
           fontStyle: data.fontStyle.includes('italic') ? 'italic' : 'normal',
           fontWeight: data.fontStyle.includes('bold') ? 'bold' : 'normal',
           color: data.fill,
           border: '2px solid #2563eb',
           borderRadius: 3,
-          padding: `${4 * stageScale}px`,
+          padding: 4,
           margin: 0,
           outline: 'none',
           resize: 'none',
           overflow: 'hidden',
-          background: 'white',
+          background: '#ffffff',
           lineHeight: '1.4',
           whiteSpace: 'pre-wrap',
+          wordWrap: 'break-word',
+          overflowWrap: 'break-word',
           tabSize: 2,
-          transformOrigin: 'top left',
-          transform: `scale(${1 / stageScale})`,
+          boxSizing: 'content-box',
         }}
       />
     </Html>
