@@ -8,3 +8,4 @@ PowerNote.html
 *.tsbuildinfo
 test-results
 playwright-report
+*.log
