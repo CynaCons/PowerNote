@@ -353,10 +353,11 @@ export function useShapeCreation(
         });
       }
     } else if (tool === 'lasso' && lassoRect && lassoRect.w > 5 && lassoRect.h > 5) {
-      // Find strokes within lasso rect
       const rect = lassoRect;
+
+      // Find strokes within lasso rect
       const allStrokes = useDrawStore.getState().strokes;
-      const selected = allStrokes.filter((s) => {
+      const selectedStrokes = allStrokes.filter((s) => {
         for (let i = 0; i < s.points.length; i += 2) {
           if (s.points[i] >= rect.x && s.points[i] <= rect.x + rect.w &&
               s.points[i + 1] >= rect.y && s.points[i + 1] <= rect.y + rect.h) {
@@ -365,7 +366,28 @@ export function useShapeCreation(
         }
         return false;
       });
-      useDrawStore.getState().selectStrokes(selected.map((s) => s.id));
+      useDrawStore.getState().selectStrokes(selectedStrokes.map((s) => s.id));
+
+      // Find nodes (text/shape/image) whose bounding box intersects the lasso rect
+      const allNodes = useCanvasStore.getState().nodes;
+      const selectedNodeIds = allNodes.filter((n) => {
+        // For arrows/lines, width/height can be negative (direction vector)
+        const nx1 = Math.min(n.x, n.x + n.width);
+        const ny1 = Math.min(n.y, n.y + n.height);
+        const nx2 = Math.max(n.x, n.x + n.width);
+        const ny2 = Math.max(n.y, n.y + n.height);
+        // Intersection check with lasso rect
+        return !(nx2 < rect.x || nx1 > rect.x + rect.w ||
+                 ny2 < rect.y || ny1 > rect.y + rect.h);
+      }).map((n) => n.id);
+
+      // Replace node selection with lassoed ones
+      useCanvasStore.setState({ selectedNodeIds });
+
+      // After lasso, switch to select mode so the user can move/duplicate
+      if (selectedNodeIds.length > 0 || selectedStrokes.length > 0) {
+        useToolStore.getState().setTool('select');
+      }
     }
 
     isDrawing.current = false;
