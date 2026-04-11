@@ -6,11 +6,13 @@
  * containing the serialized workspace data.
  */
 import { test, expect } from '@playwright/test';
-import { waitForCanvasReady, activateTool, clickCanvas } from '../helpers';
+import { waitForCanvasReady, activateTool, clickCanvas, disableFSA } from '../helpers';
 import * as fs from 'fs';
 
 test.describe('35 - Save / Export (REQ-FILE-001..003)', () => {
   test.beforeEach(async ({ page }) => {
+    // Disable File System Access API so save falls back to download flow
+    await disableFSA(page);
     await page.goto('/');
     await waitForCanvasReady(page);
   });

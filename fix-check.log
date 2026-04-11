@@ -1,0 +1,10 @@
+
+Running 5 tests using 1 worker
+
+  ✓  1 [chromium] › tests\demo\50-full-showcase.spec.ts:22:3 › 50 - Full PowerNote Showcase Demo › complete feature walkthrough (44.7s)
+  ✓  2 [chromium] › tests\file\38-workflow-persistence.spec.ts:84:3 › 38 - Workflow Persistence: EV Motor Control Report › complete 4-cycle save/reopen workflow with scientific content (17.1s)
+  ✓  3 [chromium] › tests\image\40-image-add.spec.ts:19:3 › 40 - Image Add (REQ-IMAGE-001, REQ-IMAGE-002) › adding an image node via store creates an image on canvas (1.9s)
+  ✓  4 [chromium] › tests\image\40-image-add.spec.ts:38:3 › 40 - Image Add (REQ-IMAGE-001, REQ-IMAGE-002) › image node is selectable by clicking (5.5s)
+  ✓  5 [chromium] › tests\image\40-image-add.spec.ts:59:3 › 40 - Image Add (REQ-IMAGE-001, REQ-IMAGE-002) › image node survives save/load round-trip (8.9s)
+
+  5 passed (1.6m)

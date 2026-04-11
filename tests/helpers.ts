@@ -79,3 +79,26 @@ export async function activateTool(page: Page, tool: 'text' | 'hierarchy') {
   const testId = tool === 'text' ? 'nav-text-tool' : 'nav-hierarchy';
   await page.locator(`[data-testid="${testId}"]`).click();
 }
+
+/**
+ * Disable the File System Access API in the page, forcing the app to use
+ * the legacy download-based save flow. Call this in beforeEach for tests
+ * that rely on `page.waitForEvent('download')`.
+ *
+ * Must be called BEFORE page.goto() — uses addInitScript to run before
+ * any app code executes.
+ */
+export async function disableFSA(page: Page) {
+  await page.addInitScript(() => {
+    try {
+      delete (window as any).showSaveFilePicker;
+      delete (window as any).showOpenFilePicker;
+      delete (window as any).showDirectoryPicker;
+    } catch {
+      // Some browsers don't allow deleting window properties; override with undefined
+      (window as any).showSaveFilePicker = undefined;
+      (window as any).showOpenFilePicker = undefined;
+      (window as any).showDirectoryPicker = undefined;
+    }
+  });
+}

@@ -1,0 +1,6 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 [chromium] › tests\file\38-workflow-persistence.spec.ts:84:3 › 38 - Workflow Persistence: EV Motor Control Report › complete 4-cycle save/reopen workflow with scientific content (12.8s)
+
+  1 passed (18.7s)

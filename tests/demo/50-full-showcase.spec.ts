@@ -14,11 +14,13 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
+import { disableFSA } from '../helpers';
 
 test.setTimeout(180000); // 3 minutes
 
 test.describe('50 - Full PowerNote Showcase Demo', () => {
   test('complete feature walkthrough', async ({ page }) => {
+    await disableFSA(page);
     await page.goto('/');
     await page.locator('[data-testid="canvas-container"] canvas').first().waitFor({ state: 'visible' });
     await page.waitForTimeout(1000);

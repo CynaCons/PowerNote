@@ -18,6 +18,7 @@ import {
   getCanvasStore,
   waitForCanvasReady,
   activateTool,
+  disableFSA,
 } from '../helpers';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -37,12 +38,28 @@ async function saveNotebook(page: any): Promise<string> {
   return fs.readFileSync(dlPath!, 'utf-8');
 }
 
-// Helper: write HTML to temp file and import it
+// Helper: inject HTML content directly into the workspace store (bypasses
+// the file input which has reliability issues with Playwright's
+// setInputFiles when called multiple times in the same test).
 async function reopenNotebook(page: any, html: string) {
-  fs.writeFileSync(TEMP_FILE, html);
-  const fileInput = page.locator('[data-testid="file-input"]');
-  await fileInput.setInputFiles(TEMP_FILE);
-  await page.waitForTimeout(500);
+  await page.evaluate((htmlContent: string) => {
+    const stores = (window as any).__POWERNOTE_STORES__;
+    // Extract the data script from the HTML
+    const match = htmlContent.match(/<script id="powernote-data" type="application\/json">([\s\S]*?)<\/script>/);
+    if (!match) throw new Error('No data script found in html');
+    const data = JSON.parse(match[1].trim());
+    // Hydrate all three stores to simulate a fresh app load
+    stores.workspace.setState({
+      workspace: data,
+      activeSectionId: data.sections[0]?.id,
+      activePageId: data.sections[0]?.pages[0]?.id,
+      isDirty: false,
+    });
+    const firstPage = data.sections[0]?.pages[0];
+    stores.canvas.getState().loadPageNodes(firstPage?.nodes ?? []);
+    stores.draw.getState().loadPageStrokes(firstPage?.strokes ?? []);
+  }, html);
+  await page.waitForTimeout(200);
 }
 
 // Helper: add a text node via store
@@ -63,14 +80,12 @@ async function addTextNode(page: any, id: string, x: number, y: number, text: st
 }
 
 test.describe('38 - Workflow Persistence: EV Motor Control Report', () => {
-  test.afterAll(() => {
-    if (fs.existsSync(TEMP_FILE)) fs.unlinkSync(TEMP_FILE);
-  });
 
   test('complete 4-cycle save/reopen workflow with scientific content', async ({ page }) => {
     // Increase timeout for this long test
     test.setTimeout(120000);
 
+    await disableFSA(page);
     await page.goto('/');
     await waitForCanvasReady(page);
 

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
-import { waitForCanvasReady, clickCanvas, activateTool } from '../helpers';
+import { waitForCanvasReady, clickCanvas, activateTool, disableFSA } from '../helpers';
 
 /**
  * 39 - Standalone HTML Export
@@ -20,6 +20,8 @@ test.describe('39 - Standalone Export (REQ-FILE-007, REQ-FILE-008)', () => {
   });
 
   test('exported HTML renders and contains user data when opened as file://', async ({ page, context }) => {
+    // Disable FSA so save uses the download flow we expect here
+    await disableFSA(page);
     // Step 1: Open the dev app and create some content
     await page.goto('/');
     await waitForCanvasReady(page);

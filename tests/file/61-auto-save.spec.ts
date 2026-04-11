@@ -7,12 +7,13 @@
  * file export.
  */
 import { test, expect } from '@playwright/test';
-import { waitForCanvasReady } from '../helpers';
+import { waitForCanvasReady, disableFSA } from '../helpers';
 
 const AUTOSAVE_KEY = 'powernote-autosave';
 
 test.describe('61 - Auto-Save to localStorage (REQ-FILE-009..011)', () => {
   test.beforeEach(async ({ page }) => {
+    await disableFSA(page);
     await page.goto('/');
     await waitForCanvasReady(page);
 

@@ -4,13 +4,14 @@
  * verify it renders and is selectable
  */
 import { test, expect } from '@playwright/test';
-import { waitForCanvasReady, getCanvasStore } from '../helpers';
+import { waitForCanvasReady, getCanvasStore, disableFSA } from '../helpers';
 
 // 1x1 red pixel PNG as base64
 const RED_PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
 
 test.describe('40 - Image Add (REQ-IMAGE-001, REQ-IMAGE-002)', () => {
   test.beforeEach(async ({ page }) => {
+    await disableFSA(page);
     await page.goto('/');
     await waitForCanvasReady(page);
   });

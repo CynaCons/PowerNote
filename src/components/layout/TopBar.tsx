@@ -2,8 +2,14 @@ import { ChevronRight, Download, FolderOpen, Maximize, ChevronDown } from 'lucid
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
-import { buildExportHtml, downloadFile, extractDataFromHtml, clearAutoSave } from '../../utils/serialization';
+import { extractDataFromHtml } from '../../utils/serialization';
 import { workspaceToMarkdown } from '../../utils/exportMarkdown';
+import {
+  isFSASupported,
+  openWithPicker,
+} from '../../utils/fileSystemAccess';
+import { setCurrentHandle, addRecentHandle } from '../../utils/fileHandleStore';
+import { saveNotebook } from '../../utils/saveNotebook';
 import { useRef, useState, useEffect } from 'react';
 import { showToast } from './Toast';
 import './TopBar.css';
@@ -13,8 +19,6 @@ export function TopBar() {
   const activeSectionId = useWorkspaceStore((s) => s.activeSectionId);
   const activePageId = useWorkspaceStore((s) => s.activePageId);
   const isDirty = useWorkspaceStore((s) => s.isDirty);
-  const savePageNodes = useWorkspaceStore((s) => s.savePageNodes);
-  const markClean = useWorkspaceStore((s) => s.markClean);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingFilename, setEditingFilename] = useState(false);
   const [filenameValue, setFilenameValue] = useState('');
@@ -34,25 +38,39 @@ export function TopBar() {
     return () => window.removeEventListener('beforeunload', handler);
   }, []);
 
-  const handleSave = async () => {
-    const canvasNodes = useCanvasStore.getState().nodes;
-    savePageNodes(canvasNodes);
-    useWorkspaceStore.getState().savePageStrokes(useDrawStore.getState().strokes);
-
-    const freshWorkspace = useWorkspaceStore.getState().workspace;
-    try {
-      const html = await buildExportHtml(freshWorkspace);
-      const filename = freshWorkspace.filename.replace(/[^a-zA-Z0-9_\- ]/g, '_') + '.html';
-      downloadFile(html, filename);
-      markClean();
-      clearAutoSave();
-      showToast('Notebook saved successfully', 'success');
-    } catch (err) {
-      showToast('Failed to save notebook', 'error');
-    }
+  const handleSave = async (forceSaveAs: boolean = false) => {
+    await saveNotebook(forceSaveAs);
   };
 
-  const handleOpen = () => {
+  const handleOpen = async () => {
+    // Try FSA open picker first
+    if (isFSASupported()) {
+      const result = await openWithPicker();
+      if (result) {
+        const data = extractDataFromHtml(result.text);
+        if (data) {
+          useWorkspaceStore.setState({
+            workspace: data,
+            activeSectionId: data.sections[0]?.id ?? '',
+            activePageId: data.sections[0]?.pages[0]?.id ?? '',
+            isDirty: false,
+          });
+          const firstPage = data.sections[0]?.pages[0];
+          useCanvasStore.getState().loadPageNodes(firstPage?.nodes ?? []);
+          useDrawStore.getState().loadPageStrokes(firstPage?.strokes ?? []);
+          await setCurrentHandle(result.handle);
+          await addRecentHandle(data.filename, result.handle);
+          showToast(`Opened ${result.handle.name}`, 'info');
+          return;
+        }
+        showToast('Not a valid PowerNote file', 'error');
+        return;
+      }
+      // User cancelled — do nothing
+      return;
+    }
+
+    // Fallback: legacy file input
     fileInputRef.current?.click();
   };
 
@@ -106,7 +124,7 @@ export function TopBar() {
   const handleExportMarkdown = () => {
     // Flush active page content
     const canvasNodes = useCanvasStore.getState().nodes;
-    savePageNodes(canvasNodes);
+    useWorkspaceStore.getState().savePageNodes(canvasNodes);
     useWorkspaceStore.getState().savePageStrokes(useDrawStore.getState().strokes);
 
     const ws = useWorkspaceStore.getState().workspace;
@@ -186,8 +204,8 @@ export function TopBar() {
         <div className="top-bar__save-group">
           <button
             className="top-bar__action-btn top-bar__action-btn--primary"
-            onClick={handleSave}
-            title="Save as HTML (Ctrl+S)"
+            onClick={() => handleSave(false)}
+            title="Save (Ctrl+S)"
             data-testid="save-btn"
           >
             <Download size={16} />
@@ -204,10 +222,19 @@ export function TopBar() {
             <div className="top-bar__export-menu" data-testid="export-menu">
               <button
                 className="top-bar__export-item"
-                onClick={() => { handleSave(); setShowExportMenu(false); }}
+                onClick={() => { handleSave(false); setShowExportMenu(false); }}
               >
-                Save as HTML
+                Save
               </button>
+              {isFSASupported() && (
+                <button
+                  className="top-bar__export-item"
+                  onClick={() => { handleSave(true); setShowExportMenu(false); }}
+                  data-testid="save-as-btn"
+                >
+                  Save As...
+                </button>
+              )}
               <button
                 className="top-bar__export-item"
                 onClick={handleExportMarkdown}

@@ -10,7 +10,9 @@
       "Bash(npm ls:*)",
       "Bash(npm view:*)",
       "Bash(npm install:*)",
-      "Bash(npx playwright:*)"
+      "Bash(npx playwright:*)",
+      "WebSearch",
+      "WebFetch(domain:talk.tiddlywiki.org)"
     ]
   }
 }

@@ -7,7 +7,7 @@
  * content survived the round-trip.
  */
 import { test, expect } from '@playwright/test';
-import { getWorkspaceStore, getCanvasStore, waitForCanvasReady, activateTool } from '../helpers';
+import { getWorkspaceStore, getCanvasStore, waitForCanvasReady, activateTool, disableFSA } from '../helpers';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -17,6 +17,7 @@ const __dirname = path.dirname(__filename);
 
 test.describe('37 - Full Round-Trip (REQ-FILE-004, REQ-FILE-007)', () => {
   test('save → reopen → verify: complete notebook round-trip', async ({ page }) => {
+    await disableFSA(page);
     await page.goto('/');
     await waitForCanvasReady(page);
 

@@ -144,22 +144,48 @@ export function clearAutoSave(): void {
  * flushAndGetWorkspace should flush active page nodes/strokes to workspace
  * and return the full workspace data.
  *
- * Saves to BOTH `powernote-autosave` (single snapshot, restored on next load)
- * AND the notebook library (up to 5 recent notebooks, user-browsable).
+ * Saves to THREE destinations (when available):
+ *   1. `powernote-autosave` localStorage (single snapshot, restored on next load)
+ *   2. Notebook library (up to 5 recent notebooks, user-browsable)
+ *   3. If File System Access API is available AND a current file handle exists
+ *      with granted write permission, writes the full HTML to the live file.
+ *      This is the Word-style "save in place" autosave.
  */
 export function startAutoSave(
   flushAndGetWorkspace: () => WorkspaceData,
   getIsDirty: () => boolean,
 ): () => void {
-  const interval = setInterval(() => {
+  const interval = setInterval(async () => {
     if (!getIsDirty()) return;
     const workspace = flushAndGetWorkspace();
     autoSaveToLocalStorage(workspace);
 
     // Also save to notebook library (Word-style continuous autosave)
-    import('./notebookLibrary').then(({ saveToLibrary }) => {
-      saveToLibrary(workspace);
-    });
+    const { saveToLibrary } = await import('./notebookLibrary');
+    saveToLibrary(workspace);
+
+    // If FSA + current handle + granted permission, write to the real file
+    try {
+      const { isFSASupported } = await import('./fileSystemAccess');
+      if (!isFSASupported()) return;
+      const { getCurrentHandle } = await import('./fileHandleStore');
+      const handle = await getCurrentHandle();
+      if (!handle) return;
+      const perm = await (handle as any).queryPermission?.({ mode: 'readwrite' });
+      if (perm !== 'granted') return; // don't prompt — requires user gesture
+      const html = await buildExportHtml(workspace);
+      const writable = await handle.createWritable();
+      await writable.write(html);
+      await writable.close();
+      if (import.meta.env?.DEV) {
+        console.log('[PowerNote] Auto-saved to file via FSA handle');
+      }
+    } catch (err) {
+      // FSA path is best-effort — fall through silently
+      if (import.meta.env?.DEV) {
+        console.log('[PowerNote] FSA autosave skipped:', err);
+      }
+    }
 
     if (import.meta.env?.DEV) {
       console.log('[PowerNote] Auto-saved to localStorage + library');

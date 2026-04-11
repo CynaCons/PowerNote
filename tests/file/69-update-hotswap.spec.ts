@@ -11,7 +11,7 @@
  * update mechanism relies on.
  */
 import { test, expect } from '@playwright/test';
-import { waitForCanvasReady, getWorkspaceStore, getCanvasStore } from '../helpers';
+import { waitForCanvasReady, getWorkspaceStore, getCanvasStore, disableFSA } from '../helpers';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -28,6 +28,7 @@ test.describe('69 - Update Hot-Swap (REQ-UPDATE-001)', () => {
 
   test('data injection into template preserves all workspace content', async ({ page }) => {
     test.setTimeout(60000);
+    await disableFSA(page);
     await page.goto('/');
     await waitForCanvasReady(page);
 
@@ -110,6 +111,7 @@ test.describe('69 - Update Hot-Swap (REQ-UPDATE-001)', () => {
 
   test('buildExportHtml injects data into dist-template correctly', async ({ page }) => {
     test.setTimeout(30000);
+    await disableFSA(page);
     await page.goto('/');
     await waitForCanvasReady(page);
 
