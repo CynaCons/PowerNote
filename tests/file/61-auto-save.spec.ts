@@ -1,125 +1,115 @@
 /**
- * Test 61: Auto-Save to localStorage
- * Covers: REQ-FILE-009, REQ-FILE-010, REQ-FILE-011
+ * Test 61: Debounced Auto-Save
+ * Covers: REQ-FILE-015, REQ-FILE-016, REQ-FILE-017
  *
- * Verifies that localStorage starts empty, that the auto-save functions
- * correctly persist workspace data, and that localStorage is cleared after
- * file export.
+ * Verifies the new autosave pipeline:
+ *   - An edit triggers a save within ~1.5–2 s (debounce window).
+ *   - Autosave routes workspace data into the notebook library, not the
+ *     legacy `powernote-autosave` localStorage key.
+ *   - The legacy key is removed on startup even if a previous install
+ *     left one behind.
+ *   - Continuous editing still gets a forced save within ~5 s (max-wait).
  */
 import { test, expect } from '@playwright/test';
 import { waitForCanvasReady, disableFSA } from '../helpers';
 
-const AUTOSAVE_KEY = 'powernote-autosave';
+const LEGACY_KEY = 'powernote-autosave';
+const LIBRARY_KEY = 'powernote-library';
 
-test.describe('61 - Auto-Save to localStorage (REQ-FILE-009..011)', () => {
+test.describe('61 - Debounced Auto-Save (REQ-FILE-015..017)', () => {
   test.beforeEach(async ({ page }) => {
     await disableFSA(page);
+  });
+
+  test('legacy powernote-autosave key is cleared on startup', async ({ page }) => {
+    // Seed a legacy value before the app ever runs.
+    await page.addInitScript((key) => {
+      localStorage.setItem(key, JSON.stringify({ sections: [], filename: 'legacy' }));
+    }, LEGACY_KEY);
+
     await page.goto('/');
     await waitForCanvasReady(page);
 
-    // Clear any leftover auto-save data
-    await page.evaluate((key) => {
-      localStorage.removeItem(key);
-    }, AUTOSAVE_KEY);
+    const legacy = await page.evaluate((k) => localStorage.getItem(k), LEGACY_KEY);
+    expect(legacy).toBeNull();
   });
 
-  test('localStorage has no auto-save data initially', async ({ page }) => {
-    const data = await page.evaluate((key) => localStorage.getItem(key), AUTOSAVE_KEY);
-    expect(data).toBeNull();
-  });
+  test('debounced autosave fires within ~2s after an edit', async ({ page }) => {
+    await page.addInitScript((keys) => {
+      localStorage.removeItem(keys.legacy);
+      localStorage.removeItem(keys.lib);
+    }, { legacy: LEGACY_KEY, lib: LIBRARY_KEY });
 
-  test('auto-save writes workspace data to localStorage', async ({ page }) => {
-    // Add content to make workspace dirty
+    await page.goto('/');
+    await waitForCanvasReady(page);
+
     await page.evaluate(() => {
       const stores = (window as any).__POWERNOTE_STORES__;
+      stores.workspace.getState().updateWorkspace({ filename: 'Debounce Test' });
       stores.canvas.getState().addNode({
-        id: 'auto-save-node',
+        id: 'debounce-node',
         type: 'text',
-        x: 200, y: 200, width: 120, height: 30,
-        data: { text: 'Auto-save test', fontSize: 16, fontFamily: 'Inter', fontStyle: 'normal', fill: '#1a1a1a' },
+        x: 150, y: 150, width: 120, height: 30, layer: 4,
+        data: { text: 'Debounced save', fontSize: 16,
+                fontFamily: 'Inter', fontStyle: 'normal', fill: '#1a1a1a' },
       });
       stores.workspace.getState().markDirty();
     });
-    await page.waitForTimeout(200);
 
-    // Trigger auto-save manually by calling the serialization function
-    await page.evaluate((key) => {
-      const stores = (window as any).__POWERNOTE_STORES__;
-      // Flush current page nodes to workspace
-      const canvasNodes = stores.canvas.getState().nodes;
-      stores.workspace.getState().savePageNodes(canvasNodes);
-      // Re-read workspace after the set completes
-      const workspace = stores.workspace.getState().workspace;
-      localStorage.setItem(key, JSON.stringify(workspace));
-    }, AUTOSAVE_KEY);
+    // Debounce is 1.5s; give it up to 3.5s before declaring a miss.
+    await expect
+      .poll(async () => {
+        const raw = await page.evaluate((k) => localStorage.getItem(k), LIBRARY_KEY);
+        return raw && raw.includes('Debounced save');
+      }, { timeout: 3500, intervals: [200, 300, 500] })
+      .toBeTruthy();
 
-    const data = await page.evaluate((key) => localStorage.getItem(key), AUTOSAVE_KEY);
-    expect(data).not.toBeNull();
-    expect(data).toContain('Auto-save test');
+    // Legacy key must not be written.
+    const legacy = await page.evaluate((k) => localStorage.getItem(k), LEGACY_KEY);
+    expect(legacy).toBeNull();
   });
 
-  test('auto-save data contains valid JSON with workspace structure', async ({ page }) => {
-    // Add content
+  test('max-wait forces a save during continuous editing', async ({ page }) => {
+    await page.addInitScript((keys) => {
+      localStorage.removeItem(keys.legacy);
+      localStorage.removeItem(keys.lib);
+    }, { legacy: LEGACY_KEY, lib: LIBRARY_KEY });
+
+    await page.goto('/');
+    await waitForCanvasReady(page);
+
+    // Install a canvas node once so library entries have something to track.
     await page.evaluate(() => {
       const stores = (window as any).__POWERNOTE_STORES__;
+      stores.workspace.getState().updateWorkspace({ filename: 'Max Wait Test' });
       stores.canvas.getState().addNode({
-        id: 'json-test-node',
+        id: 'max-wait-node',
         type: 'text',
-        x: 100, y: 100, width: 100, height: 30,
-        data: { text: 'JSON test', fontSize: 16, fontFamily: 'Inter', fontStyle: 'normal', fill: '#1a1a1a' },
+        x: 200, y: 200, width: 120, height: 30, layer: 4,
+        data: { text: 'start', fontSize: 16,
+                fontFamily: 'Inter', fontStyle: 'normal', fill: '#1a1a1a' },
       });
     });
-    await page.waitForTimeout(200);
 
-    // Trigger save
-    await page.evaluate((key) => {
-      const stores = (window as any).__POWERNOTE_STORES__;
-      const canvasNodes = stores.canvas.getState().nodes;
-      stores.workspace.getState().savePageNodes(canvasNodes);
-      const workspace = stores.workspace.getState().workspace;
-      localStorage.setItem(key, JSON.stringify(workspace));
-    }, AUTOSAVE_KEY);
-
-    const data = await page.evaluate((key) => {
-      const json = localStorage.getItem(key);
-      if (!json) return null;
-      try {
-        return JSON.parse(json);
-      } catch {
-        return null;
+    const start = Date.now();
+    // Keep bumping dirty every 400ms for 5s so the 1.5s debounce timer
+    // keeps getting reset. The 5s max-wait should still force a save.
+    const keepEditing = (async () => {
+      while (Date.now() - start < 5000) {
+        await page.evaluate(() => {
+          (window as any).__POWERNOTE_STORES__.workspace.getState().markDirty();
+        });
+        await page.waitForTimeout(400);
       }
-    }, AUTOSAVE_KEY);
+    })();
 
-    expect(data).not.toBeNull();
-    // Should have workspace structure with sections
-    expect(data).toHaveProperty('sections');
-    expect(Array.isArray(data.sections)).toBe(true);
-    expect(data.sections.length).toBeGreaterThan(0);
-  });
+    await expect
+      .poll(async () => {
+        const raw = await page.evaluate((k) => localStorage.getItem(k), LIBRARY_KEY);
+        return raw && raw.includes('Max Wait Test');
+      }, { timeout: 6000, intervals: [250, 500] })
+      .toBeTruthy();
 
-  test('localStorage is cleared after file export', async ({ page }) => {
-    // Manually set auto-save data
-    await page.evaluate((key) => {
-      localStorage.setItem(key, JSON.stringify({ sections: [], name: 'test' }));
-    }, AUTOSAVE_KEY);
-
-    // Verify it exists
-    let data = await page.evaluate((key) => localStorage.getItem(key), AUTOSAVE_KEY);
-    expect(data).not.toBeNull();
-
-    // Trigger export via save button (intercept download)
-    const [download] = await Promise.all([
-      page.waitForEvent('download'),
-      page.locator('[data-testid="save-btn"]').click(),
-    ]);
-
-    // Verify download happened
-    expect(download.suggestedFilename()).toMatch(/\.html$/);
-
-    await page.waitForTimeout(500);
-
-    // localStorage should be cleared after export
-    data = await page.evaluate((key) => localStorage.getItem(key), AUTOSAVE_KEY);
-    expect(data).toBeNull();
+    await keepEditing;
   });
 });

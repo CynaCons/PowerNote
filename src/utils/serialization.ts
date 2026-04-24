@@ -1,8 +1,9 @@
 import type { WorkspaceData } from '../types/data';
 
 const DATA_SCRIPT_ID = 'powernote-data';
-const AUTOSAVE_KEY = 'powernote-autosave';
-const AUTOSAVE_INTERVAL_MS = 30_000; // 30 seconds
+const LEGACY_AUTOSAVE_KEY = 'powernote-autosave';
+const AUTOSAVE_DEBOUNCE_MS = 1_500;
+const AUTOSAVE_MAX_WAIT_MS = 5_000;
 
 /**
  * Serialize workspace data to a JSON string
@@ -106,91 +107,108 @@ export function extractDataFromHtml(htmlContent: string): WorkspaceData | null {
   return deserializeWorkspace(match[1].trim());
 }
 
-// ─── Auto-Save to localStorage ───────────────────────────────
+// ─── Auto-Save ───────────────────────────────────────────────
 
 /**
- * Save workspace to localStorage
+ * Remove any legacy `powernote-autosave` localStorage snapshot. Older builds
+ * used to write the full workspace here; current builds persist via the
+ * File System Access handle + notebook library instead. Called once on
+ * startup so upgraded installs do not keep stale state around.
  */
-export function autoSaveToLocalStorage(workspace: WorkspaceData): void {
+export function clearLegacyAutoSave(): void {
   try {
-    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(workspace));
-  } catch (e) {
-    console.warn('Auto-save failed (storage full?):', e);
-  }
-}
-
-/**
- * Load workspace from localStorage (if available)
- */
-export function loadFromLocalStorage(): WorkspaceData | null {
-  try {
-    const json = localStorage.getItem(AUTOSAVE_KEY);
-    if (!json) return null;
-    return deserializeWorkspace(json);
+    localStorage.removeItem(LEGACY_AUTOSAVE_KEY);
   } catch {
-    return null;
+    // ignored — quota/privacy errors are non-fatal here
   }
 }
 
 /**
- * Clear auto-save from localStorage (call after successful file export)
- */
-export function clearAutoSave(): void {
-  localStorage.removeItem(AUTOSAVE_KEY);
-}
-
-/**
- * Start the auto-save interval. Returns a cleanup function to stop it.
- * flushAndGetWorkspace should flush active page nodes/strokes to workspace
- * and return the full workspace data.
+ * Start the auto-save pipeline. Returns a cleanup function.
  *
- * Saves to THREE destinations (when available):
- *   1. `powernote-autosave` localStorage (single snapshot, restored on next load)
- *   2. Notebook library (up to 5 recent notebooks, user-browsable)
- *   3. If File System Access API is available AND a current file handle exists
- *      with granted write permission, writes the full HTML to the live file.
- *      This is the Word-style "save in place" autosave.
+ * Cadence:
+ *   - Saves 1.5 s after the last edit (debounced).
+ *   - If edits keep arriving, saves are forced no later than 5 s after the
+ *     notebook first became dirty (max-wait safety net).
+ *
+ * Destinations (when available):
+ *   - Notebook library (localStorage, user-browsable, up to 5 entries).
+ *   - Live file on disk via the current `FileSystemFileHandle`, but only
+ *     when read-write permission is already granted (no silent prompts).
+ *
+ * `subscribeToChanges` is invoked with a handler that should fire on any
+ * workspace-affecting store update; the returned function is used to
+ * unsubscribe on cleanup.
  */
 export function startAutoSave(
   flushAndGetWorkspace: () => WorkspaceData,
   getIsDirty: () => boolean,
+  subscribeToChanges: (onChange: () => void) => () => void,
 ): () => void {
-  const interval = setInterval(async () => {
-    if (!getIsDirty()) return;
-    const workspace = flushAndGetWorkspace();
-    autoSaveToLocalStorage(workspace);
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let firstDirtyAt: number | null = null;
+  let saveInFlight = false;
 
-    // Also save to notebook library (Word-style continuous autosave)
-    const { saveToLibrary } = await import('./notebookLibrary');
-    saveToLibrary(workspace);
-
-    // If FSA + current handle + granted permission, write to the real file
+  const runSave = async () => {
+    debounceTimer = null;
+    firstDirtyAt = null;
+    if (saveInFlight || !getIsDirty()) return;
+    saveInFlight = true;
     try {
-      const { isFSASupported } = await import('./fileSystemAccess');
-      if (!isFSASupported()) return;
-      const { getCurrentHandle } = await import('./fileHandleStore');
-      const handle = await getCurrentHandle();
-      if (!handle) return;
-      const perm = await (handle as any).queryPermission?.({ mode: 'readwrite' });
-      if (perm !== 'granted') return; // don't prompt — requires user gesture
-      const html = await buildExportHtml(workspace);
-      const writable = await handle.createWritable();
-      await writable.write(html);
-      await writable.close();
-      if (import.meta.env?.DEV) {
-        console.log('[PowerNote] Auto-saved to file via FSA handle');
-      }
-    } catch (err) {
-      // FSA path is best-effort — fall through silently
-      if (import.meta.env?.DEV) {
-        console.log('[PowerNote] FSA autosave skipped:', err);
-      }
-    }
+      const workspace = flushAndGetWorkspace();
 
-    if (import.meta.env?.DEV) {
-      console.log('[PowerNote] Auto-saved to localStorage + library');
-    }
-  }, AUTOSAVE_INTERVAL_MS);
+      const { saveToLibrary } = await import('./notebookLibrary');
+      saveToLibrary(workspace);
 
-  return () => clearInterval(interval);
+      try {
+        const { isFSASupported } = await import('./fileSystemAccess');
+        if (isFSASupported()) {
+          const { getCurrentHandle } = await import('./fileHandleStore');
+          const handle = await getCurrentHandle();
+          if (handle) {
+            const perm = await (handle as any).queryPermission?.({ mode: 'readwrite' });
+            if (perm === 'granted') {
+              const html = await buildExportHtml(workspace);
+              const writable = await handle.createWritable();
+              await writable.write(html);
+              await writable.close();
+              if (import.meta.env?.DEV) {
+                console.log('[PowerNote] Auto-saved to file via FSA handle');
+              }
+            }
+          }
+        }
+      } catch (err) {
+        if (import.meta.env?.DEV) {
+          console.log('[PowerNote] FSA autosave skipped:', err);
+        }
+      }
+
+      if (import.meta.env?.DEV) {
+        console.log('[PowerNote] Auto-saved to library');
+      }
+    } finally {
+      saveInFlight = false;
+    }
+  };
+
+  const scheduleSave = () => {
+    if (!getIsDirty()) return;
+    const now = Date.now();
+    if (firstDirtyAt == null) firstDirtyAt = now;
+    const elapsed = now - firstDirtyAt;
+    const delay = Math.max(0, Math.min(AUTOSAVE_DEBOUNCE_MS, AUTOSAVE_MAX_WAIT_MS - elapsed));
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(runSave, delay);
+  };
+
+  const unsubscribe = subscribeToChanges(scheduleSave);
+
+  return () => {
+    unsubscribe();
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+  };
 }

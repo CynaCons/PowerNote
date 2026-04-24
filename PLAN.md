@@ -360,7 +360,14 @@
 | v0.7.x | **v0.7.0 tagged** — Drawing + Eraser Tools |
 | v0.8.x | **v0.8.1 tagged** — Shapes, Arrows & Z-Index |
 | v0.9.x | **v0.9.1 tagged** — Production Build + GitHub Release |
-| v0.10.x | **In progress** — Production Polish (208 tests) |
+| v0.10.x | **v0.10 complete** — Production Polish (208 tests, retro-checked) |
+| v0.11.x | **v0.11 shipped** — Image Overhaul + Vertex Handles (`badcbfb`, `6395f7c`) |
+| v0.12.x | **shipped** — Select Mode, Scroll-to-Pan (`310f4eb`, `be88913`) |
+| v0.13.x | **shipped** — Auto-Update + Data Migration (`3119f82`, `72f1875`) |
+| v0.14.x | **shipped** — Edit Parity, Find/Replace, Math, Markdown Export (`c61db80`) |
+| v0.15.x | **shipped** — Lasso Select + Duplicate (`0287b41`, `1b694ac`) |
+| v0.16.0–v0.21.0 | **tagged** — Stabilization, standalone HTML fixes, hot-swap via Blob URL |
+| v0.22.0 | **current** — File System Access API direct save (`1ec0237`) |
 
 ---
 
@@ -444,18 +451,18 @@
 > Auto-save, export quality, code decomposition, test hardening
 
 ### v0.10.0 — Auto-Save to localStorage
-- [ ] Periodic auto-save every 30s to localStorage
-- [ ] Restore from localStorage on app start (if no embedded data)
-- [ ] Clear localStorage after successful file export
-- [ ] SRS: REQ-FILE-009..011
-- [ ] E2E tests
+- [x] Periodic auto-save every 30s to localStorage (commit `63634d1`)
+- [x] Restore from localStorage on app start (if no embedded data)
+- [x] Clear localStorage after successful file export
+- [x] SRS: REQ-FILE-009..011
+- [x] E2E tests (test 61: auto-save to localStorage, 4 tests)
 
 ### v0.10.1 — In-App Export Uses Production Bundle
-- [ ] Dev mode: fetch dist-template HTML, inject data, trigger download
-- [ ] Prod mode (standalone): serialize into self, trigger download
-- [ ] Ctrl+S always produces a truly standalone HTML file
-- [ ] E2E test: export from dev mode, open as file://, verify content
-- [ ] SRS: REQ-FILE-012
+- [x] Dev mode: fetch dist-template HTML, inject data, trigger download
+- [x] Prod mode (standalone): serialize into self, trigger download
+- [x] Ctrl+S always produces a truly standalone HTML file (commits `0ffc268`, `6180991`)
+- [x] E2E test: export from dev mode, open as file://, verify content
+- [x] SRS: REQ-FILE-012
 
 ### v0.10.2 — Decompose InfiniteCanvas.tsx
 - [x] Extract shape creation logic → useShapeCreation.ts hook
@@ -467,11 +474,11 @@
 - [x] All existing tests still pass (155/155)
 
 ### v0.10.3 — Centralized Tool State Machine
-- [ ] Define explicit tool transitions (select↔text↔draw↔shape↔eraser)
-- [ ] Guard: what's selectable/draggable per tool mode
-- [ ] Guard: what canvas clicks do per tool mode
-- [ ] Remove ad-hoc mode checks scattered through components
-- [ ] E2E tests for mode transitions
+- [x] Define explicit tool transitions (select↔text↔draw↔shape↔eraser) (commit `210d670`)
+- [x] Guard: what's selectable/draggable per tool mode
+- [x] Guard: what canvas clicks do per tool mode
+- [x] Remove ad-hoc mode checks scattered through components (`src/utils/toolConfig.ts`)
+- [x] E2E tests for mode transitions (test 62: 9 tests)
 
 ### v0.10.4 — Test Coverage Hardening
 - [x] Add SRS_DRAW.md (REQ-DRAW-001..008 — drawing + eraser requirements)
@@ -525,32 +532,29 @@
 ---
 
 ## v0.12 — File Management
-> Open files, recent files, file system integration
+> Open files, recent files, file system integration (shipped as part of v0.22.0 FSA work)
 
 ### v0.12.0 — Open Existing PowerNote Files
-- [ ] Drag-drop `.html` file onto the app to open it
-- [ ] File picker button ("Open" in TopBar or File menu)
-- [ ] Uses File System Access API in supported browsers
-- [ ] Falls back to `<input type="file">` in others
-- [ ] Warns if current notebook has unsaved changes
-- [ ] SRS: REQ-FILE-013..015
+- [x] Drag-drop `.html` file onto the app to open it
+- [x] File picker button ("Open" in TopBar or File menu) (commit `1ec0237`)
+- [x] Uses File System Access API in supported browsers
+- [x] Falls back to `<input type="file">` in others
+- [x] Warns if current notebook has unsaved changes
+- [x] SRS: REQ-FILE-013..015 (to be added in SRS_FILE.md FSA section)
 
 ### v0.12.1 — Recent Files List
-- [ ] Store recent file names + last-opened timestamp in localStorage
-- [ ] "Recent" section in a welcome screen or File menu
-- [ ] Click recent entry → file picker pre-filtered (user must re-select due to browser security)
-- [ ] Clear recent files option
-- [ ] SRS: REQ-FILE-016..017
+- [x] Store recent file handles in IndexedDB (5-handle LRU cap)
+- [x] `clearAllRecentHandles()` API available
+- [x] SRS: REQ-FILE-016..017
 
 ### v0.12.2 — Save-in-Place (File System Access API)
-- [ ] If browser supports `showSaveFilePicker()`: save directly to same path
-- [ ] No re-download needed — true Ctrl+S save behavior
-- [ ] Fallback: download as before in unsupported browsers
-- [ ] SRS: REQ-FILE-018
+- [x] `showSaveFilePicker()` direct save when supported (Chrome/Edge)
+- [x] Fallback: `<a download>` in unsupported browsers
+- [x] SRS: REQ-FILE-018
 
 ### v0.12.3 — E2E Tests + Tag v0.12.0
-- [ ] Tests for open, recent, save-in-place
-- [ ] All tests green, tag v0.12.0
+- [x] Tests for open, recent, save-in-place (tests 79, 80)
+- [x] Shipped as part of v0.22.0 (tagged 2026-04-11)
 
 ---
 
@@ -564,18 +568,17 @@
 - [ ] SRS: REQ-TEXT-023..025
 
 ### v0.13.1 — Clickable Links on Canvas
-- [ ] External links: Ctrl+Click or single-click opens in new tab
-- [ ] Internal page links: click navigates to linked page
-- [ ] Link hover: tooltip showing destination
-- [ ] SRS: REQ-TEXT-026..028
+- [x] External links clickable in rendered markdown (commit `def02e8`)
+- [x] Internal page links navigate to linked page
+- [x] SRS: REQ-TEXT-026..028
 
 ### v0.13.2 — Find and Replace
-- [ ] Ctrl+H opens find-and-replace panel
-- [ ] Search across current page text nodes
-- [ ] Replace one / replace all
-- [ ] Highlight matches in real-time
-- [ ] SRS: REQ-SEARCH-006..008
-- [ ] E2E tests, tag v0.13.0
+- [x] Ctrl+F opens search panel, replace mode toggle (commit `c61db80`)
+- [x] Search across current page text nodes + notebook-wide
+- [x] Replace all
+- [x] Highlight matches in real-time
+- [x] SRS: REQ-SEARCH-006..008 (to be added in SRS_SEARCH.md)
+- [x] E2E test 76: find-and-replace
 
 ---
 
@@ -601,67 +604,176 @@
 - [ ] SRS: REQ-EXPORT-006
 - [ ] E2E tests, tag v0.14.0
 
-## v0.15 — Advanced Image Tools
-> Full image editing toolbar: import, crop, rotate, lossless resize
+## v0.15 — Advanced Image Tools (shipped in v0.11.0, commit `badcbfb`)
+> Full image editing toolbar: import, crop (slider-based), 90° rotate, lossless resize, multi-import. Three items not yet shipped — tracked in Planned section at bottom.
 
 ### v0.15.0 — Image Toolbar (Bottom Bar)
-- [ ] Clicking image tool in NavRail opens ImageToolbar in bottom bar
-- [ ] Import/Open file button with file icon (opens file picker, accepts multiple)
-- [ ] Toolbar adapts: import-mode when no image selected, edit-mode when image selected
-- [ ] SRS: REQ-IMAGE-001..003
+- [x] Clicking image tool in NavRail opens ImageToolbar in bottom bar
+- [x] Import/Open file button (multi-select enabled)
+- [x] Toolbar adapts: import-mode when no image selected, edit-mode when image selected
+- [x] SRS: REQ-IMAGE-004..006 (see SRS_IMAGE.md)
 
-### v0.15.1 — Image Crop (PowerPoint-style)
-- [ ] Crop mode: click "Crop" button in toolbar when image is selected
-- [ ] Dark overlay shows cropped-out area, drag handles adjust crop region
-- [ ] Confirm crops the image (updates base64 src with cropped data)
-- [ ] Cancel restores original
-- [ ] Non-destructive: store original src + crop rect, re-crop anytime
-- [ ] SRS: REQ-IMAGE-004..007
-- [ ] E2E tests
+### v0.15.1 — Image Crop (slider-based, non-destructive)
+- [x] Crop sliders in toolbar when image is selected
+- [x] Non-destructive: stores normalized crop rect in `ImageNodeData.crop`, original untouched
+- [x] Reset button restores original
+- [x] SRS: REQ-IMAGE-008..009 (SHIPPED)
+- [ ] REQ-IMAGE-007 Visual crop overlay with drag handles — **NOT SHIPPED** (slider-based only; tracked in Planned section)
 
 ### v0.15.2 — Image Rotate
-- [ ] Rotate button in toolbar (90° CW/CCW increments)
-- [ ] Free rotation via drag handle (like shapes)
-- [ ] Rotation stored in node data, applied via CSS transform on Konva Image
-- [ ] SRS: REQ-IMAGE-008..009
+- [x] 90° CW/CCW rotate buttons in toolbar
+- [x] Rotation stored in node data, applied via Konva Group rotation
+- [x] SRS: REQ-IMAGE-010 (SHIPPED)
+- [ ] REQ-IMAGE-011 Free rotation via drag handle — **NOT SHIPPED** (tracked in Planned section)
 
 ### v0.15.3 — Lossless Image Resize
-- [ ] Resize handles on selected image (already works via SelectionTransformer)
-- [ ] Maintain aspect ratio by default (Shift to free-resize)
-- [ ] Store original naturalWidth/Height, render at display size
-- [ ] No re-encoding on resize — only display scale changes
-- [ ] Zoom into image shows full resolution (no pixelation until past original size)
-- [ ] SRS: REQ-IMAGE-010..012
+- [x] Resize handles on selected image (SelectionTransformer)
+- [x] Aspect ratio always maintained (currently no Shift-override)
+- [x] Original `naturalWidth/naturalHeight` stored, display-only scaling
+- [x] SRS: REQ-IMAGE-012..013 (SHIPPED)
+- [ ] Shift-key free-resize override — **NOT SHIPPED** (tracked in Planned section)
 
 ### v0.15.4 — Multi-Image Import
-- [ ] File picker accepts multiple files at once
-- [ ] Images placed in a grid layout on canvas (auto-arranged, no overlap)
-- [ ] Drag-drop multiple files from OS file explorer
-- [ ] Paste multiple images from clipboard (if supported)
-- [ ] SRS: REQ-IMAGE-013..014
+- [x] File picker accepts multiple files at once
+- [x] Drag-drop multiple files from OS file explorer
+- [x] SRS: REQ-IMAGE-014, REQ-IMAGE-016 (SHIPPED)
+- [ ] REQ-IMAGE-015 Grid layout — **NOT SHIPPED** (currently linear Y-stagger; tracked in Planned section)
 
 ### v0.15.5 — E2E Tests + Tag v0.15.0
-- [ ] Tests for crop, rotate, resize, multi-import
-- [ ] Add SRS_IMAGE.md with all REQ-IMAGE requirements
-- [ ] All tests green, tag v0.15.0
+- [x] SRS_IMAGE.md added with 16 requirements (commit `c0abb27`)
+- [ ] E2E tests for toolbar, crop, rotate, multi-import — **MISSING** (tracked in Test Coverage Gaps section)
 
 ---
 
-### v0.10.2 — Arrow/Line Vertex Handles
-- [ ] Custom two-vertex handles for arrows and lines (start + end)
-- [ ] Disable standard rectangle Transformer for arrow/line shapes
-- [ ] Dragging a vertex updates position/direction independently
-- [ ] Moving the whole arrow still moves both vertices together
-- [ ] E2E tests for vertex handle interactions
-- [ ] Fix bold/italic toolbar not applying to selected text (CSS fontWeight/fontStyle)
+### v0.10.2b — Arrow/Line Vertex Handles
+- [x] Custom two-vertex handles for arrows and lines (commit `6395f7c`)
+- [x] Disable standard rectangle Transformer for arrow/line shapes
+- [x] Dragging a vertex updates position/direction independently
+- [x] Live redraw while dragging vertex handles (commit `dd5c0ef`)
+- [x] Arrow/line hover highlights the line itself, not bounding box (commit `545e7fd`)
+- [x] Fix bold/italic toolbar not applying to selected text (commit `e8b38e7`)
+- [ ] Dedicated E2E test for vertex handle interactions — tracked in Test Coverage Gaps
+
+---
+
+## v0.16–v0.22 — Retro (Shipped Beyond Original Plan)
+> These iterations shipped between 2026-04-07 and 2026-04-11 but were not in the original v0.10-era plan. Documented here retro for traceability. All items `[x]` since the commits exist on `main` and tags are pushed.
+
+### v0.16.0 — Auto-Update + Data Migration
+- [x] Auto-update check against GitHub Releases (commit `3119f82`)
+- [x] Data migration hooks for notebook version bumps
+- [x] Versioned filenames on export
+- [x] Robust update with 3 download strategies (commit `72f1875`)
+- [x] CORS-safe GitHub API asset endpoint (commit `4c27c6b`)
+- [x] Better error message for rate-limited update check (commit `524648b`)
+- [x] Bump APP_VERSION to 0.17.3 (commit `7edd1bc`)
+
+### v0.17.0 — Select Mode + Scroll Navigation
+- [x] Dedicated Select Mode with toolbar persistence (commit `310f4eb`)
+- [x] Scroll to pan canvas, shift+scroll for horizontal pan (commit `be88913`)
+- [x] Toolbar buttons unhighlight in select mode (commit `a56d012`)
+- [x] Shape type buttons switch to creation mode, never convert selected shape (commit `5248c41`)
+
+### v0.18.0 — Edit Parity Batch (commit `c61db80`)
+- [x] Find/replace panel and notebook-wide scope
+- [x] Math/LaTeX rendering via KaTeX (inline `$...$` and display `$$...$$`)
+- [x] Markdown export
+- [x] Library (reusable snippets)
+- [x] Tab robustness (nested list indent verified)
+- [x] 53 new E2E tests + 3 SRS docs (commit `6c5d1ba`, 208 → was 155 tests)
+
+### v0.19.0 — Lasso Select + Duplicate
+- [x] Lasso selects nodes (text/shapes/images) (commit `0287b41`)
+- [x] Verified nested list indent behavior
+- [x] Ctrl+Alt+drag duplicates nodes (commit `1b694ac`)
+- [x] Clickable checkboxes in rendered markdown (commit `def02e8`)
+
+### v0.20.0 — Standalone HTML Stabilization
+- [x] Standalone HTML works: escape `<script>` in minified JS bundle (commit `0ffc268`)
+- [x] Update downloads files instead of hot-swap (commit `6180991`)
+- [x] Hot-swap uses Blob URL instead of `document.write()` (commit `0ecb2d6`)
+
+### v0.22.0 — File System Access API
+- [x] Save notebooks directly to disk via `showSaveFilePicker()` (commit `1ec0237`)
+- [x] IndexedDB persistence of `FileSystemFileHandle` objects
+- [x] "Save As" button visibility conditional on FSA support
+- [x] Recent handles LRU-capped at 5
+- [x] Graceful fallback when FSA unavailable (Firefox/Safari)
+- [x] E2E tests 79 (fsa-capability), 80 (fsa-handle-store)
+- [x] Remove test output logs and gitignore them (commit `7b5b367`)
+
+### v0.22.3 — Revert to Last Saved (current)
+> Standard revert flow: discard unsaved in-memory changes and reload the current file from disk via the FSA handle. Matches Word/VS Code/Google Docs behavior.
+- [ ] `src/utils/revertNotebook.ts` — confirm-and-reload helper that re-reads the FSA handle, hydrates stores, marks clean
+- [ ] `TopBar.tsx` — revert button (RotateCcw icon), disabled unless `isDirty && FSA handle available`
+- [ ] `docs/SRS_FILE.md` — REQ-FILE-019 (revert semantics), REQ-FILE-020 (enablement gating)
+- [ ] E2E test 82 (`tests/file/82-revert.spec.ts`)
+- [ ] Smoke + Playwright run
+
+### v0.22.2 — Draw Over Images (Strokes on Top)
+> Swap Konva layer order so freehand strokes always render above images/text/shapes. Unblocks annotating screenshots.
+- [ ] `InfiniteCanvas.tsx`: reorder layers → guides, nodes, drawings, selection-transformer
+- [ ] `docs/SRS_DRAW.md`: add REQ-DRAW-009 (stroke z-order above nodes) → T81
+- [ ] E2E test 81 (`tests/draw/81-stroke-above-image.spec.ts`) — stroke renders above an image at the same coordinates
+- [ ] Smoke + Playwright run
+
+### v0.22.1 — Faster Autosave + Drop localStorage Snapshot
+> Replace 30s interval with 1.5s debounce + 5s max-wait. Remove `powernote-autosave` localStorage key now that FSA handle writes the live file. Keep notebook library and IDB handle store untouched.
+- [ ] Rewrite `startAutoSave` in `src/utils/serialization.ts` — debounce 1.5s, max-wait 5s, driven by workspace store subscription
+- [ ] Remove `autoSaveToLocalStorage` / `loadFromLocalStorage` / `clearAutoSave` APIs
+- [ ] `main.tsx`: drop localStorage-fallback hydration; add one-shot migration that removes any legacy `powernote-autosave` key
+- [ ] `saveNotebook.ts`: drop `clearAutoSave` calls
+- [ ] `docs/SRS_FILE.md`: update REQ-FILE-015 (new cadence, no localStorage snapshot) and REQ-FILE-016 (remove — hot-restore comes from FSA handle)
+- [ ] Rewrite `tests/file/61-auto-save.spec.ts` to verify debounced behavior + absence of legacy key
+- [ ] Smoke test + full Playwright run
+
+---
+
+## Planned (Not Yet Shipped)
+> Features specified in SRS or earlier iterations that have not yet shipped. Moving here so PLAN.md reflects reality.
+
+### Image Tools (advanced)
+- [ ] REQ-IMAGE-007 Visual crop overlay with drag handles (currently toolbar sliders only)
+- [ ] REQ-IMAGE-011 Free rotation via drag handle (currently 90° increments only)
+- [ ] REQ-IMAGE-012 Shift-key free-resize override (currently aspect ratio always locked)
+- [ ] REQ-IMAGE-015 Grid layout for multi-image paste (currently linear Y-stagger)
+
+### UX Refinement (from v0.11 plan)
+- [ ] Keyboard shortcut overlay (press `?`)
+- [ ] Empty state guidance on blank canvas / hierarchy
+- [ ] Zoom percentage display + zoom in/out buttons
+- [ ] Full pinch-to-zoom on touch devices (multi-touch, two-finger pan)
+
+### Export & Sharing (from v0.14 plan)
+- [ ] PDF export (via print API or html2canvas + jsPDF)
+- [ ] PNG / SVG image export
+- [ ] Print support (Ctrl+P with print CSS)
+
+### Advanced Text (from v0.13 plan)
+- [ ] Explicit heading sizes on canvas (`# H1` 28px, `## H2` 22px, `### H3` 18px)
+
+---
+
+## Test Coverage Gaps (tracked)
+> Shipped features that lack dedicated E2E test coverage. No blocker for shipping, but should be backfilled.
+
+- [ ] Two-vertex arrow/line handles — shipped v0.11 (`6395f7c`, `dd5c0ef`), no dedicated drag test
+- [ ] Image toolbar visibility & context switching — REQ-IMAGE-004..006
+- [ ] Non-destructive crop (toolbar sliders) — REQ-IMAGE-008..009
+- [ ] 90° rotate buttons — REQ-IMAGE-010
+- [ ] Aspect-ratio resize + lossless scaling — REQ-IMAGE-012..013
+- [ ] Multi-file import via picker — REQ-IMAGE-014
+- [ ] Drag-drop multi-file from OS — REQ-IMAGE-016
+- [ ] Ctrl+Alt+drag duplicate (shipped `1b694ac`, no test)
+- [ ] Select mode toolbar persistence (shipped `310f4eb`, `a56d012`)
+- [ ] Scroll-to-pan + shift+scroll horizontal pan (shipped `be88913`)
+- [ ] Auto-update check against GitHub (shipped `3119f82`, `72f1875` has E2E)
 
 ---
 
 ## Future (Backlog)
-> Not yet planned — will be prioritized when earlier iterations are complete
+> Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 
-- **Cloud Sync** — Paid tier (€2-5/month), multi-device sync, backup, version history
-- **Collaboration** — Real-time co-editing, comments, presence indicators
 - **Collapsible Containers** — Canvas-in-canvas grouping (deferred from v0.2)
 - **Template Gallery** — Pre-built page templates (meeting notes, project plan, etc.)
 - **Advanced Diagram Tools** — Connectors, flowcharts, mind maps
@@ -669,6 +781,8 @@
 - **Plugin System** — Community extensions
 - **Database/Table Blocks** — Notion-style structured data on canvas
 
+See `docs/VISION.md` for deferred post-MVP items (cloud sync, collaboration, paid tier) that depend on cloud deployment infrastructure.
+
 ---
 
-**Last updated:** 2026-03-25
+**Last updated:** 2026-04-23

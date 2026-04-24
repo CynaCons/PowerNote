@@ -1,7 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
-import { getEmbeddedData, loadFromLocalStorage, startAutoSave, extractDataFromHtml } from './utils/serialization';
+import { getEmbeddedData, startAutoSave, extractDataFromHtml, clearLegacyAutoSave } from './utils/serialization';
 import { useWorkspaceStore } from './stores/useWorkspaceStore';
 import { useCanvasStore } from './stores/useCanvasStore';
 import { useDrawStore } from './stores/useDrawStore';
@@ -24,45 +24,41 @@ function hydrateStores(data: WorkspaceData) {
   useDrawStore.getState().loadPageStrokes(firstPage?.strokes ?? []);
 }
 
+// One-shot migration: older builds stashed a full workspace snapshot under
+// `powernote-autosave`. That path is gone — the FSA handle + notebook
+// library cover persistence now. Clear any legacy value so upgraded
+// installs don't hold stale state.
+clearLegacyAutoSave();
+
 // Hydrate priority:
 //   1. Embedded data (standalone HTML)
 //   2. FSA current file handle (if permission already granted)
-//   3. localStorage autosave
-//   4. Fresh workspace
+//   3. Fresh workspace (defaults)
 const embeddedData = getEmbeddedData();
 if (embeddedData) {
   hydrateStores(migrateWorkspace(embeddedData));
-} else {
-  // Fall back to localStorage autosave synchronously (fast path)
-  const autoSavedData = loadFromLocalStorage();
-  if (autoSavedData) {
-    hydrateStores(migrateWorkspace(autoSavedData));
-  }
-
+} else if (isFSASupported()) {
   // Async: try to restore from FSA handle if permission is already granted.
   // If NOT granted, we don't prompt (that requires user gesture) — the
   // user can re-open via the Open button which prompts properly.
-  if (isFSASupported()) {
-    (async () => {
-      try {
-        const handle = await getCurrentHandle();
-        if (!handle) return;
-        // Check permission without prompting
-        const perm = await (handle as any).queryPermission?.({ mode: 'read' });
-        if (perm !== 'granted') return; // silent skip — user will reopen manually
-        const text = await readFromHandle(handle);
-        if (!text) return;
-        const data = extractDataFromHtml(text);
-        if (data) {
-          hydrateStores(migrateWorkspace(data));
-          console.log('[PowerNote] Restored last file via FSA handle');
-        }
-      } catch (err) {
-        console.warn('[PowerNote] FSA restore failed, handle may be stale:', err);
-        await clearCurrentHandle();
+  (async () => {
+    try {
+      const handle = await getCurrentHandle();
+      if (!handle) return;
+      const perm = await (handle as any).queryPermission?.({ mode: 'read' });
+      if (perm !== 'granted') return; // silent skip — user will reopen manually
+      const text = await readFromHandle(handle);
+      if (!text) return;
+      const data = extractDataFromHtml(text);
+      if (data) {
+        hydrateStores(migrateWorkspace(data));
+        console.log('[PowerNote] Restored last file via FSA handle');
       }
-    })();
-  }
+    } catch (err) {
+      console.warn('[PowerNote] FSA restore failed, handle may be stale:', err);
+      await clearCurrentHandle();
+    }
+  })();
 }
 
 // Check for updates (non-blocking, silent on failure)
@@ -76,16 +72,18 @@ checkForUpdate(APP_VERSION).then((result) => {
   console.error('[PowerNote] Update check error:', err);
 });
 
-// Start auto-save interval (every 30s when dirty)
+// Start auto-save (debounced 1.5s after last edit, max-wait 5s while dirty).
+// Driven by workspace-store subscription: canvas/draw mutations flip
+// isDirty on the workspace store, which is the only signal we listen to.
 startAutoSave(
   () => {
-    // Flush active page content to workspace before saving
     const ws = useWorkspaceStore.getState();
     ws.savePageNodes(useCanvasStore.getState().nodes);
     ws.savePageStrokes(useDrawStore.getState().strokes);
     return useWorkspaceStore.getState().workspace;
   },
   () => useWorkspaceStore.getState().isDirty,
+  (onChange) => useWorkspaceStore.subscribe(onChange),
 );
 
 // Expose stores for E2E testing (dev) and re-export (production standalone)

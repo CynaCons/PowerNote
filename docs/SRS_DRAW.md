@@ -1,8 +1,8 @@
 # SRS: Drawing & Eraser
 
 **Project:** PowerNote
-**Version:** 0.10.4
-**Date:** 2026-03-25
+**Version:** 0.10.5
+**Date:** 2026-04-23
 
 ## Purpose
 
@@ -20,3 +20,4 @@ Allow users to draw freehand strokes on the canvas using a pen tool and erase st
 | REQ-DRAW-006 | Zone eraser size shall be configurable (small, medium, large) | Should | — |
 | REQ-DRAW-007 | Strokes shall persist when navigating away from a page and returning | Must | — |
 | REQ-DRAW-008 | Strokes shall be included in the exported HTML file and restored on import | Must | — |
+| REQ-DRAW-009 | Freehand strokes shall render visually above all canvas nodes (images, text, shapes), regardless of the node's `layer` value, so the user can annotate over screenshots and other content | Must | T81 |

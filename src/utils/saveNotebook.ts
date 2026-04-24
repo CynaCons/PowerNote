@@ -1,7 +1,7 @@
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useCanvasStore } from '../stores/useCanvasStore';
 import { useDrawStore } from '../stores/useDrawStore';
-import { buildExportHtml, downloadFile, clearAutoSave } from './serialization';
+import { buildExportHtml, downloadFile } from './serialization';
 import {
   isFSASupported,
   saveAsWithPicker,
@@ -42,7 +42,6 @@ export async function saveNotebook(forceSaveAs: boolean = false): Promise<void> 
         const ok = await writeToHandle(handle, html);
         if (ok) {
           useWorkspaceStore.getState().markClean();
-          clearAutoSave();
           showToast(`Saved to ${handle.name}`, 'success');
           return;
         }
@@ -58,7 +57,6 @@ export async function saveNotebook(forceSaveAs: boolean = false): Promise<void> 
         await setCurrentHandle(newHandle);
         await addRecentHandle(ws.filename, newHandle);
         useWorkspaceStore.getState().markClean();
-        clearAutoSave();
         showToast(`Saved to ${newHandle.name}`, 'success');
         return;
       }
@@ -70,7 +68,6 @@ export async function saveNotebook(forceSaveAs: boolean = false): Promise<void> 
     const versionedFilename = `${safeName} (v${APP_VERSION}-r${revision}).html`;
     downloadFile(html, versionedFilename);
     useWorkspaceStore.getState().markClean();
-    clearAutoSave();
     showToast(`Downloaded ${versionedFilename}`, 'success');
   } catch (err) {
     console.error('[saveNotebook] Failed:', err);

@@ -287,20 +287,6 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
           <Layer>
             <PageGuides mode={backgroundMode} nodes={nodes} />
           </Layer>
-          <Layer listening={false}>
-            <DrawingLayer
-              strokes={drawStrokes}
-              selectedStrokeIds={selectedStrokeIds}
-              inProgressPoints={inProgressPoints}
-              inProgressColor={useToolStore.getState().drawOptions?.color ?? '#1a1a1a'}
-              inProgressWidth={useToolStore.getState().drawOptions?.strokeWidth ?? 3}
-              eraserPos={eraserPos}
-              penCursorPos={penCursorPos}
-              penColor={useToolStore.getState().drawOptions?.color ?? '#1a1a1a'}
-              penWidth={useToolStore.getState().drawOptions?.strokeWidth ?? 3}
-              lassoRect={lassoRect}
-            />
-          </Layer>
           <Layer>
             {/* Shape preview ghost while dragging — uses same coordinate system as ShapeNode */}
             {shapePreview && (Math.abs(shapePreview.w) > 2 || Math.abs(shapePreview.h) > 2) && (() => {
@@ -340,6 +326,27 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
               );
             })}
             <SnapGuides lines={snapLines} />
+          </Layer>
+          {/* Drawings render above nodes (REQ-DRAW-009) so pen strokes
+              annotate over images/text/shapes. listening={false} keeps
+              node clicks/drags working through the stroke layer. */}
+          <Layer listening={false} name="draw-layer">
+            <DrawingLayer
+              strokes={drawStrokes}
+              selectedStrokeIds={selectedStrokeIds}
+              inProgressPoints={inProgressPoints}
+              inProgressColor={useToolStore.getState().drawOptions?.color ?? '#1a1a1a'}
+              inProgressWidth={useToolStore.getState().drawOptions?.strokeWidth ?? 3}
+              eraserPos={eraserPos}
+              penCursorPos={penCursorPos}
+              penColor={useToolStore.getState().drawOptions?.color ?? '#1a1a1a'}
+              penWidth={useToolStore.getState().drawOptions?.strokeWidth ?? 3}
+              lassoRect={lassoRect}
+            />
+          </Layer>
+          {/* Selection handles live on the very top so resize/rotate
+              handles remain visible and clickable above strokes. */}
+          <Layer>
             <SelectionTransformer selectedNodeIds={selectedNodeIds} stageRef={stageRef} />
           </Layer>
         </Stage>

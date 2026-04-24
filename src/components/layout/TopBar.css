@@ -77,9 +77,14 @@
   transition: all 0.15s ease;
 }
 
-.top-bar__action-btn:hover {
+.top-bar__action-btn:hover:not(:disabled) {
   background: var(--color-hover);
   color: var(--color-text);
+}
+
+.top-bar__action-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .top-bar__action-btn--primary {

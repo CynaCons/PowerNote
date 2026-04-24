@@ -1,4 +1,4 @@
-import { ChevronRight, Download, FolderOpen, Maximize, ChevronDown } from 'lucide-react';
+import { ChevronRight, Download, FolderOpen, Maximize, ChevronDown, RotateCcw } from 'lucide-react';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
@@ -10,6 +10,7 @@ import {
 } from '../../utils/fileSystemAccess';
 import { setCurrentHandle, addRecentHandle } from '../../utils/fileHandleStore';
 import { saveNotebook } from '../../utils/saveNotebook';
+import { canRevert, revertNotebook } from '../../utils/revertNotebook';
 import { useRef, useState, useEffect } from 'react';
 import { showToast } from './Toast';
 import './TopBar.css';
@@ -23,6 +24,7 @@ export function TopBar() {
   const [editingFilename, setEditingFilename] = useState(false);
   const [filenameValue, setFilenameValue] = useState('');
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [revertEnabled, setRevertEnabled] = useState(false);
 
   const activeSection = workspace.sections.find((s) => s.id === activeSectionId);
   const activePage = activeSection?.pages.find((p) => p.id === activePageId);
@@ -37,6 +39,25 @@ export function TopBar() {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, []);
+
+  // Revert gating: re-check whenever dirty flag flips. canRevert() also
+  // does an async FSA permission check, so we pair it with the isDirty
+  // effect dependency to refresh the enabled/disabled state on every
+  // dirty transition.
+  useEffect(() => {
+    let cancelled = false;
+    canRevert().then((v) => {
+      if (!cancelled) setRevertEnabled(v);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isDirty]);
+
+  const handleRevert = async () => {
+    await revertNotebook();
+    setRevertEnabled(await canRevert());
+  };
 
   const handleSave = async (forceSaveAs: boolean = false) => {
     await saveNotebook(forceSaveAs);
@@ -200,6 +221,19 @@ export function TopBar() {
           data-testid="open-btn"
         >
           <FolderOpen size={16} />
+        </button>
+        <button
+          className="top-bar__action-btn"
+          onClick={handleRevert}
+          disabled={!revertEnabled}
+          title={
+            revertEnabled
+              ? 'Revert to last saved version on disk'
+              : 'Nothing to revert — workspace is unchanged or no saved file'
+          }
+          data-testid="revert-btn"
+        >
+          <RotateCcw size={16} />
         </button>
         <div className="top-bar__save-group">
           <button
