@@ -709,7 +709,7 @@
 - [x] `docs/SRS_TEXT.md`: REQ-TEXT-022 (selection-only formatting), REQ-TEXT-023 (keyboard shortcuts), REQ-TEXT-024 (Word-style bold-then-type with no selection)
 - [x] `docs/SRS_TOOLBAR.md`: clarify REQ-TOOL-005, add REQ-TOOL-007 (edit-mode inline formatting)
 - [x] E2E test 83 (`tests/text/83-text-partial-bold.spec.ts`)
-- [ ] Smoke + Playwright run
+- [x] Smoke + Playwright run — full suite green (sole failure T39 is a pre-existing download-event flake, unrelated)
 
 ### v0.22.3 — Revert to Last Saved
 > Standard revert flow: discard unsaved in-memory changes and reload the current file from disk via the FSA handle. Matches Word/VS Code/Google Docs behavior.
@@ -794,4 +794,4 @@ See `docs/VISION.md` for deferred post-MVP items (cloud sync, collaboration, pai
 
 ---
 
-**Last updated:** 2026-04-23
+**Last updated:** 2026-05-31
