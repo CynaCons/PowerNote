@@ -80,6 +80,41 @@ test.describe('83 - Partial bold/italic (REQ-TEXT-022/023, REQ-TOOL-007)', () =>
     expect(store.nodes[0].data.fontStyle).toBe('normal');
   });
 
+  test('bold with no selection bolds the next typed text (Word-style)', async ({ page }) => {
+    await page.goto('/');
+    await waitForCanvasReady(page);
+
+    await activateTool(page, 'text');
+    await clickCanvas(page, 400, 300);
+
+    const textarea = page.locator('textarea');
+    await expect(textarea).toBeVisible({ timeout: 2000 });
+
+    // Fresh block: place the cursor with nothing highlighted
+    await page.evaluate(() => {
+      const ta = document.querySelector('textarea') as HTMLTextAreaElement;
+      ta.focus();
+      ta.setSelectionRange(0, 0);
+    });
+
+    // Turn bold ON with no selection — must keep editor focused (no blur)
+    await page.locator('.text-toolbar__btn').first().click();
+    await page.waitForTimeout(50);
+
+    // Type — the new text lands between the markers and comes out bold
+    await page.keyboard.type('hello');
+    await page.waitForTimeout(50);
+
+    await expect(textarea).toHaveValue('**hello**');
+
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+    await page.waitForTimeout(200);
+
+    const store = await getCanvasStore(page);
+    expect(store.nodes[0].data.text).toBe('**hello**');
+    expect(store.nodes[0].data.fontStyle).toBe('normal');
+  });
+
   test('toolbar bold still toggles the whole block when not editing', async ({ page }) => {
     await page.goto('/');
     await waitForCanvasReady(page);

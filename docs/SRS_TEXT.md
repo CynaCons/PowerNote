@@ -35,3 +35,4 @@ Allow users to create, edit, move, and delete markdown-capable text blocks on th
 | REQ-TEXT-021 | Markdown task list checkboxes (- [ ] / - [x]) shall be clickable to toggle state | Must | — |
 | REQ-TEXT-022 | While editing a text block, applying bold/italic shall wrap **only the selected text** in markdown markers (`**`/`*`), leaving the rest of the block unaffected — it shall NOT change the whole block's style | Must | T83 |
 | REQ-TEXT-023 | While editing, Ctrl/Cmd+B and Ctrl/Cmd+I shall apply bold/italic to the current selection (same inline behavior as the toolbar buttons) | Should | — |
+| REQ-TEXT-024 | While editing with no text selected, applying bold/italic shall insert an empty marker pair and place the caret between the markers, so subsequently typed text is formatted (Word-style) | Should | T83 |
