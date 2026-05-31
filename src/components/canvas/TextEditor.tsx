@@ -28,6 +28,78 @@ function replaceSelection(
   ta.value = before + newText + after;
 }
 
+/**
+ * Apply an inline markdown formatting marker (`**` bold, `*` italic) to the
+ * textarea's current selection. Wraps the selection if unformatted, unwraps it
+ * if the markers are already present (idempotent toggle).
+ *
+ * The key behavior: this affects ONLY the selected range, never the whole block.
+ * Bold/italic are encoded as markdown in the text content itself (`**word**`),
+ * so partial formatting is preserved per-selection rather than as a block-level
+ * fontStyle. With no selection, an empty marker pair is inserted and the cursor
+ * is parked between them so the user can type formatted text directly.
+ */
+export function applyInlineFormat(ta: HTMLTextAreaElement, marker: string): void {
+  const value = ta.value;
+  const s = ta.selectionStart;
+  const e = ta.selectionEnd;
+  const m = marker;
+  const mLen = m.length;
+
+  // No selection → insert an empty pair, park cursor in the middle
+  if (s === e) {
+    replaceSelection(ta, s, e, m + m);
+    ta.selectionStart = s + mLen;
+    ta.selectionEnd = s + mLen;
+    return;
+  }
+
+  const selected = value.substring(s, e);
+
+  // Already wrapped, markers inside the selection — e.g. selection is "**word**"
+  if (selected.length >= 2 * mLen && selected.startsWith(m) && selected.endsWith(m)) {
+    const inner = selected.substring(mLen, selected.length - mLen);
+    replaceSelection(ta, s, e, inner);
+    ta.selectionStart = s;
+    ta.selectionEnd = s + inner.length;
+    return;
+  }
+
+  // Already wrapped, markers just outside the selection — e.g. selecting "word"
+  // inside "**word**". Strip the surrounding markers. The guard prevents a single
+  // '*' (italic) from matching one half of a '**' (bold) run.
+  const before = value.substring(s - mLen, s);
+  const after = value.substring(e, e + mLen);
+  const isExactMarker =
+    before === m &&
+    after === m &&
+    value.charAt(s - mLen - 1) !== m.charAt(0) &&
+    value.charAt(e + mLen) !== m.charAt(0);
+  if (isExactMarker) {
+    replaceSelection(ta, s - mLen, e + mLen, selected);
+    ta.selectionStart = s - mLen;
+    ta.selectionEnd = s - mLen + selected.length;
+    return;
+  }
+
+  // Default: wrap the selection, keep the original text selected (markers excluded)
+  replaceSelection(ta, s, e, m + selected + m);
+  ta.selectionStart = s + mLen;
+  ta.selectionEnd = s + mLen + selected.length;
+}
+
+// ── Active editor registry ────────────────────────────────────────────────
+// Lets external UI (the bottom toolbar) apply inline formatting to the text
+// block currently being edited, targeting only the live textarea selection.
+export interface ActiveTextEditor {
+  applyFormat: (marker: string) => void;
+  hasSelection: () => boolean;
+}
+let activeTextEditor: ActiveTextEditor | null = null;
+export function getActiveTextEditor(): ActiveTextEditor | null {
+  return activeTextEditor;
+}
+
 interface TextEditorProps {
   node: CanvasNode;
   stageScale: number;
@@ -61,9 +133,38 @@ export function TextEditor({ node, stageScale: _stageScale, onFinish, onCancel }
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
 
+  // Register this editor so the bottom toolbar can format the live selection
+  useEffect(() => {
+    const editor: ActiveTextEditor = {
+      applyFormat: (marker) => {
+        const ta = textareaRef.current;
+        if (!ta) return;
+        applyInlineFormat(ta, marker);
+        ta.style.height = 'auto';
+        ta.style.height = ta.scrollHeight + 'px';
+      },
+      hasSelection: () => {
+        const ta = textareaRef.current;
+        return !!ta && ta.selectionStart !== ta.selectionEnd;
+      },
+    };
+    activeTextEditor = editor;
+    return () => {
+      if (activeTextEditor === editor) activeTextEditor = null;
+    };
+  }, []);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
+
+    // Ctrl/Cmd+B / Ctrl/Cmd+I: bold / italic the selection (inline markdown)
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'i')) {
+      e.preventDefault();
+      applyInlineFormat(textarea, e.key === 'b' ? '**' : '*');
+      autoHeight(textarea);
+      return;
+    }
 
     // Tab / Shift+Tab: indent / unindent (supports single-line + multi-line selection)
     if (e.key === 'Tab') {
