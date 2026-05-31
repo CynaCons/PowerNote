@@ -33,3 +33,5 @@ Allow users to create, edit, move, and delete markdown-capable text blocks on th
 | REQ-TEXT-019 | Shift+drag shall show snap alignment guides when edges/centers align with other nodes | Should | — |
 | REQ-TEXT-020 | Text blocks shall auto-size width to fit rendered content (min 60px, max 800px) | Must | T21 |
 | REQ-TEXT-021 | Markdown task list checkboxes (- [ ] / - [x]) shall be clickable to toggle state | Must | — |
+| REQ-TEXT-022 | While editing a text block, applying bold/italic shall wrap **only the selected text** in markdown markers (`**`/`*`), leaving the rest of the block unaffected — it shall NOT change the whole block's style | Must | T83 |
+| REQ-TEXT-023 | While editing, Ctrl/Cmd+B and Ctrl/Cmd+I shall apply bold/italic to the current selection (same inline behavior as the toolbar buttons) | Should | — |

@@ -16,5 +16,6 @@ Provide a contextual toolbar for formatting text properties (font size, style, c
 | REQ-TOOL-002 | The toolbar shall provide font size selection from predefined sizes | Must | T11 |
 | REQ-TOOL-003 | The toolbar shall provide bold and italic toggle buttons | Must | T11 |
 | REQ-TOOL-004 | The toolbar shall provide text color selection | Must | T11 |
-| REQ-TOOL-005 | When a text node is selected, toolbar changes shall update that node in real-time | Must | T11 |
+| REQ-TOOL-005 | When a text node is selected (not being edited), bold/italic shall toggle the whole block's style; size/color changes shall update that node in real-time | Must | T11 |
 | REQ-TOOL-006 | When no node is selected (text tool mode), toolbar changes shall set defaults for new text blocks | Should | T11 |
+| REQ-TOOL-007 | When a text block is being edited, the bold/italic buttons shall format **only the selected text** (inline markdown) and shall not blur the editor or affect unselected text | Must | T83 |

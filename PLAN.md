@@ -702,7 +702,16 @@
 - [x] E2E tests 79 (fsa-capability), 80 (fsa-handle-store)
 - [x] Remove test output logs and gitignore them (commit `7b5b367`)
 
-### v0.22.3 — Revert to Last Saved (current)
+### v0.22.4 — Partial Bold/Italic in Text Blocks (Bug Fix, current)
+> Bug: applying bold to a selection inside a text block bolded the ENTIRE block (block-level `fontStyle`). Fix: while editing, bold/italic wrap only the selected text in inline markdown (`**`/`*`). Block-level toggle is preserved for a selected (non-editing) node.
+- [x] `TextEditor.tsx`: `applyInlineFormat()` helper (wrap/unwrap selection) + active-editor registry + Ctrl/Cmd+B / Ctrl/Cmd+I shortcuts
+- [x] `TextToolbar.tsx`: bold/italic route to selection while editing; `onMouseDown` preventDefault keeps the editor focused
+- [x] `docs/SRS_TEXT.md`: REQ-TEXT-022 (selection-only formatting), REQ-TEXT-023 (keyboard shortcuts)
+- [x] `docs/SRS_TOOLBAR.md`: clarify REQ-TOOL-005, add REQ-TOOL-007 (edit-mode inline formatting)
+- [x] E2E test 83 (`tests/text/83-text-partial-bold.spec.ts`)
+- [ ] Smoke + Playwright run
+
+### v0.22.3 — Revert to Last Saved
 > Standard revert flow: discard unsaved in-memory changes and reload the current file from disk via the FSA handle. Matches Word/VS Code/Google Docs behavior.
 - [ ] `src/utils/revertNotebook.ts` — confirm-and-reload helper that re-reads the FSA handle, hydrates stores, marks clean
 - [ ] `TopBar.tsx` — revert button (RotateCcw icon), disabled unless `isDirty && FSA handle available`
