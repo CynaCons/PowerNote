@@ -371,7 +371,7 @@
 | v0.23.0 | **shipped** — Extended inline formatting + read-only Gantt nodes (`d49eb48`) |
 | v0.24.1 | **tagged** — Persist canvas settings in HTML + save-in-progress animation |
 | v0.25.0-proto | **shipped** — Live update via FSA A/B swap |
-| v0.25.1 | **current** — Show bound HTML file path in TopBar |
+| v0.25.1 | **tagged** — Live update swap + bound HTML file path |
 
 ---
 
