@@ -9,7 +9,12 @@ interface FileBindingState {
   setFromHandle: (handle: { name: string }) => void;
   setFromFileUrl: () => void;
   clear: () => void;
-  /** Re-read FSA handle, else fall back to file:// path, else clear */
+  /**
+   * Re-resolve display identity.
+   * - handle present → `handle.name` (picker APIs do not expose a folder path)
+   * - `file://` + no handle → absolute path from `location`
+   * - otherwise → unlinked
+   */
   refresh: () => Promise<void>;
 }
 
@@ -28,6 +33,17 @@ export function formatFileUrlPath(pathname: string): string {
   return path;
 }
 
+/** Resolve absolute display path from a document location, or null if not file://. */
+export function resolveFileUrlLabel(protocol: string, pathname: string): string | null {
+  if (protocol !== 'file:') return null;
+  return formatFileUrlPath(pathname);
+}
+
+/** True when the tab itself is a local HTML file (full path available). */
+export function isFileUrlDocument(): boolean {
+  return typeof window !== 'undefined' && window.location.protocol === 'file:';
+}
+
 export const useFileBindingStore = create<FileBindingState>((set) => ({
   label: null,
   source: 'none',
@@ -36,14 +52,16 @@ export const useFileBindingStore = create<FileBindingState>((set) => ({
     set({ label: handle.name, source: 'fsa' }),
 
   setFromFileUrl: () => {
-    if (typeof window === 'undefined' || window.location.protocol !== 'file:') {
+    if (typeof window === 'undefined') {
       set({ label: null, source: 'none' });
       return;
     }
-    set({
-      label: formatFileUrlPath(window.location.pathname),
-      source: 'file-url',
-    });
+    const label = resolveFileUrlLabel(window.location.protocol, window.location.pathname);
+    if (!label) {
+      set({ label: null, source: 'none' });
+      return;
+    }
+    set({ label, source: 'file-url' });
   },
 
   clear: () => set({ label: null, source: 'none' }),
@@ -55,12 +73,12 @@ export const useFileBindingStore = create<FileBindingState>((set) => ({
       set({ label: handle.name, source: 'fsa' });
       return;
     }
-    if (typeof window !== 'undefined' && window.location.protocol === 'file:') {
-      set({
-        label: formatFileUrlPath(window.location.pathname),
-        source: 'file-url',
-      });
-      return;
+    if (typeof window !== 'undefined') {
+      const label = resolveFileUrlLabel(window.location.protocol, window.location.pathname);
+      if (label) {
+        set({ label, source: 'file-url' });
+        return;
+      }
     }
     set({ label: null, source: 'none' });
   },

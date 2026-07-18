@@ -372,6 +372,7 @@
 | v0.24.1 | **tagged** — Persist canvas settings in HTML + save-in-progress animation |
 | v0.25.0-proto | **shipped** — Live update via FSA A/B swap |
 | v0.25.1 | **tagged** — Live update swap + bound HTML file path |
+| v0.25.2 | **tagged** — Absolute file:// path; clear stale FSA on local open |
 
 ---
 
@@ -706,7 +707,15 @@
 - [x] E2E tests 79 (fsa-capability), 80 (fsa-handle-store)
 - [x] Remove test output logs and gitignore them (commit `7b5b367`)
 
-### v0.25.1 — Show bound HTML file path (current)
+### v0.25.2 — Absolute path on file:// + no stale FSA name (current)
+> Opening a Downloads copy via `file://` showed a stale IndexedDB handle name (e.g. `Take Action Now.html`) instead of the real absolute path. Prefer decoded `file://` absolute path; clear the current FSA handle when booting from embedded local HTML so Ctrl+S cannot overwrite the wrong file.
+- [x] On embedded `file://` boot: `clearCurrentHandle` before path resolve + `setFromFileUrl`
+- [x] `resolveFileUrlLabel` / format absolute Windows paths (incl. spaces)
+- [x] `docs/SRS_FILE.md` — REQ-FILE-023
+- [x] E2E test 91
+- [x] Smoke + Playwright — T90/T91 green (9/9)
+
+### v0.25.1 — Show bound HTML file path
 > Show which HTML file the session is linked to. Browsers cannot expose a full OS path via FSA — display `handle.name` when bound, `file://` decoded path when opened as a local file, or “Not linked to a file” otherwise. Refresh on Open / Save As / library load / handle clear.
 - [x] `useFileBindingStore` — label + source; refresh from FSA handle or `file://` location
 - [x] Wire `setCurrentHandle` / `clearCurrentHandle`; library load clears handle
@@ -856,4 +865,4 @@ See `docs/VISION.md` for deferred post-MVP items (cloud sync, collaboration, pai
 
 ---
 
-**Last updated:** 2026-07-18 (v0.25.1 bound HTML file path)
+**Last updated:** 2026-07-18 (v0.25.2 absolute file:// path fix)

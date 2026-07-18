@@ -13,7 +13,7 @@ import { useFileBindingStore } from './stores/useFileBindingStore';
 import { APP_VERSION } from './version';
 import type { WorkspaceData } from './types/data';
 
-function hydrateStores(data: WorkspaceData) {
+function hydrateStores(data: WorkspaceData, refreshBinding = true) {
   useWorkspaceStore.setState({
     workspace: data,
     activeSectionId: data.sections[0]?.id,
@@ -23,8 +23,9 @@ function hydrateStores(data: WorkspaceData) {
   const firstPage = data.sections[0]?.pages[0];
   useCanvasStore.getState().loadPageNodes(firstPage?.nodes ?? []);
   useDrawStore.getState().loadPageStrokes(firstPage?.strokes ?? []);
-  // Keep file-path indicator in sync after hydrate (FSA handle or file://)
-  void useFileBindingStore.getState().refresh();
+  if (refreshBinding) {
+    void useFileBindingStore.getState().refresh();
+  }
 }
 
 // One-shot migration: older builds stashed a full workspace snapshot under
@@ -39,7 +40,20 @@ clearLegacyAutoSave();
 //   3. Fresh workspace (defaults)
 const embeddedData = getEmbeddedData();
 if (embeddedData) {
-  hydrateStores(migrateWorkspace(embeddedData));
+  const migrated = migrateWorkspace(embeddedData);
+  if (window.location.protocol === 'file:') {
+    // Local file:// open: this HTML document IS the notebook. Drop any
+    // persisted FSA handle BEFORE resolving the path indicator so a stale
+    // name (e.g. from a previous Save As) cannot win — and so Save/autosave
+    // cannot overwrite that other file.
+    hydrateStores(migrated, false);
+    void (async () => {
+      await clearCurrentHandle();
+      useFileBindingStore.getState().setFromFileUrl();
+    })();
+  } else {
+    hydrateStores(migrated);
+  }
 } else if (isFSASupported()) {
   // Async: try to restore from FSA handle if permission is already granted.
   // If NOT granted, we don't prompt (that requires user gesture) — the

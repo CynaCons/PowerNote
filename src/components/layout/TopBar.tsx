@@ -180,6 +180,11 @@ export function TopBar() {
   };
 
   const pathDisplay = filePathLabel ?? 'Not linked to a file';
+  const pathTitle = filePathLabel
+    ? filePathLabel.includes('\\') || filePathLabel.includes('/')
+      ? pathDisplay
+      : `${pathDisplay} — full folder path is only available when this tab is opened as a local file (file://). Open/Save As can only expose the file name.`
+    : 'No disk file linked. Open a notebook or save with Save As to link one.';
 
   return (
     <header className="top-bar" data-testid="topbar">
@@ -227,7 +232,7 @@ export function TopBar() {
         <div
           className={`top-bar__file-path${filePathLabel ? '' : ' top-bar__file-path--unlinked'}`}
           data-testid="topbar-file-path"
-          title={pathDisplay}
+          title={pathTitle}
         >
           {pathDisplay}
         </div>
