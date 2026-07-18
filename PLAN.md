@@ -369,7 +369,9 @@
 | v0.16.0–v0.21.0 | **tagged** — Stabilization, standalone HTML fixes, hot-swap via Blob URL |
 | v0.22.0–v0.22.4 | **tagged** — FSA direct save, autosave, draw-over-images, revert, partial bold/italic |
 | v0.23.0 | **shipped** — Extended inline formatting + read-only Gantt nodes (`d49eb48`) |
-| v0.24.1 | **current** — Persist canvas settings in HTML + save-in-progress animation |
+| v0.24.1 | **tagged** — Persist canvas settings in HTML + save-in-progress animation |
+| v0.25.0-proto | **shipped** — Live update via FSA A/B swap |
+| v0.25.1 | **current** — Show bound HTML file path in TopBar |
 
 ---
 
@@ -704,6 +706,36 @@
 - [x] E2E tests 79 (fsa-capability), 80 (fsa-handle-store)
 - [x] Remove test output logs and gitignore them (commit `7b5b367`)
 
+### v0.25.1 — Show bound HTML file path (current)
+> Show which HTML file the session is linked to. Browsers cannot expose a full OS path via FSA — display `handle.name` when bound, `file://` decoded path when opened as a local file, or “Not linked to a file” otherwise. Refresh on Open / Save As / library load / handle clear.
+- [x] `useFileBindingStore` — label + source; refresh from FSA handle or `file://` location
+- [x] Wire `setCurrentHandle` / `clearCurrentHandle`; library load clears handle
+- [x] TopBar shows path under notebook title (`data-testid="topbar-file-path"`)
+- [x] `docs/SRS_FILE.md` — REQ-FILE-022
+- [x] E2E test 90
+- [x] Smoke + Playwright — T90 + T77/T80 regression green (15/15)
+
+### v0.25.0-proto — Live update via FSA A/B swap
+> Prototype: when a File System Access handle exists, overwrite that notebook with the new app bundle + injected data, then `location.reload()` (same-document swap). Fallback: existing dual download (backup + updated file) when no handle / write fails / live-update disabled via `window.__POWERNOTE_LIVE_UPDATE__ = false`.
+- [x] `docs/SRS_UPDATE.md` — REQ-UPDATE-001..004
+- [x] `src/utils/updateChecker.ts` — `buildUpdatedHtml`, live-swap vs download fallback; safety backup before overwrite (default on)
+- [x] `SettingsPanel.tsx` — status copy: “Updating this file…” vs “Downloading backup + update…”
+- [x] E2E T87 (parse/hydrate), T88 (write+reload mocks), T89 (download fallback)
+- [x] Chrome FSA manual checklist (see below)
+- [x] Regression: T69/T70/T79/T80/T82 + T87–T89 — **21/21 passed**; `tsc` clean
+
+#### Manual Chrome checklist (prototype)
+| Step | Result |
+|------|--------|
+| 1. Save As once so FSA handle exists | Covered by T80 handle store + T88 getHandle mock |
+| 2. Distinctive text → Update | T88 asserts payload written into handle HTML |
+| 3. Live path reloads (updated notebook not downloaded) | T88: `reloadCount === 1`, only backup download |
+| 4. After reload content + version intact | T87: hydrate from built HTML preserves text + settings |
+| 5. Ctrl+S still targets same handle | Unchanged FSA save path (T79/T80); no live-swap regression |
+| 6. No-handle / disabled live → download pair | T89 + T88 flag-off case |
+
+**Prototype verdict: PASS** (automated contract). End-to-end human click through Settings → Update against a real GitHub asset + real disk file remains a release-hardening smoke before promoting out of `-proto`.
+
 ### v0.24.1 — Save-in-Progress Animation
 > Manual save (Ctrl+S / Save / Save As) can take a noticeable moment with no feedback. Show a clear in-progress state until the write finishes. Autosave stays silent (no spinner).
 - [x] Workspace `isSaving` flag set around manual `saveNotebook` only
@@ -824,4 +856,4 @@ See `docs/VISION.md` for deferred post-MVP items (cloud sync, collaboration, pai
 
 ---
 
-**Last updated:** 2026-07-18 (v0.24.0 + v0.24.1 shipped)
+**Last updated:** 2026-07-18 (v0.25.1 bound HTML file path)

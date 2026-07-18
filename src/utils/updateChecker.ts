@@ -1,13 +1,46 @@
 import type { WorkspaceData } from '../types/data';
+import { isFSASupported, writeToHandle, verifyPermission } from './fileSystemAccess';
+import { getCurrentHandle } from './fileHandleStore';
 
 const GITHUB_REPO = 'CynaCons/PowerNote';
 const ASSET_NAME = 'PowerNote.html';
 
-interface UpdateInfo {
+export interface UpdateInfo {
   available: boolean;
   latestVersion?: string;
   downloadUrl?: string;
   releaseUrl?: string;
+}
+
+/** Result of performUpdate — callers use mode for UI copy. */
+export type UpdateMode = 'live-swap' | 'download';
+
+export type PerformUpdateResult =
+  | { ok: true; mode: UpdateMode }
+  | { ok: false };
+
+/**
+ * Injectable deps for tests. Production uses the defaults below.
+ */
+export interface PerformUpdateDeps {
+  fetchTemplate?: (downloadUrl: string) => Promise<string | null>;
+  getHandle?: () => Promise<FileSystemFileHandle | null>;
+  writeHandle?: (handle: FileSystemFileHandle, html: string) => Promise<boolean>;
+  verifyWritePermission?: (handle: FileSystemFileHandle) => Promise<boolean>;
+  reload?: () => void;
+  download?: (content: string, filename: string) => void;
+  buildBackupHtml?: (workspace: WorkspaceData) => Promise<string>;
+  /** When false, skip live-swap even if a handle exists. Default: window flag. */
+  isLiveUpdateEnabled?: () => boolean;
+  /** Download a safety backup before overwriting the live file. Default: true. */
+  downloadBackupBeforeLiveSwap?: boolean;
+}
+
+declare global {
+  interface Window {
+    /** Set to `false` to force download fallback (prototype / E2E). Default: enabled. */
+    __POWERNOTE_LIVE_UPDATE__?: boolean;
+  }
 }
 
 /**
@@ -55,7 +88,6 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
     return {
       available: true,
       latestVersion: latest,
-      // Store both URLs — we'll try multiple download strategies
       downloadUrl: asset?.browser_download_url,
       releaseUrl: data.html_url,
     };
@@ -66,13 +98,34 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
 }
 
 /**
+ * Inject workspace JSON into a PowerNote HTML template (pure, testable).
+ */
+export function buildUpdatedHtml(templateHtml: string, workspace: WorkspaceData): string {
+  const json = JSON.stringify(workspace, null, 2);
+  const dataScript = `<script id="powernote-data" type="application/json">\n${json}\n</script>`;
+  const existingPattern = /<script id="powernote-data"[^>]*>[\s\S]*?<\/script>/;
+  if (existingPattern.test(templateHtml)) {
+    return templateHtml.replace(existingPattern, dataScript);
+  }
+  if (templateHtml.includes('</head>')) {
+    return templateHtml.replace('</head>', `${dataScript}\n</head>`);
+  }
+  return dataScript + templateHtml;
+}
+
+/** Live-update enabled unless explicitly disabled via window flag. */
+export function isLiveUpdateEnabled(): boolean {
+  if (typeof window === 'undefined') return true;
+  return window.__POWERNOTE_LIVE_UPDATE__ !== false;
+}
+
+/**
  * Try to fetch the PowerNote.html asset using multiple strategies.
  * GitHub's download URLs have CORS issues from file:// origins,
  * so we try several approaches in order.
  */
-async function fetchAssetHtml(downloadUrl: string): Promise<string | null> {
+export async function fetchAssetHtml(downloadUrl: string): Promise<string | null> {
   // Strategy 1: Direct fetch of browser_download_url
-  // Works from http:// origins, may fail from file://
   console.log('[PowerNote Update] Strategy 1: direct fetch');
   try {
     const resp = await fetch(downloadUrl);
@@ -88,14 +141,12 @@ async function fetchAssetHtml(downloadUrl: string): Promise<string | null> {
   }
 
   // Strategy 2: Use GitHub API asset endpoint with octet-stream
-  // The API itself has CORS, but it 302-redirects to a CDN that might not
   try {
     const match = downloadUrl.match(/repos\/([^/]+\/[^/]+)\/releases\/download/);
     const assetMatch = downloadUrl.match(/\/([^/]+)$/);
     if (match && assetMatch) {
       const repo = match[1];
       console.log('[PowerNote Update] Strategy 2: GitHub API asset endpoint');
-      // First get the release to find asset ID
       const releaseResp = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
         headers: { Accept: 'application/vnd.github.v3+json' },
       });
@@ -122,8 +173,7 @@ async function fetchAssetHtml(downloadUrl: string): Promise<string | null> {
     console.log('[PowerNote Update] Strategy 2 failed:', err);
   }
 
-  // Strategy 3: Use raw.githubusercontent.com to fetch dist-template from main branch
-  // This bypasses the release system but gets the latest built template
+  // Strategy 3: raw.githubusercontent.com dist-template
   console.log('[PowerNote Update] Strategy 3: raw.githubusercontent.com');
   try {
     const resp = await fetch(
@@ -144,9 +194,6 @@ async function fetchAssetHtml(downloadUrl: string): Promise<string | null> {
   return null;
 }
 
-/**
- * Download a file to the user's machine.
- */
 function triggerDownload(content: string, filename: string) {
   const blob = new Blob([content], { type: 'text/html;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -158,57 +205,83 @@ function triggerDownload(content: string, filename: string) {
 }
 
 /**
- * Perform update: saves a backup of current notebook, then downloads
- * the new version with user data injected. User opens the downloaded file.
+ * Perform update with A/B-style live-swap when possible:
+ *   1. Fetch new template, inject workspace data
+ *   2. If FSA handle + write permission + live-update enabled → write file + reload
+ *   3. Else download backup + updated HTML (user opens manually)
  *
- * Hot-swap via document.write/Blob URL doesn't work because browsers'
- * HTML parsers choke on the minified JS bundle. Download is the only
- * reliable approach for self-contained HTML files.
+ * Prototype default: download a safety backup before live overwrite.
  */
 export async function performUpdate(
   downloadUrl: string,
   workspace: WorkspaceData,
   currentVersion: string,
   newVersion: string,
-): Promise<boolean> {
+  deps: PerformUpdateDeps = {},
+): Promise<PerformUpdateResult> {
   console.log(`[PowerNote Update] Starting update ${currentVersion} → ${newVersion}...`);
-  try {
-    // Step 1: Save backup of current notebook
-    console.log('[PowerNote Update] Saving backup...');
-    const { buildExportHtml } = await import('./serialization');
-    const backupHtml = await buildExportHtml(workspace);
-    const safeName = workspace.filename.replace(/[^a-zA-Z0-9_\- ]/g, '_');
-    triggerDownload(backupHtml, `${safeName} (v${currentVersion}_update-backup).html`);
 
-    // Step 2: Download new template
+  const fetchTemplate = deps.fetchTemplate ?? fetchAssetHtml;
+  const getHandle = deps.getHandle ?? getCurrentHandle;
+  const writeHandle = deps.writeHandle ?? writeToHandle;
+  const verifyWrite = deps.verifyWritePermission
+    ?? ((h: FileSystemFileHandle) => verifyPermission(h, true));
+  const reload = deps.reload ?? (() => { window.location.reload(); });
+  const download = deps.download ?? triggerDownload;
+  const liveEnabled = deps.isLiveUpdateEnabled ?? isLiveUpdateEnabled;
+  const backupBeforeLive = deps.downloadBackupBeforeLiveSwap !== false;
+
+  const buildBackup = deps.buildBackupHtml ?? (async (ws: WorkspaceData) => {
+    const { buildExportHtml } = await import('./serialization');
+    return buildExportHtml(ws);
+  });
+
+  try {
+    const safeName = workspace.filename.replace(/[^a-zA-Z0-9_\- ]/g, '_');
+
     console.log('[PowerNote Update] Downloading new version...');
-    const newHtml = await fetchAssetHtml(downloadUrl);
+    const newHtml = await fetchTemplate(downloadUrl);
     if (!newHtml) {
       console.error('[PowerNote Update] Could not download new version');
-      return false;
+      return { ok: false };
     }
 
-    // Step 3: Inject user data into new template
-    const json = JSON.stringify(workspace, null, 2);
-    console.log(`[PowerNote Update] Workspace JSON size: ${json.length} bytes`);
-    const dataScript = `<script id="powernote-data" type="application/json">\n${json}\n</script>`;
+    const finalHtml = buildUpdatedHtml(newHtml, workspace);
+    console.log(`[PowerNote Update] Built updated HTML (${finalHtml.length} bytes)`);
 
-    let finalHtml: string;
-    const existingPattern = /<script id="powernote-data"[^>]*>[\s\S]*?<\/script>/;
-    if (existingPattern.test(newHtml)) {
-      finalHtml = newHtml.replace(existingPattern, dataScript);
-    } else {
-      finalHtml = newHtml.replace('</head>', `${dataScript}\n</head>`);
+    // ── Live-swap path (FSA A/B) ─────────────────────────────
+    if (liveEnabled() && isFSASupported()) {
+      const handle = await getHandle();
+      if (handle) {
+        const canWrite = await verifyWrite(handle);
+        if (canWrite) {
+          if (backupBeforeLive) {
+            console.log('[PowerNote Update] Saving safety backup before live-swap...');
+            const backupHtml = await buildBackup(workspace);
+            download(backupHtml, `${safeName} (v${currentVersion}_update-backup).html`);
+          }
+
+          console.log('[PowerNote Update] Live-swap: writing to current file handle...');
+          const written = await writeHandle(handle, finalHtml);
+          if (written) {
+            console.log('[PowerNote Update] Live-swap write OK — reloading');
+            reload();
+            return { ok: true, mode: 'live-swap' };
+          }
+          console.warn('[PowerNote Update] Live-swap write failed — falling back to download');
+        }
+      }
     }
 
-    // Step 4: Download the updated notebook
-    console.log(`[PowerNote Update] Downloading updated notebook (${finalHtml.length} bytes)...`);
-    triggerDownload(finalHtml, `${safeName} (v${newVersion}).html`);
-
+    // ── Download fallback ────────────────────────────────────
+    console.log('[PowerNote Update] Download fallback path...');
+    const backupHtml = await buildBackup(workspace);
+    download(backupHtml, `${safeName} (v${currentVersion}_update-backup).html`);
+    download(finalHtml, `${safeName} (v${newVersion}).html`);
     console.log('[PowerNote Update] Update complete — open the downloaded file to use the new version');
-    return true;
+    return { ok: true, mode: 'download' };
   } catch (err) {
     console.error('[PowerNote Update] Update failed:', err);
-    return false;
+    return { ok: false };
   }
 }

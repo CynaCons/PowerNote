@@ -10,6 +10,7 @@ import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
 import { migrateWorkspace } from '../../utils/migrations';
+import { clearCurrentHandle } from '../../utils/fileHandleStore';
 import { showToast } from './Toast';
 import './NotebookLibraryPanel.css';
 
@@ -29,7 +30,7 @@ export function NotebookLibraryPanel({ isOpen, onClose }: NotebookLibraryPanelPr
 
   const refresh = () => setEntries(loadLibrary());
 
-  const handleLoad = (entry: LibraryEntry) => {
+  const handleLoad = async (entry: LibraryEntry) => {
     const isDirty = useWorkspaceStore.getState().isDirty;
     if (isDirty) {
       const confirmed = window.confirm(
@@ -48,6 +49,8 @@ export function NotebookLibraryPanel({ isOpen, onClose }: NotebookLibraryPanelPr
     const firstPage = ws.sections[0]?.pages[0];
     useCanvasStore.getState().loadPageNodes(firstPage?.nodes ?? []);
     useDrawStore.getState().loadPageStrokes(firstPage?.strokes ?? []);
+    // Library entries are not disk-linked — drop any stale FSA binding
+    await clearCurrentHandle();
     showToast(`Loaded "${entry.name}"`, 'info');
     onClose();
   };

@@ -9,6 +9,7 @@ import { migrateWorkspace } from './utils/migrations';
 import { checkForUpdate } from './utils/updateChecker';
 import { isFSASupported, readFromHandle } from './utils/fileSystemAccess';
 import { getCurrentHandle, clearCurrentHandle } from './utils/fileHandleStore';
+import { useFileBindingStore } from './stores/useFileBindingStore';
 import { APP_VERSION } from './version';
 import type { WorkspaceData } from './types/data';
 
@@ -22,6 +23,8 @@ function hydrateStores(data: WorkspaceData) {
   const firstPage = data.sections[0]?.pages[0];
   useCanvasStore.getState().loadPageNodes(firstPage?.nodes ?? []);
   useDrawStore.getState().loadPageStrokes(firstPage?.strokes ?? []);
+  // Keep file-path indicator in sync after hydrate (FSA handle or file://)
+  void useFileBindingStore.getState().refresh();
 }
 
 // One-shot migration: older builds stashed a full workspace snapshot under
@@ -87,12 +90,16 @@ startAutoSave(
 );
 
 // Expose stores for E2E testing (dev) and re-export (production standalone)
-import('./stores/useToolStore').then(({ useToolStore }) => {
+Promise.all([
+  import('./stores/useToolStore'),
+  import('./stores/useFileBindingStore'),
+]).then(([{ useToolStore }, { useFileBindingStore }]) => {
   (window as any).__POWERNOTE_STORES__ = {
     workspace: useWorkspaceStore,
     canvas: useCanvasStore,
     tool: useToolStore,
     draw: useDrawStore,
+    fileBinding: useFileBindingStore,
   };
 });
 

@@ -9,7 +9,8 @@ import {
   isFSASupported,
   openWithPicker,
 } from '../../utils/fileSystemAccess';
-import { setCurrentHandle, addRecentHandle } from '../../utils/fileHandleStore';
+import { setCurrentHandle, addRecentHandle, clearCurrentHandle } from '../../utils/fileHandleStore';
+import { useFileBindingStore } from '../../stores/useFileBindingStore';
 import { saveNotebook } from '../../utils/saveNotebook';
 import { canRevert, revertNotebook } from '../../utils/revertNotebook';
 import { useRef, useState, useEffect } from 'react';
@@ -22,6 +23,8 @@ export function TopBar() {
   const activePageId = useWorkspaceStore((s) => s.activePageId);
   const isDirty = useWorkspaceStore((s) => s.isDirty);
   const isSaving = useWorkspaceStore((s) => s.isSaving);
+  const filePathLabel = useFileBindingStore((s) => s.label);
+  const refreshFileBinding = useFileBindingStore((s) => s.refresh);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingFilename, setEditingFilename] = useState(false);
   const [filenameValue, setFilenameValue] = useState('');
@@ -41,6 +44,11 @@ export function TopBar() {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, []);
+
+  // Resolve FSA handle name or file:// path on mount / after hydration
+  useEffect(() => {
+    void refreshFileBinding();
+  }, [refreshFileBinding]);
 
   // Revert gating: re-check whenever dirty flag flips. canRevert() also
   // does an async FSA permission check, so we pair it with the isDirty
@@ -104,7 +112,7 @@ export function TopBar() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const htmlContent = reader.result as string;
       const data = extractDataFromHtml(htmlContent);
       if (data) {
@@ -118,6 +126,10 @@ export function TopBar() {
         const firstPage = migrated.sections[0]?.pages[0];
         useCanvasStore.getState().loadPageNodes(firstPage?.nodes ?? []);
         useDrawStore.getState().loadPageStrokes(firstPage?.strokes ?? []);
+        // <input type="file"> does not yield an FSA handle — clear any prior binding
+        // and show the picked file name as the best available identity.
+        await clearCurrentHandle();
+        useFileBindingStore.getState().setFromHandle({ name: file.name });
         showToast('Notebook opened', 'info');
       } else {
         showToast('Not a valid PowerNote file', 'error');
@@ -167,47 +179,58 @@ export function TopBar() {
     setShowExportMenu(false);
   };
 
+  const pathDisplay = filePathLabel ?? 'Not linked to a file';
+
   return (
     <header className="top-bar" data-testid="topbar">
-      <div className="top-bar__breadcrumb">
-        {editingFilename ? (
-          <input
-            className="top-bar__filename-input"
-            data-testid="topbar-filename-input"
-            value={filenameValue}
-            onChange={(e) => setFilenameValue(e.target.value)}
-            onBlur={commitFilename}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commitFilename();
-              if (e.key === 'Escape') setEditingFilename(false);
-            }}
-            autoFocus
-          />
-        ) : (
-          <span
-            className="top-bar__filename"
-            data-testid="topbar-filename"
-            onClick={handleFilenameClick}
-            title="Click to rename notebook"
-          >
-            {workspace.filename}
-            {isDirty && <span className="top-bar__dirty" data-testid="dirty-indicator"> *</span>}
-          </span>
-        )}
-        {activeSection && (
-          <>
-            <ChevronRight size={14} className="top-bar__separator" />
-            <span className="top-bar__crumb" data-testid="topbar-section">{activeSection.title}</span>
-          </>
-        )}
-        {activePage && (
-          <>
-            <ChevronRight size={14} className="top-bar__separator" />
-            <span className="top-bar__crumb top-bar__crumb--active" data-testid="topbar-page">
-              {activePage.title}
+      <div className="top-bar__identity">
+        <div className="top-bar__breadcrumb">
+          {editingFilename ? (
+            <input
+              className="top-bar__filename-input"
+              data-testid="topbar-filename-input"
+              value={filenameValue}
+              onChange={(e) => setFilenameValue(e.target.value)}
+              onBlur={commitFilename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitFilename();
+                if (e.key === 'Escape') setEditingFilename(false);
+              }}
+              autoFocus
+            />
+          ) : (
+            <span
+              className="top-bar__filename"
+              data-testid="topbar-filename"
+              onClick={handleFilenameClick}
+              title="Click to rename notebook"
+            >
+              {workspace.filename}
+              {isDirty && <span className="top-bar__dirty" data-testid="dirty-indicator"> *</span>}
             </span>
-          </>
-        )}
+          )}
+          {activeSection && (
+            <>
+              <ChevronRight size={14} className="top-bar__separator" />
+              <span className="top-bar__crumb" data-testid="topbar-section">{activeSection.title}</span>
+            </>
+          )}
+          {activePage && (
+            <>
+              <ChevronRight size={14} className="top-bar__separator" />
+              <span className="top-bar__crumb top-bar__crumb--active" data-testid="topbar-page">
+                {activePage.title}
+              </span>
+            </>
+          )}
+        </div>
+        <div
+          className={`top-bar__file-path${filePathLabel ? '' : ' top-bar__file-path--unlinked'}`}
+          data-testid="topbar-file-path"
+          title={pathDisplay}
+        >
+          {pathDisplay}
+        </div>
       </div>
 
       <div className="top-bar__actions">

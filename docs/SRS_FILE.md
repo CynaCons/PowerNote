@@ -1,7 +1,7 @@
 # SRS: File System (Save/Load)
 
 **Project:** PowerNote
-**Version:** 0.24.1
+**Version:** 0.25.1
 **Date:** 2026-07-18
 
 ## Purpose
@@ -33,3 +33,4 @@ Enable users to save their entire notebook as a single self-contained HTML file 
 | REQ-FILE-019 | The TopBar shall expose a Revert action. On user confirmation, the app shall re-read the current `FileSystemFileHandle`, hydrate the workspace/canvas/draw stores from that content, and clear the dirty flag | Must | T82 |
 | REQ-FILE-020 | The Revert action shall be enabled only when the workspace is dirty AND a current `FileSystemFileHandle` with granted read permission is available. Otherwise it shall be disabled (and not prompt the user) | Must | T82 |
 | REQ-FILE-021 | While a manual Save / Save As is in progress, the TopBar Save control shall show a busy/spinner state, shall be disabled to prevent double-trigger, and shall clear the busy state when the save completes (success or failure). Autosave shall not drive this indicator | Must | T86 |
+| REQ-FILE-022 | The TopBar shall show the best-available identity of the linked HTML file: FSA `handle.name` when a current handle exists; decoded `file://` path when the app was opened as a local file with no handle; otherwise an explicit “Not linked to a file” state. The indicator shall update when the user Opens, Save-As, loads from the notebook library, or clears the current handle | Must | T90 |

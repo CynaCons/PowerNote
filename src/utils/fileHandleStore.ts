@@ -95,6 +95,9 @@ async function idbDelete(key: string): Promise<void> {
 
 export async function setCurrentHandle(handle: FileSystemFileHandle): Promise<void> {
   await idbPut(CURRENT_KEY, handle);
+  // Keep TopBar path indicator in sync (dynamic import avoids circular init)
+  const { useFileBindingStore } = await import('../stores/useFileBindingStore');
+  useFileBindingStore.getState().setFromHandle(handle);
 }
 
 export async function getCurrentHandle(): Promise<FileSystemFileHandle | null> {
@@ -103,6 +106,10 @@ export async function getCurrentHandle(): Promise<FileSystemFileHandle | null> {
 
 export async function clearCurrentHandle(): Promise<void> {
   await idbDelete(CURRENT_KEY);
+  const { useFileBindingStore } = await import('../stores/useFileBindingStore');
+  // Explicit unlink — do not fall back to file:// (library / file-input swaps
+  // mean the in-memory notebook is no longer that disk file).
+  useFileBindingStore.getState().clear();
 }
 
 // ── Recent handles (max 5) ──────────────────────────────────

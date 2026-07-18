@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import type { BackgroundMode, CanvasBgColor } from '../../types/data';
 import { APP_VERSION } from '../../version';
-import { checkForUpdate, performUpdate } from '../../utils/updateChecker';
+import { checkForUpdate, performUpdate, isLiveUpdateEnabled } from '../../utils/updateChecker';
+import { isFSASupported } from '../../utils/fileSystemAccess';
+import { getCurrentHandle } from '../../utils/fileHandleStore';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
+import { showToast } from '../layout/Toast';
 import './SettingsPanel.css';
 
 interface SettingsPanelProps {
@@ -21,8 +24,10 @@ const BG_COLORS: { value: CanvasBgColor; label: string; preview: string }[] = [
   { value: 'paper', label: 'Paper', preview: '#f5f0e8' },
 ];
 
+type UpdateStatus = 'idle' | 'checking' | 'available' | 'updating-live' | 'updating-download' | 'failed';
+
 export function SettingsPanel({ backgroundMode, onChangeBackgroundMode, bgColor, onChangeBgColor }: SettingsPanelProps) {
-  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'updating' | 'failed'>('idle');
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
   const [updateInfo, setUpdateInfo] = useState<{ version: string; url?: string; releaseUrl?: string } | null>(null);
 
   const handleCheckUpdate = async () => {
@@ -34,6 +39,7 @@ export function SettingsPanel({ backgroundMode, onChangeBackgroundMode, bgColor,
     } else if (result && !result.available) {
       setUpdateStatus('idle');
       setUpdateInfo(null);
+      showToast('Already up to date', 'info');
     } else {
       setUpdateStatus('failed');
     }
@@ -41,24 +47,38 @@ export function SettingsPanel({ backgroundMode, onChangeBackgroundMode, bgColor,
 
   const handleUpdate = async () => {
     if (!updateInfo?.url) {
-      // Can't fetch — open release page instead
       if (updateInfo?.releaseUrl) window.open(updateInfo.releaseUrl, '_blank');
       return;
     }
-    setUpdateStatus('updating');
-    // Flush current data
+
+    // Prefer live-swap messaging when a writable FSA handle is likely available
+    let preferLive = false;
+    if (isLiveUpdateEnabled() && isFSASupported()) {
+      const handle = await getCurrentHandle();
+      preferLive = !!handle;
+    }
+    setUpdateStatus(preferLive ? 'updating-live' : 'updating-download');
+
     const wsStore = useWorkspaceStore.getState();
     wsStore.savePageNodes(useCanvasStore.getState().nodes);
     wsStore.savePageStrokes(useDrawStore.getState().strokes);
     const ws = wsStore.workspace;
-    const success = await performUpdate(updateInfo.url, ws, APP_VERSION, updateInfo.version);
-    if (success) {
-      setUpdateStatus('idle');
-      setUpdateInfo(null);
-    } else {
+
+    const result = await performUpdate(updateInfo.url, ws, APP_VERSION, updateInfo.version);
+    if (!result.ok) {
       setUpdateStatus('failed');
       if (updateInfo.releaseUrl) window.open(updateInfo.releaseUrl, '_blank');
+      return;
     }
+
+    if (result.mode === 'live-swap') {
+      // Page is reloading — leave status as updating-live
+      return;
+    }
+
+    showToast('Updated notebook downloaded — open it to use the new version', 'success');
+    setUpdateStatus('idle');
+    setUpdateInfo(null);
   };
 
   return (
@@ -119,8 +139,8 @@ export function SettingsPanel({ backgroundMode, onChangeBackgroundMode, bgColor,
       </div>
 
       <div className="settings-panel__section" style={{ marginTop: 12, borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
-        <span className="settings-panel__label">PowerNote v{APP_VERSION}</span>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
+        <span className="settings-panel__label" data-testid="settings-app-version">PowerNote v{APP_VERSION}</span>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
           {updateStatus === 'idle' && (
             <button
               className="settings-panel__btn"
@@ -130,7 +150,9 @@ export function SettingsPanel({ backgroundMode, onChangeBackgroundMode, bgColor,
               Check for updates
             </button>
           )}
-          {updateStatus === 'checking' && <span style={{ fontSize: 12, color: '#64748b' }}>Checking...</span>}
+          {updateStatus === 'checking' && (
+            <span style={{ fontSize: 12, color: '#64748b' }} data-testid="update-status-checking">Checking...</span>
+          )}
           {updateStatus === 'available' && updateInfo && (
             <>
               <span style={{ fontSize: 12, color: '#16a34a' }}>v{updateInfo.version} available!</span>
@@ -143,10 +165,19 @@ export function SettingsPanel({ backgroundMode, onChangeBackgroundMode, bgColor,
               </button>
             </>
           )}
-          {updateStatus === 'updating' && <span style={{ fontSize: 12, color: '#2563eb' }}>Downloading backup + update...</span>}
+          {updateStatus === 'updating-live' && (
+            <span style={{ fontSize: 12, color: '#2563eb' }} data-testid="update-status-live">
+              Updating this file…
+            </span>
+          )}
+          {updateStatus === 'updating-download' && (
+            <span style={{ fontSize: 12, color: '#2563eb' }} data-testid="update-status-download">
+              Downloading backup + update…
+            </span>
+          )}
           {updateStatus === 'failed' && (
             <>
-              <span style={{ fontSize: 12, color: '#dc2626' }}>Check failed (rate limited or offline)</span>
+              <span style={{ fontSize: 12, color: '#dc2626' }}>Update failed (rate limited or offline)</span>
               <button className="settings-panel__btn" onClick={handleCheckUpdate}>Retry</button>
             </>
           )}
