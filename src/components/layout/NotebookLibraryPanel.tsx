@@ -9,6 +9,7 @@ import {
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
+import { migrateWorkspace } from '../../utils/migrations';
 import { showToast } from './Toast';
 import './NotebookLibraryPanel.css';
 
@@ -37,7 +38,7 @@ export function NotebookLibraryPanel({ isOpen, onClose }: NotebookLibraryPanelPr
       if (!confirmed) return;
     }
 
-    const ws = entry.workspace;
+    const ws = migrateWorkspace(entry.workspace);
     useWorkspaceStore.setState({
       workspace: ws,
       activeSectionId: ws.sections[0]?.id ?? '',

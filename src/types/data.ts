@@ -94,12 +94,26 @@ export interface Section {
   pages: Page[];
 }
 
+/** Canvas guide overlay: A4 pages, dot/line grid, or blank */
+export type BackgroundMode = 'pages' | 'grid' | 'none';
+
+/** Canvas fill color presets (including paper texture tone) */
+export type CanvasBgColor = '#ffffff' | '#f5f5f5' | '#e5e5e5' | 'paper';
+
+/** Notebook-level UI preferences persisted inside `#powernote-data` */
+export interface WorkspaceSettings {
+  backgroundMode: BackgroundMode;
+  bgColor: CanvasBgColor;
+}
+
 export interface WorkspaceData {
   version: string;
   filename: string;
   sections: Section[];
   editorVersion?: string; // App version that created/last updated this file
   saveRevision?: number;  // Incremented on each Ctrl+S save
+  /** Canvas look — optional on older files; hydrated with defaults on load */
+  settings?: WorkspaceSettings;
 }
 
 // ── Tool types ──────────────────────────────────────────────

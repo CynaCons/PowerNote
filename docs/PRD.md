@@ -173,7 +173,7 @@ The MVP is complete when all of the following are true. Each criterion is binary
 
 | Phase | Status | Scope |
 |-------|--------|-------|
-| Phase 1 (MVP, v0.1–v0.22) | **Shipped** | Canvas (pan/zoom/scroll-to-pan), text + markdown + math, images (toolbar, crop, rotate, multi-import, drag-drop), shapes (rect/circle/triangle/arrow/line with two-vertex handles), freehand drawing + eraser, hierarchy (sections + pages), search + replace, lasso select, undo/redo, save/load standalone HTML, File System Access direct save, auto-save, auto-update |
+| Phase 1 (MVP, v0.1–v0.24) | **Shipped** | Canvas (pan/zoom/scroll-to-pan), text + markdown + math, images (toolbar, crop, rotate, multi-import, drag-drop), shapes (rect/circle/triangle/arrow/line with two-vertex handles), freehand drawing + eraser, hierarchy (sections + pages), search + replace, lasso select, undo/redo, save/load standalone HTML, File System Access direct save, auto-save, auto-update, persisted canvas settings, Gantt embed |
 | Phase 2 (current) | In progress | Production polish: SRS coverage for shipped features, test backfill, SC-* success criteria green |
 | Phase 3 (planned) | Planned | Mobile touch polish, keyboard shortcuts overlay, richer image tooling (visual crop overlay, free rotation, grid layout) |
 | Phase 4 (deferred) | Deferred | Cloud sync, multi-device, collaboration — requires cloud deployment infrastructure; scope tracked in `VISION.md` |

@@ -19,20 +19,32 @@ import { showToast } from '../components/layout/Toast';
  * @param forceSaveAs If true, always show the Save As picker (ignores current handle).
  */
 export async function saveNotebook(forceSaveAs: boolean = false): Promise<void> {
-  // Flush in-memory state to workspace
-  const canvasNodes = useCanvasStore.getState().nodes;
   const wsStore = useWorkspaceStore.getState();
-  wsStore.savePageNodes(canvasNodes);
-  wsStore.savePageStrokes(useDrawStore.getState().strokes);
+  // Guard against double-trigger while a save is already running
+  if (wsStore.isSaving) return;
 
-  // Increment save revision and stamp editor version
-  const revision = (wsStore.workspace.saveRevision || 0) + 1;
-  wsStore.updateWorkspace({ editorVersion: APP_VERSION, saveRevision: revision });
-
-  const ws = useWorkspaceStore.getState().workspace;
-  const safeName = ws.filename.replace(/[^a-zA-Z0-9_\- ]/g, '_');
-
+  wsStore.setSaving(true);
   try {
+    // Test hook: artificial delay so E2E can observe the saving indicator
+    const delayMs = (window as unknown as { __POWERNOTE_SAVE_DELAY__?: number })
+      .__POWERNOTE_SAVE_DELAY__;
+    if (typeof delayMs === 'number' && delayMs > 0) {
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+
+    // Flush in-memory state to workspace
+    const canvasNodes = useCanvasStore.getState().nodes;
+    const store = useWorkspaceStore.getState();
+    store.savePageNodes(canvasNodes);
+    store.savePageStrokes(useDrawStore.getState().strokes);
+
+    // Increment save revision and stamp editor version
+    const revision = (store.workspace.saveRevision || 0) + 1;
+    store.updateWorkspace({ editorVersion: APP_VERSION, saveRevision: revision });
+
+    const ws = useWorkspaceStore.getState().workspace;
+    const safeName = ws.filename.replace(/[^a-zA-Z0-9_\- ]/g, '_');
+
     const html = await buildExportHtml(ws);
 
     // ── Fast path: overwrite existing file via FSA ──────────
@@ -72,5 +84,7 @@ export async function saveNotebook(forceSaveAs: boolean = false): Promise<void> 
   } catch (err) {
     console.error('[saveNotebook] Failed:', err);
     showToast('Failed to save notebook', 'error');
+  } finally {
+    useWorkspaceStore.getState().setSaving(false);
   }
 }

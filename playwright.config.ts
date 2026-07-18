@@ -6,14 +6,15 @@ export default defineConfig({
   timeout: 15000,
   retries: 0,
   use: {
-    baseURL: 'http://localhost:5173',
+    // Dedicated test port — avoids colliding with other Vite apps on 5173
+    baseURL: 'http://localhost:5193',
     headless: true,
     viewport: { width: 1280, height: 720 },
     actionTimeout: 5000,
   },
   webServer: {
-    command: 'npm run dev',
-    port: 5173,
+    command: 'npx vite --port 5193 --strictPort',
+    port: 5193,
     reuseExistingServer: !process.env.CI,
   },
   reporter: [['list'], ['html', { open: 'never' }]],

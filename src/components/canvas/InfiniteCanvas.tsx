@@ -9,7 +9,7 @@ import { CanvasNode } from './CanvasNode';
 import { SelectionTransformer } from './SelectionTransformer';
 import { ContextMenu } from './ContextMenu';
 import { SnapGuides, type SnapLine } from './SnapGuides';
-import { PageGuides, type BackgroundMode } from './PageGuides';
+import { PageGuides } from './PageGuides';
 import { DrawingLayer } from './DrawingLayer';
 import { TrashButton } from './TrashButton';
 import { useShapeCreation } from '../../hooks/useShapeCreation';
@@ -17,13 +17,14 @@ import { useTextPlacement, consumeAutoEditNodeId } from '../../hooks/useTextPlac
 import { useCanvasKeyboard } from '../../hooks/useCanvasKeyboard';
 import { useContextMenu } from '../../hooks/useContextMenu';
 import { useCanvasDragDrop } from '../../hooks/useCanvasDragDrop';
+import type { BackgroundMode, CanvasBgColor } from '../../types/data';
 import './InfiniteCanvas.css';
 
 const MIN_SCALE = 0.1;
 const MAX_SCALE = 5.0;
 const ZOOM_FACTOR = 1.05;
 
-export type CanvasBgColor = '#ffffff' | '#f5f5f5' | '#e5e5e5' | 'paper';
+export type { CanvasBgColor };
 
 interface InfiniteCanvasProps {
   backgroundMode?: BackgroundMode;

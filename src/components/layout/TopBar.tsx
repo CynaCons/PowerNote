@@ -1,8 +1,9 @@
-import { ChevronRight, Download, FolderOpen, Maximize, ChevronDown, RotateCcw } from 'lucide-react';
+import { ChevronRight, Download, FolderOpen, Maximize, ChevronDown, RotateCcw, Loader2 } from 'lucide-react';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
 import { extractDataFromHtml } from '../../utils/serialization';
+import { migrateWorkspace } from '../../utils/migrations';
 import { workspaceToMarkdown } from '../../utils/exportMarkdown';
 import {
   isFSASupported,
@@ -20,6 +21,7 @@ export function TopBar() {
   const activeSectionId = useWorkspaceStore((s) => s.activeSectionId);
   const activePageId = useWorkspaceStore((s) => s.activePageId);
   const isDirty = useWorkspaceStore((s) => s.isDirty);
+  const isSaving = useWorkspaceStore((s) => s.isSaving);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editingFilename, setEditingFilename] = useState(false);
   const [filenameValue, setFilenameValue] = useState('');
@@ -60,6 +62,7 @@ export function TopBar() {
   };
 
   const handleSave = async (forceSaveAs: boolean = false) => {
+    if (useWorkspaceStore.getState().isSaving) return;
     await saveNotebook(forceSaveAs);
   };
 
@@ -70,17 +73,18 @@ export function TopBar() {
       if (result) {
         const data = extractDataFromHtml(result.text);
         if (data) {
+          const migrated = migrateWorkspace(data);
           useWorkspaceStore.setState({
-            workspace: data,
-            activeSectionId: data.sections[0]?.id ?? '',
-            activePageId: data.sections[0]?.pages[0]?.id ?? '',
+            workspace: migrated,
+            activeSectionId: migrated.sections[0]?.id ?? '',
+            activePageId: migrated.sections[0]?.pages[0]?.id ?? '',
             isDirty: false,
           });
-          const firstPage = data.sections[0]?.pages[0];
+          const firstPage = migrated.sections[0]?.pages[0];
           useCanvasStore.getState().loadPageNodes(firstPage?.nodes ?? []);
           useDrawStore.getState().loadPageStrokes(firstPage?.strokes ?? []);
           await setCurrentHandle(result.handle);
-          await addRecentHandle(data.filename, result.handle);
+          await addRecentHandle(migrated.filename, result.handle);
           showToast(`Opened ${result.handle.name}`, 'info');
           return;
         }
@@ -104,13 +108,14 @@ export function TopBar() {
       const htmlContent = reader.result as string;
       const data = extractDataFromHtml(htmlContent);
       if (data) {
+        const migrated = migrateWorkspace(data);
         useWorkspaceStore.setState({
-          workspace: data,
-          activeSectionId: data.sections[0]?.id,
-          activePageId: data.sections[0]?.pages[0]?.id,
+          workspace: migrated,
+          activeSectionId: migrated.sections[0]?.id,
+          activePageId: migrated.sections[0]?.pages[0]?.id,
           isDirty: false,
         });
-        const firstPage = data.sections[0]?.pages[0];
+        const firstPage = migrated.sections[0]?.pages[0];
         useCanvasStore.getState().loadPageNodes(firstPage?.nodes ?? []);
         useDrawStore.getState().loadPageStrokes(firstPage?.strokes ?? []);
         showToast('Notebook opened', 'info');
@@ -237,16 +242,23 @@ export function TopBar() {
         </button>
         <div className="top-bar__save-group">
           <button
-            className="top-bar__action-btn top-bar__action-btn--primary"
+            className={`top-bar__action-btn top-bar__action-btn--primary${isSaving ? ' top-bar__action-btn--saving' : ''}`}
             onClick={() => handleSave(false)}
-            title="Save (Ctrl+S)"
+            disabled={isSaving}
+            title={isSaving ? 'Saving…' : 'Save (Ctrl+S)'}
+            aria-busy={isSaving}
             data-testid="save-btn"
           >
-            <Download size={16} />
+            {isSaving ? (
+              <Loader2 size={16} className="top-bar__save-spinner" data-testid="save-spinner" />
+            ) : (
+              <Download size={16} />
+            )}
           </button>
           <button
             className="top-bar__action-btn top-bar__action-btn--primary top-bar__save-chevron"
             onClick={() => setShowExportMenu((v) => !v)}
+            disabled={isSaving}
             title="Export options"
             data-testid="save-dropdown-btn"
           >

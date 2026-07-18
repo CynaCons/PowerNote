@@ -1,6 +1,18 @@
-import type { WorkspaceData, Section, Page, TextOptions, ShapeOptions } from '../types/data';
+import type {
+  WorkspaceData,
+  WorkspaceSettings,
+  Section,
+  Page,
+  TextOptions,
+  ShapeOptions,
+} from '../types/data';
 import { generateId } from './ids';
 import { APP_VERSION } from '../version';
+
+export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
+  backgroundMode: 'pages',
+  bgColor: '#ffffff',
+};
 
 export function createPage(title = 'Untitled Page'): Page {
   return {
@@ -25,6 +37,7 @@ export function createWorkspace(): WorkspaceData {
     sections: [createSection('Section 1')],
     editorVersion: APP_VERSION,
     saveRevision: 0,
+    settings: { ...DEFAULT_WORKSPACE_SETTINGS },
   };
 }
 

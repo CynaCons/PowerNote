@@ -1,15 +1,31 @@
 import { create } from 'zustand';
-import type { WorkspaceData, Section, Page, CanvasNode } from '../types/data';
-import { createWorkspace, createSection, createPage } from '../utils/defaults';
+import type {
+  WorkspaceData,
+  WorkspaceSettings,
+  Section,
+  Page,
+  CanvasNode,
+} from '../types/data';
+import {
+  createWorkspace,
+  createSection,
+  createPage,
+  DEFAULT_WORKSPACE_SETTINGS,
+} from '../utils/defaults';
 
 interface WorkspaceState {
   workspace: WorkspaceData;
   activeSectionId: string;
   activePageId: string;
   isDirty: boolean;
+  /** True while a manual Save / Save As is in flight */
+  isSaving: boolean;
   markDirty: () => void;
   markClean: () => void;
+  setSaving: (saving: boolean) => void;
   updateWorkspace: (updates: Partial<WorkspaceData>) => void;
+  /** Update canvas look settings and mark the notebook dirty */
+  updateSettings: (updates: Partial<WorkspaceSettings>) => void;
 
   // Getters
   getActiveSection: () => Section | undefined;
@@ -49,10 +65,23 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     activeSectionId: firstSection.id,
     activePageId: firstPage.id,
     isDirty: false,
+    isSaving: false,
     markDirty: () => set({ isDirty: true }),
     markClean: () => set({ isDirty: false }),
+    setSaving: (saving) => set({ isSaving: saving }),
     updateWorkspace: (updates) =>
       set((state) => ({ workspace: { ...state.workspace, ...updates } })),
+    updateSettings: (updates) =>
+      set((state) => {
+        const prev = state.workspace.settings ?? DEFAULT_WORKSPACE_SETTINGS;
+        return {
+          isDirty: true,
+          workspace: {
+            ...state.workspace,
+            settings: { ...prev, ...updates },
+          },
+        };
+      }),
 
     getActiveSection: () => {
       const { workspace, activeSectionId } = get();

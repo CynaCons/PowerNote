@@ -1,5 +1,7 @@
 import { Rect, Line, Group } from 'react-konva';
-import type { CanvasNode } from '../../types/data';
+import type { BackgroundMode, CanvasNode } from '../../types/data';
+
+export type { BackgroundMode };
 
 // A4 at 96 DPI
 const A4_WIDTH = 794;
@@ -10,8 +12,6 @@ const MARGIN = 60;
 // Grid mode spacing
 const GRID_SPACING = 100;
 const GRID_EXTENT = 5000; // how far grid lines extend
-
-export type BackgroundMode = 'pages' | 'grid' | 'none';
 
 interface PageGuidesProps {
   mode: BackgroundMode;

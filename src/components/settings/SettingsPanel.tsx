@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import type { BackgroundMode } from '../canvas/PageGuides';
-import type { CanvasBgColor } from '../canvas/InfiniteCanvas';
+import type { BackgroundMode, CanvasBgColor } from '../../types/data';
 import { APP_VERSION } from '../../version';
 import { checkForUpdate, performUpdate } from '../../utils/updateChecker';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';

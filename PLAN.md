@@ -367,7 +367,9 @@
 | v0.14.x | **shipped** — Edit Parity, Find/Replace, Math, Markdown Export (`c61db80`) |
 | v0.15.x | **shipped** — Lasso Select + Duplicate (`0287b41`, `1b694ac`) |
 | v0.16.0–v0.21.0 | **tagged** — Stabilization, standalone HTML fixes, hot-swap via Blob URL |
-| v0.22.0 | **current** — File System Access API direct save (`1ec0237`) |
+| v0.22.0–v0.22.4 | **tagged** — FSA direct save, autosave, draw-over-images, revert, partial bold/italic |
+| v0.23.0 | **shipped** — Extended inline formatting + read-only Gantt nodes (`d49eb48`) |
+| v0.24.1 | **current** — Persist canvas settings in HTML + save-in-progress animation |
 
 ---
 
@@ -702,7 +704,24 @@
 - [x] E2E tests 79 (fsa-capability), 80 (fsa-handle-store)
 - [x] Remove test output logs and gitignore them (commit `7b5b367`)
 
-### v0.23.0 — Extended Inline Formatting + Gantt Nodes (current)
+### v0.24.1 — Save-in-Progress Animation
+> Manual save (Ctrl+S / Save / Save As) can take a noticeable moment with no feedback. Show a clear in-progress state until the write finishes. Autosave stays silent (no spinner).
+- [x] Workspace `isSaving` flag set around manual `saveNotebook` only
+- [x] TopBar Save button: spinner + disabled + `aria-busy` while in flight; guard against double-trigger
+- [x] `docs/SRS_FILE.md` — REQ-FILE-021 (save-in-progress indicator)
+- [x] E2E test 86 — Save shows busy state then clears on success; no-op while already saving
+- [x] Smoke + Playwright run — T85/T86 green; fixed T39 flake (disable FSA on standalone `file://` page so re-export uses download)
+
+### v0.24.0 — Persist Canvas Settings in HTML Data
+> Background mode (pages / grid / none) and background color lived in React `useState` in `AppShell` — they reset on reopen. Now persisted in `#powernote-data` so each notebook remembers its look.
+- [x] Extend `WorkspaceData` with `settings: { backgroundMode, bgColor }` (defaults for older files)
+- [x] Move settings out of `AppShell` local state into workspace store; mark dirty on change
+- [x] Serialize/hydrate on save/load + FSA revert / library / open paths via `migrateWorkspace` → `ensureWorkspaceSettings`
+- [x] `docs/SRS_SETTINGS.md` — REQ-SETTINGS-004 (file round-trip); clarify REQ-SETTINGS-003 (in-session)
+- [x] E2E test 85 — change settings → save → reload → settings restored
+- [x] Smoke + Playwright run — covered with v0.24.1 suite run
+
+### v0.23.0 — Extended Inline Formatting + Gantt Nodes (commit `d49eb48`)
 > Extends v0.22.4 with Strike/Code/Underline (toolbar + shortcuts), Gantt chart canvas nodes (vendored PowerPlanner renderer), docs polish (PRD/VISION/SRS_MATH), and ESLint tooling.
 - [x] `src/utils/markdownToggle.ts` — wrap/unwrap helper for asymmetric marker pairs (underline, strike, code)
 - [x] `src/stores/useEditorStore.ts` — reactive enablement for edit-only format buttons
@@ -793,6 +812,7 @@
 ## Future (Backlog)
 > Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 
+- **Editable Gantt (PowerPlanner)** — Today the embed is intentionally read-only (`pointerEvents: none` + read-only `GanttRenderer`). Future: double-click / edit mode to change tasks & dates, persist `node.data.doc` on save, optional deep-link into PowerPlanner for full editing
 - **Collapsible Containers** — Canvas-in-canvas grouping (deferred from v0.2)
 - **Template Gallery** — Pre-built page templates (meeting notes, project plan, etc.)
 - **Advanced Diagram Tools** — Connectors, flowcharts, mind maps
@@ -804,4 +824,4 @@ See `docs/VISION.md` for deferred post-MVP items (cloud sync, collaboration, pai
 
 ---
 
-**Last updated:** 2026-07-18
+**Last updated:** 2026-07-18 (v0.24.0 + v0.24.1 shipped)

@@ -58,8 +58,11 @@ test.describe('39 - Standalone Export (REQ-FILE-007, REQ-FILE-008)', () => {
     expect(fileContent).toContain('powernote-data');
     expect(fileContent).toContain('Standalone Export Test Content');
 
-    // Step 3: Open the exported file as file:// in a new page
+    // Step 3: Open the exported file as file:// in a new page.
+    // Disable FSA on this page too — Chromium still exposes the picker on
+    // file://, which would hang Save instead of triggering a download.
     const standalonePage = await context.newPage();
+    await disableFSA(standalonePage);
     await standalonePage.goto(`file:///${exportPath.replace(/\\/g, '/')}`);
 
     // Wait for the app to render (longer timeout for file:// cold start)

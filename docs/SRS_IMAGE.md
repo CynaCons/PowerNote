@@ -1,7 +1,7 @@
 # SRS — Image Features
 
 **Project:** PowerNote
-**Version:** 0.22.0
+**Version:** 0.24.1
 **Date:** 2026-04-14
 
 ## Purpose

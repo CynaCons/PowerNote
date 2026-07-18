@@ -7,11 +7,10 @@ import { BottomToolbar } from '../toolbar/BottomToolbar';
 import { SearchPanel } from '../search/SearchPanel';
 import { SettingsPanel } from '../settings/SettingsPanel';
 import { NotebookLibraryPanel } from './NotebookLibraryPanel';
-import type { BackgroundMode } from '../canvas/PageGuides';
-import type { CanvasBgColor } from '../canvas/InfiniteCanvas';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
+import { DEFAULT_WORKSPACE_SETTINGS } from '../../utils/defaults';
 import { saveNotebook } from '../../utils/saveNotebook';
 import './AppShell.css';
 
@@ -21,8 +20,13 @@ export function AppShell() {
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchNotebookWide, setSearchNotebookWide] = useState(false);
-  const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('pages');
-  const [bgColor, setBgColor] = useState<CanvasBgColor>('#ffffff');
+
+  const settings = useWorkspaceStore(
+    (s) => s.workspace.settings ?? DEFAULT_WORKSPACE_SETTINGS,
+  );
+  const updateSettings = useWorkspaceStore((s) => s.updateSettings);
+  const backgroundMode = settings.backgroundMode;
+  const bgColor = settings.bgColor;
 
   // Ctrl+S / Ctrl+F / Ctrl+Shift+F keyboard shortcuts
   useEffect(() => {
@@ -88,9 +92,9 @@ export function AppShell() {
       {isSettingsOpen && (
         <SettingsPanel
           backgroundMode={backgroundMode}
-          onChangeBackgroundMode={setBackgroundMode}
+          onChangeBackgroundMode={(mode) => updateSettings({ backgroundMode: mode })}
           bgColor={bgColor}
-          onChangeBgColor={setBgColor}
+          onChangeBgColor={(color) => updateSettings({ bgColor: color })}
         />
       )}
       <NotebookLibraryPanel
