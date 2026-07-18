@@ -5,7 +5,7 @@ PowerNote is an offline-first, file-based visual note-taking app combining OneNo
 
 ## Tech Stack
 - **Canvas**: Konva.js (react-konva) — MIT license, chosen over tldraw ($6K/year)
-- **State**: 3 Zustand stores (workspace, canvas, tool)
+- **State**: 4 Zustand stores (workspace, canvas, draw, tool)
 - **Text**: Markdown rendering via `marked`, raw editing in textarea overlay
 - **Testing**: Playwright E2E, ASPICE-style SRS docs with traceability
 

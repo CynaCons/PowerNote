@@ -1,0 +1,8 @@
+dist
+dist-template
+node_modules
+playwright-report
+test-results
+*.config.ts
+*.config.js
+tsconfig.tsbuildinfo

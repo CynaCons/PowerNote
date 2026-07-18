@@ -5,7 +5,7 @@
  * and cursor style. Components import from here instead of doing ad-hoc checks.
  */
 
-export type ToolType = 'select' | 'text' | 'draw' | 'shape' | 'lasso' | 'image';
+export type ToolType = 'select' | 'text' | 'draw' | 'shape' | 'lasso' | 'image' | 'gantt';
 
 interface ToolModeConfig {
   /** Can the user click to select/deselect existing nodes? */
@@ -62,6 +62,13 @@ const TOOL_CONFIG: Record<ToolType, ToolModeConfig> = {
     allowNodeHover: true,
     cursorClass: '',
     canvasClickAction: 'none',
+  },
+  gantt: {
+    allowNodeSelection: true,
+    allowNodeDrag: true,
+    allowNodeHover: true,
+    cursorClass: '',
+    canvasClickAction: 'placeText', // reuses the text-placement handler that branches on 'gantt'
   },
 };
 

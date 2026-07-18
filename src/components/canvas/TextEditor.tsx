@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { Html } from 'react-konva-utils';
 import type { CanvasNode, TextNodeData } from '../../types/data';
+import { useEditorStore } from '../../stores/useEditorStore';
+import { FORMAT_MARKERS, toggleMarker, type FormatKind } from '../../utils/markdownToggle';
 
 /**
  * Replace the textarea's selected range with new text using a native-compatible
@@ -88,11 +90,23 @@ export function applyInlineFormat(ta: HTMLTextAreaElement, marker: string): void
   ta.selectionEnd = s + mLen + selected.length;
 }
 
+function applyFormatKind(ta: HTMLTextAreaElement, kind: FormatKind): void {
+  // Bold/italic keep the dedicated helper so '*' never eats half of '**'.
+  if (kind === 'bold' || kind === 'italic') {
+    applyInlineFormat(ta, FORMAT_MARKERS[kind].open);
+    return;
+  }
+  const next = toggleMarker(ta.value, ta.selectionStart, ta.selectionEnd, FORMAT_MARKERS[kind]);
+  replaceSelection(ta, 0, ta.value.length, next.value);
+  ta.selectionStart = next.selStart;
+  ta.selectionEnd = next.selEnd;
+}
+
 // ── Active editor registry ────────────────────────────────────────────────
 // Lets external UI (the bottom toolbar) apply inline formatting to the text
 // block currently being edited, targeting only the live textarea selection.
 export interface ActiveTextEditor {
-  applyFormat: (marker: string) => void;
+  applyFormat: (markerOrKind: string | FormatKind) => void;
   hasSelection: () => boolean;
 }
 let activeTextEditor: ActiveTextEditor | null = null;
@@ -111,6 +125,11 @@ export function TextEditor({ node, stageScale: _stageScale, onFinish, onCancel }
   const data = node.data as TextNodeData;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const autoHeight = (textarea: HTMLTextAreaElement) => {
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+  };
+
   // Focus the textarea reliably — the Html portal renders async,
   // so we retry until it's in the DOM and focusable
   useEffect(() => {
@@ -119,8 +138,7 @@ export function TextEditor({ node, stageScale: _stageScale, onFinish, onCancel }
       if (!textarea) return false;
       textarea.focus();
       textarea.select();
-      textarea.style.height = 'auto';
-      textarea.style.height = textarea.scrollHeight + 'px';
+      autoHeight(textarea);
       return document.activeElement === textarea;
     };
 
@@ -135,22 +153,56 @@ export function TextEditor({ node, stageScale: _stageScale, onFinish, onCancel }
 
   // Register this editor so the bottom toolbar can format the live selection
   useEffect(() => {
+    const apply = (markerOrKind: string | FormatKind) => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      if (markerOrKind === '**' || markerOrKind === 'bold') {
+        applyFormatKind(ta, 'bold');
+      } else if (markerOrKind === '*' || markerOrKind === 'italic') {
+        applyFormatKind(ta, 'italic');
+      } else if (
+        markerOrKind === 'strike' ||
+        markerOrKind === 'code' ||
+        markerOrKind === 'underline'
+      ) {
+        applyFormatKind(ta, markerOrKind);
+      } else {
+        applyInlineFormat(ta, markerOrKind);
+      }
+      autoHeight(ta);
+    };
+
     const editor: ActiveTextEditor = {
-      applyFormat: (marker) => {
-        const ta = textareaRef.current;
-        if (!ta) return;
-        applyInlineFormat(ta, marker);
-        ta.style.height = 'auto';
-        ta.style.height = ta.scrollHeight + 'px';
-      },
+      applyFormat: apply,
       hasSelection: () => {
         const ta = textareaRef.current;
         return !!ta && ta.selectionStart !== ta.selectionEnd;
       },
     };
     activeTextEditor = editor;
+
+    let registeredEl: HTMLTextAreaElement | null = null;
+    const tryRegister = () => {
+      const ta = textareaRef.current;
+      if (!ta || registeredEl === ta) return !!ta;
+      useEditorStore.getState().registerEditor(ta, (kind) => apply(kind));
+      registeredEl = ta;
+      return true;
+    };
+
+    let timers: ReturnType<typeof setTimeout>[] = [];
+    if (!tryRegister()) {
+      timers = [
+        setTimeout(tryRegister, 10),
+        setTimeout(tryRegister, 50),
+        setTimeout(tryRegister, 150),
+      ];
+    }
+
     return () => {
+      timers.forEach(clearTimeout);
       if (activeTextEditor === editor) activeTextEditor = null;
+      if (registeredEl) useEditorStore.getState().unregisterEditor(registeredEl);
     };
   }, []);
 
@@ -158,12 +210,22 @@ export function TextEditor({ node, stageScale: _stageScale, onFinish, onCancel }
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    // Ctrl/Cmd+B / Ctrl/Cmd+I: bold / italic the selection (inline markdown)
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'i')) {
-      e.preventDefault();
-      applyInlineFormat(textarea, e.key === 'b' ? '**' : '*');
-      autoHeight(textarea);
-      return;
+    // Inline formatting shortcuts (must come before the generic stopPropagation)
+    if (e.ctrlKey || e.metaKey) {
+      const k = e.key.toLowerCase();
+      let kind: FormatKind | null = null;
+      if (k === 'b' && !e.shiftKey) kind = 'bold';
+      else if (k === 'i' && !e.shiftKey) kind = 'italic';
+      else if (k === 'u' && !e.shiftKey) kind = 'underline';
+      else if (k === 'e' && !e.shiftKey) kind = 'code';
+      else if (k === 'x' && e.shiftKey) kind = 'strike';
+      if (kind) {
+        e.preventDefault();
+        e.stopPropagation();
+        applyFormatKind(textarea, kind);
+        autoHeight(textarea);
+        return;
+      }
     }
 
     // Tab / Shift+Tab: indent / unindent (supports single-line + multi-line selection)
@@ -307,11 +369,6 @@ export function TextEditor({ node, stageScale: _stageScale, onFinish, onCancel }
 
   const handleBlur = () => {
     onFinish(textareaRef.current?.value ?? '');
-  };
-
-  const autoHeight = (textarea: HTMLTextAreaElement) => {
-    textarea.style.height = 'auto';
-    textarea.style.height = textarea.scrollHeight + 'px';
   };
 
   const handleInput = () => {

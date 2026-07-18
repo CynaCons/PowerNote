@@ -34,5 +34,8 @@ Allow users to create, edit, move, and delete markdown-capable text blocks on th
 | REQ-TEXT-020 | Text blocks shall auto-size width to fit rendered content (min 60px, max 800px) | Must | T21 |
 | REQ-TEXT-021 | Markdown task list checkboxes (- [ ] / - [x]) shall be clickable to toggle state | Must | — |
 | REQ-TEXT-022 | While editing a text block, applying bold/italic shall wrap **only the selected text** in markdown markers (`**`/`*`), leaving the rest of the block unaffected — it shall NOT change the whole block's style | Must | T83 |
-| REQ-TEXT-023 | While editing, Ctrl/Cmd+B and Ctrl/Cmd+I shall apply bold/italic to the current selection (same inline behavior as the toolbar buttons) | Should | — |
+| REQ-TEXT-023 | While editing, Ctrl/Cmd+B and Ctrl/Cmd+I shall apply bold/italic to the current selection (same inline behavior as the toolbar buttons) | Should | T83 |
 | REQ-TEXT-024 | While editing with no text selected, applying bold/italic shall insert an empty marker pair and place the caret between the markers, so subsequently typed text is formatted (Word-style) | Should | T83 |
+| REQ-TEXT-025 | While editing, applying Strike/Code/Underline shall wrap only the selected substring (or unwrap if already wrapped); when no substring is selected the markers shall be inserted at the caret | Must | T84 |
+| REQ-TEXT-026 | The text editor shall support Ctrl+U (underline), Ctrl+E (inline code), Ctrl+Shift+X (strikethrough) keyboard shortcuts | Should | T84 |
+| REQ-TEXT-027 | Underline shall be persisted as `<u>...</u>` HTML inside the markdown source and rendered as an underline by the markdown renderer | Should | T84 |

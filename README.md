@@ -15,15 +15,21 @@ No install. No account. No server. Just open and write.
 
 ## Features
 
-- **Infinite canvas** — pan, zoom, pinch on touch devices
-- **Rich text** — Markdown rendering (headers, bold, italic, lists, tables, code, checkboxes)
-- **Images** — paste from clipboard, drag-drop, or file picker
+- **Infinite canvas** — pan, zoom, pinch on touch devices; scroll-to-pan, shift+scroll for horizontal
+- **Rich text** — Markdown rendering (headers, bold, italic, lists, tables, code, checkboxes, clickable links)
+- **Math / LaTeX** — inline `$E=mc^2$` and display `$$...$$` via KaTeX
+- **Images** — paste from clipboard, drag-drop, multi-file import, crop, 90° rotate, notes
 - **Freehand drawing** — pen with color/size options, stroke and zone erasers
-- **Shapes** — rectangles, circles, triangles, arrows, lines with fill/stroke/dash styling
+- **Shapes** — rectangles, circles, triangles, arrows (two-vertex handles), lines with fill/stroke/dash styling
 - **Hierarchy** — sections and pages like OneNote, drag to reorder
-- **Search** — Ctrl+F for current page, Ctrl+Shift+F across notebook
+- **Search & Replace** — Ctrl+F for current page, Ctrl+Shift+F across notebook, replace mode
+- **Lasso select** — drag-rectangle to select multiple nodes, move as a group
 - **Undo/Redo** — per-page history (Ctrl+Z / Ctrl+Shift+Z)
+- **Duplicate** — Ctrl+Alt+drag to clone nodes
 - **Links** — external URLs and internal page links
+- **Save to disk** — File System Access API (Chrome/Edge) or download fallback
+- **Auto-save** — every 30s to localStorage while editing
+- **Auto-update** — detects new releases on GitHub, in-app update
 - **Self-contained** — every file is both the editor and the data
 - **Offline-first** — works without internet, no cloud dependency
 
@@ -37,7 +43,7 @@ Each PowerNote file is a standalone HTML application. When you save, your notes 
 npm install
 npm run dev          # Dev server at localhost:5173
 npm run build:template  # Build standalone HTML
-npx playwright test  # Run E2E tests (155 tests)
+npx playwright test  # Run E2E tests (246 tests across 65 files)
 ```
 
 ## Tech Stack

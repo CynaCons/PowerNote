@@ -1,6 +1,6 @@
 // ── Node types ──────────────────────────────────────────────
 
-export type NodeType = 'text' | 'image' | 'shape';
+export type NodeType = 'text' | 'image' | 'shape' | 'gantt';
 
 export interface TextNodeData {
   text: string;
@@ -37,7 +37,19 @@ export interface ShapeNodeData {
   strokeDash: number[];   // [] solid, [8,4] dashed, [2,2] dotted
 }
 
-export type NodeData = TextNodeData | ImageNodeData | ShapeNodeData;
+// Gantt node — embeds a PowerPlanner chart document.
+// The chart `doc` is the canonical GanttDocument schema; we store it inline
+// so the notebook file remains fully self-contained.
+export interface GanttNodeData {
+  // Stored as `unknown` to avoid pulling the full GanttDocument type into
+  // PowerNote's type system; the renderer validates at mount.
+  doc: unknown;
+  showCriticalPath?: boolean;
+  showBaseline?: boolean;
+  theme?: 'dark' | 'light' | 'print' | 'auto';
+}
+
+export type NodeData = TextNodeData | ImageNodeData | ShapeNodeData | GanttNodeData;
 
 export interface CanvasNode {
   id: string;
@@ -92,7 +104,7 @@ export interface WorkspaceData {
 
 // ── Tool types ──────────────────────────────────────────────
 
-export type ToolType = 'select' | 'text' | 'draw' | 'lasso' | 'shape' | 'image';
+export type ToolType = 'select' | 'text' | 'draw' | 'lasso' | 'shape' | 'image' | 'gantt';
 
 export interface ShapeOptions {
   shapeType: ShapeType;

@@ -702,7 +702,17 @@
 - [x] E2E tests 79 (fsa-capability), 80 (fsa-handle-store)
 - [x] Remove test output logs and gitignore them (commit `7b5b367`)
 
-### v0.22.4 — Partial Bold/Italic in Text Blocks (Bug Fix, current)
+### v0.23.0 — Extended Inline Formatting + Gantt Nodes (current)
+> Extends v0.22.4 with Strike/Code/Underline (toolbar + shortcuts), Gantt chart canvas nodes (vendored PowerPlanner renderer), docs polish (PRD/VISION/SRS_MATH), and ESLint tooling.
+- [x] `src/utils/markdownToggle.ts` — wrap/unwrap helper for asymmetric marker pairs (underline, strike, code)
+- [x] `src/stores/useEditorStore.ts` — reactive enablement for edit-only format buttons
+- [x] `TextEditor.tsx` / `TextToolbar.tsx` — Strike/Code/Underline buttons + Ctrl+U/E/Shift+X; keep v0.22.4 bold/italic path
+- [x] Gantt node type + NavRail tool + `src/vendor/powerplanner` read-only embed
+- [x] `docs/SRS_TEXT.md` — REQ-TEXT-025/026/027; `docs/VISION.md`, `docs/SRS_MATH.md`, PRD refresh
+- [x] ESLint config + `lint` / `typecheck` scripts
+- [x] E2E test 84 (`tests/text/84-inline-formatting.spec.ts`)
+
+### v0.22.4 — Partial Bold/Italic in Text Blocks (Bug Fix)
 > Bug: applying bold to a selection inside a text block bolded the ENTIRE block (block-level `fontStyle`). Fix: while editing, bold/italic wrap only the selected text in inline markdown (`**`/`*`). Block-level toggle is preserved for a selected (non-editing) node.
 - [x] `TextEditor.tsx`: `applyInlineFormat()` helper (wrap/unwrap selection) + active-editor registry + Ctrl/Cmd+B / Ctrl/Cmd+I shortcuts
 - [x] `TextToolbar.tsx`: bold/italic route to selection while editing; `onMouseDown` preventDefault keeps the editor focused
@@ -711,30 +721,30 @@
 - [x] E2E test 83 (`tests/text/83-text-partial-bold.spec.ts`)
 - [x] Smoke + Playwright run — full suite green (sole failure T39 is a pre-existing download-event flake, unrelated)
 
-### v0.22.3 — Revert to Last Saved
+### v0.22.3 — Revert to Last Saved (commit `9f7686c`)
 > Standard revert flow: discard unsaved in-memory changes and reload the current file from disk via the FSA handle. Matches Word/VS Code/Google Docs behavior.
-- [ ] `src/utils/revertNotebook.ts` — confirm-and-reload helper that re-reads the FSA handle, hydrates stores, marks clean
-- [ ] `TopBar.tsx` — revert button (RotateCcw icon), disabled unless `isDirty && FSA handle available`
-- [ ] `docs/SRS_FILE.md` — REQ-FILE-019 (revert semantics), REQ-FILE-020 (enablement gating)
-- [ ] E2E test 82 (`tests/file/82-revert.spec.ts`)
-- [ ] Smoke + Playwright run
+- [x] `src/utils/revertNotebook.ts` — confirm-and-reload helper that re-reads the FSA handle, hydrates stores, marks clean
+- [x] `TopBar.tsx` — revert button (RotateCcw icon), disabled unless `isDirty && FSA handle available`
+- [x] `docs/SRS_FILE.md` — REQ-FILE-019 (revert semantics), REQ-FILE-020 (enablement gating)
+- [x] E2E test 82 (`tests/file/82-revert.spec.ts`)
+- [x] Smoke + Playwright run
 
-### v0.22.2 — Draw Over Images (Strokes on Top)
+### v0.22.2 — Draw Over Images (Strokes on Top) (commit `9f7686c`)
 > Swap Konva layer order so freehand strokes always render above images/text/shapes. Unblocks annotating screenshots.
-- [ ] `InfiniteCanvas.tsx`: reorder layers → guides, nodes, drawings, selection-transformer
-- [ ] `docs/SRS_DRAW.md`: add REQ-DRAW-009 (stroke z-order above nodes) → T81
-- [ ] E2E test 81 (`tests/draw/81-stroke-above-image.spec.ts`) — stroke renders above an image at the same coordinates
-- [ ] Smoke + Playwright run
+- [x] `InfiniteCanvas.tsx`: reorder layers → guides, nodes, drawings, selection-transformer
+- [x] `docs/SRS_DRAW.md`: add REQ-DRAW-009 (stroke z-order above nodes) → T81
+- [x] E2E test 81 (`tests/draw/81-stroke-above-image.spec.ts`) — stroke renders above an image at the same coordinates
+- [x] Smoke + Playwright run
 
-### v0.22.1 — Faster Autosave + Drop localStorage Snapshot
+### v0.22.1 — Faster Autosave + Drop localStorage Snapshot (commit `9f7686c`)
 > Replace 30s interval with 1.5s debounce + 5s max-wait. Remove `powernote-autosave` localStorage key now that FSA handle writes the live file. Keep notebook library and IDB handle store untouched.
-- [ ] Rewrite `startAutoSave` in `src/utils/serialization.ts` — debounce 1.5s, max-wait 5s, driven by workspace store subscription
-- [ ] Remove `autoSaveToLocalStorage` / `loadFromLocalStorage` / `clearAutoSave` APIs
-- [ ] `main.tsx`: drop localStorage-fallback hydration; add one-shot migration that removes any legacy `powernote-autosave` key
-- [ ] `saveNotebook.ts`: drop `clearAutoSave` calls
-- [ ] `docs/SRS_FILE.md`: update REQ-FILE-015 (new cadence, no localStorage snapshot) and REQ-FILE-016 (remove — hot-restore comes from FSA handle)
-- [ ] Rewrite `tests/file/61-auto-save.spec.ts` to verify debounced behavior + absence of legacy key
-- [ ] Smoke test + full Playwright run
+- [x] Rewrite `startAutoSave` in `src/utils/serialization.ts` — debounce 1.5s, max-wait 5s, driven by workspace store subscription
+- [x] Remove `autoSaveToLocalStorage` / `loadFromLocalStorage` / `clearAutoSave` APIs
+- [x] `main.tsx`: drop localStorage-fallback hydration; add one-shot migration that removes any legacy `powernote-autosave` key
+- [x] `saveNotebook.ts`: drop `clearAutoSave` calls
+- [x] `docs/SRS_FILE.md`: update REQ-FILE-015 (new cadence, no localStorage snapshot) and REQ-FILE-016 (remove — hot-restore comes from FSA handle)
+- [x] Rewrite `tests/file/61-auto-save.spec.ts` to verify debounced behavior + absence of legacy key
+- [x] Smoke test + full Playwright run
 
 ---
 
@@ -794,4 +804,4 @@ See `docs/VISION.md` for deferred post-MVP items (cloud sync, collaboration, pai
 
 ---
 
-**Last updated:** 2026-05-31
+**Last updated:** 2026-07-18

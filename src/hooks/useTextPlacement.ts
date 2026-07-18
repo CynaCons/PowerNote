@@ -75,6 +75,47 @@ export function useTextPlacement(
         addNode(newNode);
         selectNode(newNode.id, false);
         autoEditNodeId = newNode.id;
+      } else if (currentTool === 'gantt') {
+        const pointer = stage.getPointerPosition();
+        if (!pointer) return;
+        const scale = stage.scaleX();
+        const stageX = (pointer.x - stage.x()) / scale;
+        const stageY = (pointer.y - stage.y()) / scale;
+        // Sample chart so the user sees a populated Gantt immediately.
+        const sampleDoc = {
+          schemaVersion: 1,
+          title: 'New plan',
+          calendar: { scale: 'week', fiscalYearStart: 1, workingDays: [1, 2, 3, 4, 5], holidays: [] },
+          rows: [
+            { id: 'row-1', label: 'Design', groupId: null },
+            { id: 'row-2', label: 'Engineering', groupId: null },
+            { id: 'row-3', label: 'Launch', groupId: null },
+          ],
+          tasks: [
+            { id: 't-1', rowId: 'row-1', label: 'Wireframes', start: '2026-06-01', end: '2026-06-14', percentComplete: 60, color: '#7a82c9' },
+            { id: 't-2', rowId: 'row-2', label: 'Build', start: '2026-06-15', end: '2026-07-12', percentComplete: 20, color: '#8aa68a' },
+            { id: 't-3', rowId: 'row-3', label: 'Ship', start: '2026-07-13', end: '2026-07-19', color: '#c47a55' },
+          ],
+          milestones: [{ id: 'm-1', rowId: 'row-3', label: 'Public launch', date: '2026-07-19' }],
+          brackets: [],
+          dependencies: [],
+          markers: [],
+          style: { theme: 'dark', preset: 'default' },
+        };
+        const newNode: CanvasNodeType = {
+          id: generateId(),
+          type: 'gantt',
+          x: stageX,
+          y: stageY,
+          width: 600,
+          height: 300,
+          layer: 3,
+          data: { doc: sampleDoc, theme: 'dark' },
+        };
+        undoBatchStart(useCanvasStore.getState().nodes);
+        useToolStore.getState().setTool('select');
+        addNode(newNode);
+        selectNode(newNode.id, false);
       } else {
         clearSelection();
       }

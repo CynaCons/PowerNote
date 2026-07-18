@@ -3,6 +3,7 @@ import type { SnapLine } from './SnapGuides';
 import { TextNode } from './TextNode';
 import { ImageNode } from './ImageNode';
 import { ShapeNode } from './ShapeNode';
+import { GanttNode } from './GanttNode';
 
 interface CanvasNodeProps {
   node: CanvasNodeType;
@@ -39,6 +40,16 @@ export function CanvasNode({ node, isSelected, onSelect, stageScale, autoEdit, o
     case 'shape':
       return (
         <ShapeNode
+          node={node}
+          isSelected={isSelected}
+          onSelect={onSelect}
+          stageScale={stageScale}
+          onSnapChange={onSnapChange}
+        />
+      );
+    case 'gantt':
+      return (
+        <GanttNode
           node={node}
           isSelected={isSelected}
           onSelect={onSelect}

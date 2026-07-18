@@ -27,3 +27,8 @@ Allow users to create, style, select, move, resize, and delete geometric shapes 
 | REQ-SHAPE-013 | Ctrl+C / Ctrl+V shall copy and paste selected shapes with a position offset | Must | T51 |
 | REQ-SHAPE-014 | Shapes shall support a 5-layer z-index system (layers 1-5, default layer 3), controllable via right-click context menu | Must | T53 |
 | REQ-SHAPE-015 | Shape nodes shall persist through save/load round-trips (all properties preserved in exported HTML) | Must | T51 |
+| REQ-SHAPE-016 | Selecting an arrow or line shall display two vertex handles (start endpoint, end endpoint) instead of the standard rectangle Transformer | Must | — |
+| REQ-SHAPE-017 | Dragging an arrow/line vertex handle shall update that endpoint's position independently while the other endpoint stays fixed | Must | — |
+| REQ-SHAPE-018 | The arrow/line stroke shall redraw live while a vertex handle is being dragged | Must | — |
+| REQ-SHAPE-019 | Hover highlight on arrows and lines shall detect the stroke path, not the bounding box | Must | — |
+| REQ-SHAPE-020 | Dragging the body of an arrow/line shall translate both endpoints together | Must | — |

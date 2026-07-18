@@ -63,6 +63,16 @@
   color: var(--color-primary);
 }
 
+.text-toolbar__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.text-toolbar__btn:disabled:hover {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
 .text-toolbar__colors {
   display: flex;
   align-items: center;

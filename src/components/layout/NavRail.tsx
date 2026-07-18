@@ -1,4 +1,4 @@
-import { Layers, Library, MousePointer2, Type, Pen, ImageIcon, BoxSelect, Shapes, Settings } from 'lucide-react';
+import { Layers, Library, MousePointer2, Type, Pen, ImageIcon, BoxSelect, Shapes, Settings, GanttChartSquare } from 'lucide-react';
 import { useToolStore } from '../../stores/useToolStore';
 import './NavRail.css';
 
@@ -101,6 +101,16 @@ export function NavRail({
           onClick={() => setTool(activeTool === 'lasso' ? 'select' : 'lasso')}
         >
           <BoxSelect size={20} />
+        </button>
+
+        <button
+          className={`nav-rail__btn ${activeTool === 'gantt' ? 'nav-rail__btn--active' : ''}`}
+          title="Insert Gantt chart"
+          aria-label="Insert Gantt chart"
+          data-testid="nav-gantt-tool"
+          onClick={() => setTool(activeTool === 'gantt' ? 'select' : 'gantt')}
+        >
+          <GanttChartSquare size={20} />
         </button>
 
       </div>
