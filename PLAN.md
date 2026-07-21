@@ -374,6 +374,7 @@
 | v0.25.1 | **tagged** — Live update swap + bound HTML file path |
 | v0.25.2 | **tagged** — Absolute file:// path; clear stale FSA on local open |
 | v0.26.0 | **shipped** — Default text width = one page; manual widen |
+| v0.27.0 | **current** — Shape & drawing groups (flat + isolation) |
 
 ---
 
@@ -732,7 +733,7 @@
 - [x] E2E tests 79 (fsa-capability), 80 (fsa-handle-store)
 - [x] Remove test output logs and gitignore them (commit `7b5b367`)
 
-### v0.25.2 — Absolute path on file:// + no stale FSA name (current)
+### v0.25.2 — Absolute path on file:// + no stale FSA name (2026-07-18) (COMPLETE)
 > Opening a Downloads copy via `file://` showed a stale IndexedDB handle name (e.g. `Take Action Now.html`) instead of the real absolute path. Prefer decoded `file://` absolute path; clear the current FSA handle when booting from embedded local HTML so Ctrl+S cannot overwrite the wrong file.
 - [x] On embedded `file://` boot: `clearCurrentHandle` before path resolve + `setFromFileUrl`
 - [x] `resolveFileUrlLabel` / format absolute Windows paths (incl. spaces)
@@ -882,7 +883,7 @@
 > Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 
 - **Editable Gantt (PowerPlanner)** — Today the embed is intentionally read-only (`pointerEvents: none` + read-only `GanttRenderer`). Future: double-click / edit mode to change tasks & dates, persist `node.data.doc` on save, optional deep-link into PowerPlanner for full editing
-- **Collapsible Containers** — Canvas-in-canvas grouping (deferred from v0.2)
+- **Collapsible Containers** — Canvas-in-canvas named frames (deferred from v0.2); flat shape/stroke groups land in v0.27.0 first
 - **Template Gallery** — Pre-built page templates (meeting notes, project plan, etc.)
 - **Advanced Diagram Tools** — Connectors, flowcharts, mind maps
 - **Mobile App** — React Native or PWA for tablet/phone
@@ -893,4 +894,23 @@ See `docs/VISION.md` for deferred post-MVP items (cloud sync, collaboration, pai
 
 ---
 
-**Last updated:** 2026-07-20 (v0.26.0 default text width = page shipped)
+## v0.27 — Shape & Drawing Groups
+> Durable flat groups for shapes + freehand strokes; move as a unit; isolation mode to edit members.
+
+### v0.27.0 — Shape & drawing groups (2026-07-21) (COMPLETE)
+> Group/ungroup (Ctrl+G / Ctrl+Shift+G); shapes + strokes only; flat groups; isolation via double-click/Esc. Fix multi-select drag (REQ-CANVAS-015).
+>
+> **Goal:** Multi-select shapes + freehand into a durable flat group; move as a unit; isolation mode to edit one member.
+- [x] Multi-select drag: move all selected nodes + strokes together (REQ-CANVAS-015 fix) [agent: grok]
+- [x] Data model: groupId on nodes/strokes + Page.groups + migrate/hydrate [agent: grok]
+- [x] Group / Ungroup commands (Ctrl+G / Ctrl+Shift+G) for shapes+strokes only [agent: grok]
+- [x] Selection expands to full group on member click [agent: grok]
+- [x] Isolation mode: enter (dblclick/Enter), dim, single-member edit, Esc exit [agent: grok]
+- [x] Context menu + light chrome (union bounds / breadcrumb) [agent: grok]
+- [x] docs/SRS_GROUP.md REQ-GROUP-001..010 + cross-links to canvas/shapes/draw [agent: grok]
+- [x] E2E T93+ group/ungroup/move/isolate/persist [agent: grok]
+- [x] Smoke + Playwright [agent: grok]
+
+---
+
+**Last updated:** 2026-07-21 (v0.27.0 shape & drawing groups shipped)

@@ -1,0 +1,41 @@
+.group-isolation-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 56px;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  background: #1e293b;
+  color: #f8fafc;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  font-size: 13px;
+  pointer-events: auto;
+}
+
+.group-isolation-bar__label {
+  font-weight: 600;
+}
+
+.group-isolation-bar__hint {
+  opacity: 0.7;
+  font-size: 12px;
+}
+
+.group-isolation-bar__done {
+  border: none;
+  background: #2563eb;
+  color: #fff;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.group-isolation-bar__done:hover {
+  background: #1d4ed8;
+}

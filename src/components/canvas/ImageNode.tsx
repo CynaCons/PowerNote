@@ -7,6 +7,7 @@ import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useToolStore } from '../../stores/useToolStore';
 import { isNodeInteractive } from '../../utils/toolConfig';
 import { generateId } from '../../utils/ids';
+import { multiDragStart, multiDragMove, multiDragEnd } from '../../utils/multiDrag';
 import { calculateSnap, type SnapLine } from './SnapGuides';
 
 interface ImageNodeProps {
@@ -44,9 +45,11 @@ export function ImageNode({ node, isSelected, onSelect, stageScale, onSnapChange
       };
       useCanvasStore.getState().addNode(duplicate);
     }
+    multiDragStart(node.id, e.target.x(), e.target.y());
   };
 
   const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+    multiDragMove(node.id, e.target.x(), e.target.y(), e.target.getStage());
     if (!e.evt.shiftKey) {
       onSnapChange([]);
       return;
@@ -63,14 +66,12 @@ export function ImageNode({ node, isSelected, onSelect, stageScale, onSnapChange
     onSnapChange(snap.lines);
     e.target.x(snap.x);
     e.target.y(snap.y);
+    multiDragMove(node.id, snap.x, snap.y, e.target.getStage());
   };
 
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
     onSnapChange([]);
-    updateNode(node.id, {
-      x: e.target.x(),
-      y: e.target.y(),
-    });
+    multiDragEnd(node.id, e.target.x(), e.target.y());
   };
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {

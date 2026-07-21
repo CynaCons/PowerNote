@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { Copy, Trash2, CopyPlus, Layers } from 'lucide-react';
+import { Copy, Trash2, CopyPlus, Layers, Group as GroupIcon, Ungroup } from 'lucide-react';
 import { useCanvasStore } from '../../stores/useCanvasStore';
+import { useDrawStore } from '../../stores/useDrawStore';
+import { useGroupStore } from '../../stores/useGroupStore';
+import { groupSelection, ungroupSelection } from '../../utils/groupOps';
 import './ContextMenu.css';
 
 interface ContextMenuProps {
@@ -67,6 +70,12 @@ export function ContextMenu({ x, y, nodeId, onClose }: ContextMenuProps) {
     onClose();
   };
 
+  const selectedCount =
+    useCanvasStore.getState().selectedNodeIds.length +
+    useDrawStore.getState().selectedStrokeIds.length;
+  const hasGroup = !!node.groupId;
+  const isolating = useGroupStore.getState().editingGroupId === node.groupId;
+
   return (
     <div
       ref={menuRef}
@@ -86,6 +95,54 @@ export function ContextMenu({ x, y, nodeId, onClose }: ContextMenuProps) {
         <Trash2 size={14} />
         <span>Delete</span>
       </button>
+
+      <div className="context-menu__divider" />
+
+      {selectedCount >= 2 && (
+        <button
+          className="context-menu__item"
+          data-testid="context-group"
+          onClick={() => {
+            groupSelection();
+            onClose();
+          }}
+        >
+          <GroupIcon size={14} />
+          <span>Group</span>
+          <span className="context-menu__hint">Ctrl+G</span>
+        </button>
+      )}
+      {hasGroup && (
+        <button
+          className="context-menu__item"
+          data-testid="context-ungroup"
+          onClick={() => {
+            ungroupSelection();
+            onClose();
+          }}
+        >
+          <Ungroup size={14} />
+          <span>Ungroup</span>
+          <span className="context-menu__hint">Ctrl+Shift+G</span>
+        </button>
+      )}
+      {hasGroup && !isolating && (
+        <button
+          className="context-menu__item"
+          data-testid="context-edit-group"
+          onClick={() => {
+            if (node.groupId) {
+              useGroupStore.getState().enterIsolation(node.groupId);
+              useCanvasStore.setState({ selectedNodeIds: [nodeId] });
+              useDrawStore.getState().selectStrokes([]);
+            }
+            onClose();
+          }}
+        >
+          <Layers size={14} />
+          <span>Edit group</span>
+        </button>
+      )}
 
       <div className="context-menu__divider" />
 

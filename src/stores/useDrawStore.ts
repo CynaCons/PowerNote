@@ -12,8 +12,16 @@ interface DrawState {
   deleteStroke: (id: string) => void;
   deleteStrokes: (ids: string[]) => void;
   moveStrokes: (ids: string[], dx: number, dy: number) => void;
+  /** Move strokes to absolute positions from a start snapshot (no undo). */
+  moveStrokesSilent: (
+    ids: string[],
+    dx: number,
+    dy: number,
+    startPoints: Map<string, number[]>,
+  ) => void;
   selectStrokes: (ids: string[]) => void;
   clearStrokeSelection: () => void;
+  setStrokeGroupIds: (ids: string[], groupId: string | null) => void;
 
   loadPageStrokes: (strokes: Stroke[]) => void;
   getStrokesSnapshot: () => Stroke[];
@@ -31,6 +39,17 @@ function pushUndo(strokes: Stroke[]) {
   undoStack.push(strokes.map((s) => ({ ...s, points: [...s.points] })));
   if (undoStack.length > MAX_HISTORY) undoStack.shift();
   redoStack = [];
+}
+
+/** Export for multi-drag / group ops that batch canvas+stroke history. */
+export function pushStrokeUndo(strokes: Stroke[]) {
+  pushUndo(strokes);
+}
+
+/** Replace entire stroke list without undo (after pushStrokeUndo was called). */
+export function replaceStrokesSilent(strokes: Stroke[]) {
+  useDrawStore.setState({ strokes });
+  useWorkspaceStore.getState().markDirty();
 }
 
 function deepCopy(strokes: Stroke[]): Stroke[] {
@@ -91,8 +110,40 @@ export const useDrawStore = create<DrawState>((set, get) => ({
     });
   },
 
+  moveStrokesSilent: (ids, dx, dy, startPoints) => {
+    set((state) => {
+      useWorkspaceStore.getState().markDirty();
+      const idSet = new Set(ids);
+      return {
+        strokes: state.strokes.map((s) => {
+          if (!idSet.has(s.id)) return s;
+          const base = startPoints.get(s.id) ?? s.points;
+          const newPoints = [...base];
+          for (let i = 0; i < newPoints.length; i += 2) {
+            newPoints[i] += dx;
+            newPoints[i + 1] += dy;
+          }
+          return { ...s, points: newPoints };
+        }),
+      };
+    });
+  },
+
   selectStrokes: (ids) => set({ selectedStrokeIds: ids }),
   clearStrokeSelection: () => set({ selectedStrokeIds: [] }),
+
+  setStrokeGroupIds: (ids, groupId) => {
+    set((state) => {
+      pushUndo(state.strokes);
+      useWorkspaceStore.getState().markDirty();
+      const idSet = new Set(ids);
+      return {
+        strokes: state.strokes.map((s) =>
+          idSet.has(s.id) ? { ...s, groupId } : s,
+        ),
+      };
+    });
+  },
 
   loadPageStrokes: (strokes) => {
     undoStack = [];

@@ -60,6 +60,8 @@ export interface CanvasNode {
   height: number;
   layer: number;          // z-index layer 1-5 (default: 3)
   data: NodeData;
+  /** Flat group membership (v0.27+). Same id = same group. */
+  groupId?: string | null;
 }
 
 // ── Drawing strokes ─────────────────────────────────────────
@@ -69,6 +71,13 @@ export interface Stroke {
   points: number[]; // flat [x1,y1,x2,y2,...] for Konva Line
   color: string;
   strokeWidth: number;
+  /** Flat group membership (v0.27+), shared with shape nodes. */
+  groupId?: string | null;
+}
+
+/** Optional group index entry (derived membership is canonical). */
+export interface GroupRecord {
+  id: string;
 }
 
 export interface DrawOptions {
@@ -86,6 +95,8 @@ export interface Page {
   title: string;
   nodes: CanvasNode[];
   strokes?: Stroke[];
+  /** Optional group records for this page (ids only; members use groupId). */
+  groups?: GroupRecord[];
 }
 
 export interface Section {

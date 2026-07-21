@@ -107,14 +107,18 @@ startAutoSave(
 Promise.all([
   import('./stores/useToolStore'),
   import('./stores/useFileBindingStore'),
-]).then(([{ useToolStore }, { useFileBindingStore }]) => {
+  import('./stores/useGroupStore'),
+  import('./utils/groupOps'),
+]).then(([{ useToolStore }, { useFileBindingStore }, { useGroupStore }, groupOps]) => {
   (window as any).__POWERNOTE_STORES__ = {
     workspace: useWorkspaceStore,
     canvas: useCanvasStore,
     tool: useToolStore,
     draw: useDrawStore,
     fileBinding: useFileBindingStore,
+    group: useGroupStore,
   };
+  (window as any).__POWERNOTE_GROUP_OPS__ = groupOps;
 });
 
 createRoot(document.getElementById('root')!).render(<App />);

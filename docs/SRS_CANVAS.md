@@ -20,6 +20,6 @@ Provide an infinite, pannable, zoomable canvas as the primary workspace for plac
 | REQ-CANVAS-006 | Clicking the background with the select tool shall deselect any selected node | Must | T03 |
 | REQ-CANVAS-013 | With the select tool active, dragging on the canvas background shall draw a lasso selection rectangle | Must | T74 |
 | REQ-CANVAS-014 | Releasing the lasso shall select every node whose bounding box intersects the lasso rectangle (text, shapes, images) | Must | T74 |
-| REQ-CANVAS-015 | Dragging any node in a multi-selection shall move all selected nodes together | Must | T74 |
+| REQ-CANVAS-015 | Dragging any node in a multi-selection shall move all selected nodes (and selected strokes) together | Must | T74, T93 |
 | REQ-CANVAS-016 | Pressing Escape or clicking the background shall clear the multi-selection | Must | T74 |
 | REQ-CANVAS-017 | Scrolling without Ctrl shall pan the canvas vertically; Shift+scroll shall pan horizontally | Must | — |

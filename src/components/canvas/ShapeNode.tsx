@@ -4,8 +4,11 @@ import type Konva from 'konva';
 import type { CanvasNode, ShapeNodeData } from '../../types/data';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useToolStore } from '../../stores/useToolStore';
+import { useGroupStore } from '../../stores/useGroupStore';
+import { useDrawStore } from '../../stores/useDrawStore';
 import { isNodeInteractive } from '../../utils/toolConfig';
 import { generateId } from '../../utils/ids';
+import { multiDragStart, multiDragMove, multiDragEnd } from '../../utils/multiDrag';
 import { calculateSnap, type SnapLine } from './SnapGuides';
 
 interface ShapeNodeProps {
@@ -33,9 +36,11 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
       };
       useCanvasStore.getState().addNode(duplicate);
     }
+    multiDragStart(node.id, e.target.x(), e.target.y());
   };
 
   const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+    multiDragMove(node.id, e.target.x(), e.target.y(), e.target.getStage());
     if (!e.evt.shiftKey) {
       onSnapChange([]);
       return;
@@ -52,14 +57,12 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
     onSnapChange(snap.lines);
     e.target.x(snap.x);
     e.target.y(snap.y);
+    multiDragMove(node.id, snap.x, snap.y, e.target.getStage());
   };
 
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
     onSnapChange([]);
-    updateNode(node.id, {
-      x: e.target.x(),
-      y: e.target.y(),
-    });
+    multiDragEnd(node.id, e.target.x(), e.target.y());
   };
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -69,6 +72,17 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
     if (tool === 'select' || tool === 'text' || tool === 'image') {
       onSelect(node.id, e.evt.ctrlKey || e.evt.metaKey);
     }
+  };
+
+  const handleDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    e.cancelBubble = true;
+    if (!node.groupId) return;
+    const editing = useGroupStore.getState().editingGroupId;
+    if (editing === node.groupId) return;
+    useGroupStore.getState().enterIsolation(node.groupId);
+    // Select only this member inside isolation
+    useCanvasStore.setState({ selectedNodeIds: [node.id] });
+    useDrawStore.getState().selectStrokes([]);
   };
 
   const fill = data.fill === 'transparent' ? undefined : data.fill;
@@ -106,6 +120,8 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
       onDragEnd={handleDragEnd}
       onClick={handleClick}
       onTap={handleClick}
+      onDblClick={handleDblClick}
+      onDblTap={handleDblClick}
       onMouseEnter={(e) => {
         if (!isInteractive) return;
         setHovered(true);

@@ -5,7 +5,7 @@ import { Html } from 'react-konva-utils';
 import type { CanvasNode as CanvasNodeType, GanttNodeData } from '../../types/data';
 import { GanttRenderer, blankDocument, validateDocument } from '../../vendor/powerplanner/embed';
 import type { GanttDocument } from '../../vendor/powerplanner/embed';
-import { useCanvasStore } from '../../stores/useCanvasStore';
+import { multiDragStart, multiDragMove, multiDragEnd } from '../../utils/multiDrag';
 import type { SnapLine } from './SnapGuides';
 
 interface GanttNodeProps {
@@ -24,7 +24,6 @@ interface GanttNodeProps {
  * we just render into an Html portal sized to the node's bounding box.
  */
 export function GanttNode({ node, isSelected, onSelect, onSnapChange }: GanttNodeProps) {
-  const updateNode = useCanvasStore((s) => s.updateNode);
   const data = node.data as GanttNodeData;
 
   // Validate (or fall back to blank) once per doc reference change.
@@ -42,8 +41,16 @@ export function GanttNode({ node, isSelected, onSelect, onSnapChange }: GanttNod
     onSelect(node.id, evt.shiftKey || evt.metaKey || evt.ctrlKey);
   };
 
+  const handleDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
+    multiDragStart(node.id, e.target.x(), e.target.y());
+  };
+
+  const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+    multiDragMove(node.id, e.target.x(), e.target.y(), e.target.getStage());
+  };
+
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
-    updateNode(node.id, { x: e.target.x(), y: e.target.y() });
+    multiDragEnd(node.id, e.target.x(), e.target.y());
     onSnapChange([]);
   };
 
@@ -52,6 +59,8 @@ export function GanttNode({ node, isSelected, onSelect, onSnapChange }: GanttNod
       x={node.x}
       y={node.y}
       draggable
+      onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onClick={handleClick}
       onTap={handleClick}

@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Stage, Layer, Rect as KonvaRect, Ellipse, Line as KonvaLine } from 'react-konva';
+import { Stage, Layer, Group as KonvaGroup, Rect as KonvaRect, Ellipse, Line as KonvaLine } from 'react-konva';
 import type Konva from 'konva';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useToolStore } from '../../stores/useToolStore';
@@ -12,11 +12,13 @@ import { SnapGuides, type SnapLine } from './SnapGuides';
 import { PageGuides } from './PageGuides';
 import { DrawingLayer } from './DrawingLayer';
 import { TrashButton } from './TrashButton';
+import { GroupIsolationBar } from './GroupIsolationBar';
 import { useShapeCreation } from '../../hooks/useShapeCreation';
 import { useTextPlacement, consumeAutoEditNodeId } from '../../hooks/useTextPlacement';
 import { useCanvasKeyboard } from '../../hooks/useCanvasKeyboard';
 import { useContextMenu } from '../../hooks/useContextMenu';
 import { useCanvasDragDrop } from '../../hooks/useCanvasDragDrop';
+import { useGroupStore } from '../../stores/useGroupStore';
 import type { BackgroundMode, CanvasBgColor } from '../../types/data';
 import './InfiniteCanvas.css';
 
@@ -40,6 +42,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
 
   const drawStrokes = useDrawStore((s) => s.strokes);
   const selectedStrokeIds = useDrawStore((s) => s.selectedStrokeIds);
+  const editingGroupId = useGroupStore((s) => s.editingGroupId);
 
   const nodes = useCanvasStore((s) => s.nodes);
   const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds);
@@ -314,16 +317,19 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
             {/* Sort nodes by layer for z-ordering */}
             {[...nodes].sort((a, b) => (a.layer ?? 3) - (b.layer ?? 3)).map((node) => {
               const isAutoEdit = consumeAutoEditNodeId(node.id);
+              const dimmed =
+                !!editingGroupId && node.groupId !== editingGroupId;
               return (
-                <CanvasNode
-                  key={node.id}
-                  node={node}
-                  isSelected={selectedNodeIds.includes(node.id)}
-                  onSelect={handleNodeSelect}
-                  stageScale={currentScale}
-                  autoEdit={isAutoEdit}
-                  onSnapChange={setSnapLines}
-                />
+                <KonvaGroup key={node.id} opacity={dimmed ? 0.35 : 1} listening={!dimmed}>
+                  <CanvasNode
+                    node={node}
+                    isSelected={selectedNodeIds.includes(node.id)}
+                    onSelect={handleNodeSelect}
+                    stageScale={currentScale}
+                    autoEdit={isAutoEdit}
+                    onSnapChange={setSnapLines}
+                  />
+                </KonvaGroup>
               );
             })}
             <SnapGuides lines={snapLines} />
@@ -356,6 +362,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
       {selectedNodeIds.length > 0 && (
         <TrashButton />
       )}
+      <GroupIsolationBar />
       {/* Right-click context menu */}
       {contextMenu && (
         <ContextMenu

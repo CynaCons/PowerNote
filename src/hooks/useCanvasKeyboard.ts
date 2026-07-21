@@ -2,6 +2,9 @@ import { useEffect } from 'react';
 import { useCanvasStore } from '../stores/useCanvasStore';
 import { useToolStore } from '../stores/useToolStore';
 import { useDrawStore } from '../stores/useDrawStore';
+import { useGroupStore } from '../stores/useGroupStore';
+import { groupSelection, ungroupSelection } from '../utils/groupOps';
+import { getGroupMembers } from '../utils/groups';
 
 /**
  * Hook for all keyboard event handlers on the canvas.
@@ -26,13 +29,53 @@ export function useCanvasKeyboard(
         }
       }
 
-      // Escape: return to select mode + clear selection
+      // Escape: exit isolation first, else return to select + clear
       if (e.key === 'Escape') {
+        const groupUi = useGroupStore.getState();
+        if (groupUi.editingGroupId) {
+          e.preventDefault();
+          const gid = groupUi.editingGroupId;
+          groupUi.exitIsolation();
+          const canvas = useCanvasStore.getState();
+          const draw = useDrawStore.getState();
+          const members = getGroupMembers(gid, canvas.nodes, draw.strokes);
+          useCanvasStore.setState({ selectedNodeIds: members.nodeIds });
+          draw.selectStrokes(members.strokeIds);
+          return;
+        }
         const toolStore = useToolStore.getState();
         if (toolStore.activeTool !== 'select') {
           toolStore.setTool('select');
         }
         clearSelection();
+      }
+
+      // Ctrl+G: group / Ctrl+Shift+G: ungroup
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'g' || e.key === 'G')) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          ungroupSelection();
+        } else {
+          groupSelection();
+        }
+        return;
+      }
+
+      // Enter: enter isolation when a single group is selected
+      if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
+        const canvas = useCanvasStore.getState();
+        const draw = useDrawStore.getState();
+        const first = canvas.nodes.find((n) => canvas.selectedNodeIds.includes(n.id));
+        const gid = first?.groupId;
+        if (gid && !useGroupStore.getState().editingGroupId) {
+          e.preventDefault();
+          useGroupStore.getState().enterIsolation(gid);
+          // Keep first shape as the active isolated member
+          if (first) {
+            useCanvasStore.setState({ selectedNodeIds: [first.id] });
+            draw.selectStrokes([]);
+          }
+        }
       }
 
       // V: select tool

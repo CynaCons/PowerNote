@@ -1,7 +1,10 @@
 import { create } from 'zustand';
 import type { CanvasNode, Viewport } from '../types/data';
 import { generateId } from '../utils/ids';
+import { expandSelectionForGroup } from '../utils/groups';
 import { useWorkspaceStore } from './useWorkspaceStore';
+import { useDrawStore } from './useDrawStore';
+import { useGroupStore } from './useGroupStore';
 
 const MAX_HISTORY = 50;
 
@@ -141,20 +144,37 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   getNodesSnapshot: () => get().nodes,
 
-  selectNode: (id, additive) =>
-    set((state) => {
-      if (additive) {
-        const already = state.selectedNodeIds.includes(id);
-        return {
-          selectedNodeIds: already
-            ? state.selectedNodeIds.filter((sid) => sid !== id)
-            : [...state.selectedNodeIds, id],
-        };
-      }
-      return { selectedNodeIds: [id] };
-    }),
+  selectNode: (id, additive) => {
+    const editingGroupId = useGroupStore.getState().editingGroupId;
+    const draw = useDrawStore.getState();
 
-  clearSelection: () => set({ selectedNodeIds: [] }),
+    // Isolation: only allow selecting members of the editing group (single)
+    if (editingGroupId) {
+      const node = get().nodes.find((n) => n.id === id);
+      if (!node || node.groupId !== editingGroupId) return;
+      set({ selectedNodeIds: [id] });
+      draw.selectStrokes([]);
+      return;
+    }
+
+    const state = get();
+    const expanded = expandSelectionForGroup(
+      id,
+      state.nodes,
+      draw.strokes,
+      additive,
+      state.selectedNodeIds,
+      draw.selectedStrokeIds,
+    );
+    set({ selectedNodeIds: expanded.nodeIds });
+    draw.selectStrokes(expanded.strokeIds);
+  },
+
+  clearSelection: () => {
+    useGroupStore.getState().exitIsolation();
+    useDrawStore.getState().clearStrokeSelection();
+    set({ selectedNodeIds: [] });
+  },
 
   setViewport: (viewport) => {
     set((state) => ({

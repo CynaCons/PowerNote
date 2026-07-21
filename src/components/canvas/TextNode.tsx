@@ -15,6 +15,7 @@ import {
   MAX_TEXT_WIDTH,
   MIN_TEXT_HEIGHT,
 } from '../../utils/pageLayout';
+import { multiDragStart, multiDragMove, multiDragEnd } from '../../utils/multiDrag';
 import { TextEditor } from './TextEditor';
 import { calculateSnap, type SnapLine } from './SnapGuides';
 import { marked } from 'marked';
@@ -150,9 +151,11 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
       };
       useCanvasStore.getState().addNode(duplicate);
     }
+    multiDragStart(node.id, e.target.x(), e.target.y());
   };
 
   const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+    multiDragMove(node.id, e.target.x(), e.target.y(), e.target.getStage());
     // Only snap when Shift is held
     if (!e.evt.shiftKey) {
       onSnapChange([]);
@@ -174,14 +177,12 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
     // Apply snap position
     e.target.x(snap.x);
     e.target.y(snap.y);
+    multiDragMove(node.id, snap.x, snap.y, e.target.getStage());
   };
 
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
     onSnapChange([]); // Clear guides
-    updateNode(node.id, {
-      x: e.target.x(),
-      y: e.target.y(),
-    });
+    multiDragEnd(node.id, e.target.x(), e.target.y());
   };
 
   const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
