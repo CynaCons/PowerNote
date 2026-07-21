@@ -1,0 +1,3 @@
+[submodule "powerplan"]
+	path = powerplan
+	url = https://github.com/CynaCons/powerplan.git

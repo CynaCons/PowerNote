@@ -26,6 +26,24 @@ Only then proceed with implementation.
 - Status table at the bottom
 - Update in real-time as tasks are completed
 
+## powerplan MCP (PLAN.md operations)
+
+PowerNote vendors [powerplan](https://github.com/CynaCons/powerplan) as a git
+submodule at `powerplan/` and registers it in project `.mcp.json`.
+
+- **Server:** `powerplan` (stdio) — `python powerplan/powerplan_server.py`
+- **Purpose:** single-writer API over `PLAN.md` (create iterations, complete
+  tasks, current-iteration queries) without freeform thrash
+- **Default plan:** walk-up from cwd finds this repo’s root `PLAN.md`
+- **Setup after clone:**
+  ```bash
+  git submodule update --init --recursive
+  # optional: pip install -e ./powerplan
+  ```
+- Prefer MCP tools (`get_current_iteration`, `complete_task`, …) over hand-editing
+  PLAN checkboxes when the server is available. Restart the agent session after
+  changing `.mcp.json` so tools load.
+
 ## Testing Requirements
 - Every feature must have E2E test coverage
 - Test numbers are **globally unique** across the project (00, 01, 02, ...)

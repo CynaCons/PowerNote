@@ -41,9 +41,22 @@ Each PowerNote file is a standalone HTML application. When you save, your notes 
 
 ```bash
 npm install
+git submodule update --init --recursive   # powerplan MCP (PLAN.md tools)
 npm run dev          # Dev server at localhost:5173
 npm run build:template  # Build standalone HTML
 npx playwright test  # Run E2E tests (246 tests across 65 files)
+```
+
+### powerplan MCP
+
+[`powerplan`](https://github.com/CynaCons/powerplan) is vendored as a git submodule
+(`powerplan/`) and registered in [`.mcp.json`](.mcp.json). Agents use it to read and
+mutate `PLAN.md` (current iteration, complete tasks, lifecycle) instead of freeform
+edits. After clone or MCP config changes, restart the agent session so tools load.
+
+```bash
+# optional global install (also works path-only via powerplan/powerplan_server.py)
+pip install -e ./powerplan
 ```
 
 ## Tech Stack
