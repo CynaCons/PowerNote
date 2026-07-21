@@ -1,13 +1,13 @@
 import { Rect, Line, Group } from 'react-konva';
 import type { BackgroundMode, CanvasNode } from '../../types/data';
+import {
+  A4_WIDTH,
+  A4_HEIGHT,
+  PAGE_GAP,
+  PAGE_MARGIN as MARGIN,
+} from '../../utils/pageLayout';
 
 export type { BackgroundMode };
-
-// A4 at 96 DPI
-const A4_WIDTH = 794;
-const A4_HEIGHT = 1123;
-const PAGE_GAP = 40;
-const MARGIN = 60;
 
 // Grid mode spacing
 const GRID_SPACING = 100;

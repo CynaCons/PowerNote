@@ -1,8 +1,8 @@
 # SRS: Text Blocks
 
 **Project:** PowerNote
-**Version:** 0.2.7
-**Date:** 2026-03-21
+**Version:** 0.26.0
+**Date:** 2026-07-20
 
 ## Purpose
 
@@ -18,7 +18,7 @@ Allow users to create, edit, move, and delete markdown-capable text blocks on th
 | REQ-TEXT-004 | Blur (click away) shall commit the text edit | Must | T04 |
 | REQ-TEXT-005 | Pressing Escape during edit shall cancel and revert | Must | T04 |
 | REQ-TEXT-006 | Text blocks shall be draggable to reposition on the canvas | Must | T05 |
-| REQ-TEXT-007 | Text blocks shall auto-size to content (no manual resize handles) | Must | — |
+| REQ-TEXT-007 | Text block **height** shall auto-size to laid-out content at the current width; **width** is intentional (page default or user-resized) and shall not auto-shrink to content | Must | T21 |
 | REQ-TEXT-008 | Text shall reflow (word-wrap) within the block width | Must | T16 |
 | REQ-TEXT-009 | Delete/Backspace key shall delete the selected text block(s) | Must | T06 |
 | REQ-TEXT-010 | The T key shall toggle the text tool on/off | Should | T06 |
@@ -31,7 +31,7 @@ Allow users to create, edit, move, and delete markdown-capable text blocks on th
 | REQ-TEXT-017 | The text editor shall support Tab/Shift+Tab for indentation | Should | — |
 | REQ-TEXT-018 | The text editor shall auto-continue bullet points and numbered lists on Enter | Should | — |
 | REQ-TEXT-019 | Shift+drag shall show snap alignment guides when edges/centers align with other nodes | Should | — |
-| REQ-TEXT-020 | Text blocks shall auto-size width to fit rendered content (min 60px, max 800px) | Must | T21 |
+| REQ-TEXT-020 | Newly placed text blocks shall default to **one page width** (A4 at 96 DPI = 794px). Width shall be preserved across edit commits. Minimum width 60px; wider-than-page widths are allowed (soft max for drag safety only) | Must | T03, T21, T92 |
 | REQ-TEXT-021 | Markdown task list checkboxes (- [ ] / - [x]) shall be clickable to toggle state | Must | — |
 | REQ-TEXT-022 | While editing a text block, applying bold/italic shall wrap **only the selected text** in markdown markers (`**`/`*`), leaving the rest of the block unaffected — it shall NOT change the whole block's style | Must | T83 |
 | REQ-TEXT-023 | While editing, Ctrl/Cmd+B and Ctrl/Cmd+I shall apply bold/italic to the current selection (same inline behavior as the toolbar buttons) | Should | T83 |
@@ -39,3 +39,5 @@ Allow users to create, edit, move, and delete markdown-capable text blocks on th
 | REQ-TEXT-025 | While editing, applying Strike/Code/Underline shall wrap only the selected substring (or unwrap if already wrapped); when no substring is selected the markers shall be inserted at the caret | Must | T84 |
 | REQ-TEXT-026 | The text editor shall support Ctrl+U (underline), Ctrl+E (inline code), Ctrl+Shift+X (strikethrough) keyboard shortcuts | Should | T84 |
 | REQ-TEXT-027 | Underline shall be persisted as `<u>...</u>` HTML inside the markdown source and rendered as an underline by the markdown renderer | Should | T84 |
+| REQ-TEXT-028 | While editing, the text editor wrap width shall equal the node’s intentional width (not a temporary stub narrower than the node) | Must | T92 |
+| REQ-TEXT-029 | When a text block is selected (not editing), left/right resize handles shall change width; height remains content-driven after reflow | Must | T92 |

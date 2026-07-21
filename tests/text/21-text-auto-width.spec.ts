@@ -1,19 +1,22 @@
 /**
- * Test 21: Text Auto-Width
- * Covers: REQ-TEXT-020 — Text blocks shall auto-size width to fit rendered content
- *
- * Verifies that text blocks grow/shrink width based on content.
+ * Test 21: Text intentional width (was auto-width)
+ * Covers: REQ-TEXT-007, REQ-TEXT-020 — width is intentional (page default /
+ * user-resized); height auto-sizes to content. Width must not shrink to content
+ * after commit.
  */
 import { test, expect } from '@playwright/test';
 import { getCanvasStore, waitForCanvasReady, activateTool, clickCanvas } from '../helpers';
 
-test.describe('21 - Text Auto-Width (REQ-TEXT-020)', () => {
+/** Matches src/utils/pageLayout.ts DEFAULT_TEXT_WIDTH / A4_WIDTH */
+const DEFAULT_TEXT_WIDTH = 794;
+
+test.describe('21 - Text Intentional Width (REQ-TEXT-007, REQ-TEXT-020)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await waitForCanvasReady(page);
   });
 
-  test('short text has small width', async ({ page }) => {
+  test('short text keeps page default width after commit', async ({ page }) => {
     await activateTool(page, 'text');
     await clickCanvas(page, 400, 300);
 
@@ -25,39 +28,44 @@ test.describe('21 - Text Auto-Width (REQ-TEXT-020)', () => {
 
     const store = await getCanvasStore(page);
     expect(store.nodes).toHaveLength(1);
-    // Short text should have a small width (min 60)
-    expect(store.nodes[0].width).toBeGreaterThanOrEqual(60);
-    expect(store.nodes[0].width).toBeLessThan(200);
+    // Must not shrink to content — stays page width
+    expect(store.nodes[0].width).toBe(DEFAULT_TEXT_WIDTH);
   });
 
-  test('long text has larger width', async ({ page }) => {
+  test('long text keeps page default width and has positive height', async ({ page }) => {
     await activateTool(page, 'text');
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
     await expect(textarea).toBeVisible({ timeout: 2000 });
-    await textarea.fill('This is a longer piece of text that should cause the block to be wider');
+    await textarea.fill(
+      'This is a longer piece of text that should wrap within the page-wide block rather than growing the box to content',
+    );
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.waitForTimeout(200);
 
     const store = await getCanvasStore(page);
     expect(store.nodes).toHaveLength(1);
-    // Longer text should have a wider width
-    expect(store.nodes[0].width).toBeGreaterThan(200);
+    expect(store.nodes[0].width).toBe(DEFAULT_TEXT_WIDTH);
+    expect(store.nodes[0].height).toBeGreaterThan(0);
   });
 
-  test('width is capped at 800px', async ({ page }) => {
-    // Add a node with very long text via store
+  test('width can exceed the old 800px content cap after resize', async ({ page }) => {
     await page.evaluate(() => {
       const s = (window as any).__POWERNOTE_STORES__.canvas.getState();
       s.addNode({
         id: 'wide-text',
         type: 'text',
-        x: 100, y: 100,
-        width: 120, height: 30,
+        x: 100,
+        y: 100,
+        width: 900,
+        height: 30,
         data: {
-          text: 'A'.repeat(500),
-          fontSize: 16, fontFamily: 'sans-serif', fontStyle: 'normal', fill: '#1a1a1a',
+          text: 'A'.repeat(80),
+          fontSize: 16,
+          fontFamily: 'sans-serif',
+          fontStyle: 'normal',
+          fill: '#1a1a1a',
         },
       });
     });
@@ -65,7 +73,7 @@ test.describe('21 - Text Auto-Width (REQ-TEXT-020)', () => {
 
     const store = await getCanvasStore(page);
     const node = store.nodes.find((n: any) => n.id === 'wide-text');
-    // Should be capped at max 800 + padding
-    expect(node.width).toBeLessThanOrEqual(820);
+    // Intentional width must be preserved (no shrink/cap to ~800)
+    expect(node.width).toBe(900);
   });
 });

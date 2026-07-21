@@ -3,6 +3,7 @@ import type Konva from 'konva';
 import { useCanvasStore, undoBatchStart } from '../stores/useCanvasStore';
 import { useToolStore } from '../stores/useToolStore';
 import { generateId } from '../utils/ids';
+import { DEFAULT_TEXT_WIDTH } from '../utils/pageLayout';
 import type { CanvasNode as CanvasNodeType } from '../types/data';
 
 // Track the most recently placed node so it auto-enters edit mode
@@ -57,7 +58,7 @@ export function useTextPlacement(
           type: 'text',
           x: stageX,
           y: stageY,
-          width: 120,
+          width: DEFAULT_TEXT_WIDTH,
           height: 30,
           layer: 4,
           data: {

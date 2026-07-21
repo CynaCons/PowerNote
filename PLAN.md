@@ -373,6 +373,31 @@
 | v0.25.0-proto | **shipped** — Live update via FSA A/B swap |
 | v0.25.1 | **tagged** — Live update swap + bound HTML file path |
 | v0.25.2 | **tagged** — Absolute file:// path; clear stale FSA on local open |
+| v0.26.0 | **shipped** — Default text width = one page; manual widen |
+
+---
+
+## v0.26.0 — Default Text Width = Page (user CR)
+> **Problem:** Placing a text block with the text tool creates a ~120px-wide box. While typing the first edit, words wrap after only a few characters. Final size is only settled after commit via content auto-measure (REQ-TEXT-020, max 800). That feels wrong for page-oriented notebooks.
+>
+> **Wanted:** New text elements should default to **one page width** (A4 guide width, 794px at 96 DPI — same constant as `PageGuides`) for the entire first edit session, so typing uses a full-page column. Users must still be able to **resize wider** (and narrower) when needed; the page-width default is a starting size, not a hard max.
+>
+> **Root cause (current code):**
+> - `useTextPlacement.ts` hardcodes `width: 120` on create
+> - `TextEditor.tsx` uses that width with `maxWidth: 800` while editing
+> - `TextNode.tsx` post-commit auto-shrinks to content (`scrollWidth`, max 800)
+> - `SelectionTransformer` enables resize only for `image` / `shape` — text has no width handles today (SRS REQ-TEXT-007 still says “no manual resize handles”; that must be updated)
+>
+> **Acceptance:**
+> - [x] New text from text tool is created with default width = page width (`A4_WIDTH` / shared page constant, not 120)
+> - [x] Inline editor (first edit and subsequent edits) uses the node’s width for wrapping — page-wide by default, no early wrap
+> - [x] Raise or remove the 800px editor/render max so wider-than-page text is allowed after resize
+> - [x] Manual resize of text block width (L/R handles on TextNode); height remains auto from content
+> - [x] After commit: do **not** shrink width back to content — preserve intentional width; height auto-grows
+> - [ ] Optional: snap / show guide when width ≈ page width *(deferred)*
+> - [x] Update `docs/SRS_TEXT.md` — revise REQ-TEXT-007 / REQ-TEXT-020; add REQ-TEXT-028/029
+> - [x] E2E: T03/T16/T21 rewrite + T92 page-default + resize preserve
+> - [x] Smoke + Playwright — `tsc` clean; T03/T16/T21/T92 **14/14** green; `npm run dev` HTTP 200
 
 ---
 
@@ -811,6 +836,9 @@
 ## Planned (Not Yet Shipped)
 > Features specified in SRS or earlier iterations that have not yet shipped. Moving here so PLAN.md reflects reality.
 
+### Active next (user CR)
+- [x] **v0.26.0** — Default text block width = one page; allow wider resize (see section above) — impl + tests; optional page-width snap deferred
+
 ### Image Tools (advanced)
 - [ ] REQ-IMAGE-007 Visual crop overlay with drag handles (currently toolbar sliders only)
 - [ ] REQ-IMAGE-011 Free rotation via drag handle (currently 90° increments only)
@@ -865,4 +893,4 @@ See `docs/VISION.md` for deferred post-MVP items (cloud sync, collaboration, pai
 
 ---
 
-**Last updated:** 2026-07-18 (v0.25.2 absolute file:// path fix)
+**Last updated:** 2026-07-20 (v0.26.0 default text width = page shipped)

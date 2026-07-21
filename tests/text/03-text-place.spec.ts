@@ -45,7 +45,8 @@ test.describe('03 - Text Place (REQ-TEXT-001, REQ-TEXT-002)', () => {
     expect(node.type).toBe('text');
     expect(node.data.text).toBe('');
     expect(node.data.fontSize).toBe(16);
-    expect(node.width).toBeGreaterThanOrEqual(60);
+    // REQ-TEXT-020: default width = one page (A4 @ 96 DPI)
+    expect(node.width).toBe(794);
   });
 
   test('textarea appears after placing text (auto-edit mode)', async ({ page }) => {

@@ -3,6 +3,7 @@ import { Html } from 'react-konva-utils';
 import type { CanvasNode, TextNodeData } from '../../types/data';
 import { useEditorStore } from '../../stores/useEditorStore';
 import { FORMAT_MARKERS, toggleMarker, type FormatKind } from '../../utils/markdownToggle';
+import { MIN_TEXT_WIDTH, MAX_TEXT_WIDTH } from '../../utils/pageLayout';
 
 /**
  * Replace the textarea's selected range with new text using a native-compatible
@@ -402,9 +403,9 @@ export function TextEditor({ node, stageScale: _stageScale, onFinish, onCancel }
           position: 'absolute',
           top: 0,
           left: 0,
-          minWidth: 60,
-          maxWidth: 800,
-          width: Math.max(node.width, 60),
+          minWidth: MIN_TEXT_WIDTH,
+          maxWidth: MAX_TEXT_WIDTH,
+          width: Math.max(node.width, MIN_TEXT_WIDTH),
           minHeight: 24,
           fontSize: data.fontSize,
           fontFamily: data.fontFamily,

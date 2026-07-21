@@ -3,13 +3,18 @@ import { Group, Rect } from 'react-konva';
 import { Html } from 'react-konva-utils';
 import type Konva from 'konva';
 import type { CanvasNode, TextNodeData } from '../../types/data';
-import { undoBatchEnd } from '../../stores/useCanvasStore';
+import { undoBatchEnd, undoBatchStart } from '../../stores/useCanvasStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useDrawStore } from '../../stores/useDrawStore';
 import { useToolStore } from '../../stores/useToolStore';
 import { isNodeInteractive } from '../../utils/toolConfig';
 import { generateId } from '../../utils/ids';
+import {
+  MIN_TEXT_WIDTH,
+  MAX_TEXT_WIDTH,
+  MIN_TEXT_HEIGHT,
+} from '../../utils/pageLayout';
 import { TextEditor } from './TextEditor';
 import { calculateSnap, type SnapLine } from './SnapGuides';
 import { marked } from 'marked';
@@ -91,18 +96,49 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
                .replace(/<input\s+checked=""\s+disabled=""\s+type="checkbox"/g, '<input checked="" type="checkbox"');
   }, [data.text]);
 
-  // Measure the HTML content dimensions and sync back to store (silent — no undo push)
+  // Height auto-sizes to laid-out content at the intentional width.
+  // Width is intentional (page default or user resize) — never shrink-to-content.
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!htmlRef.current) return;
-      const w = Math.max(60, htmlRef.current.scrollWidth + 8); // +8 for padding
-      const h = Math.max(24, htmlRef.current.offsetHeight);
-      if (Math.abs(w - node.width) > 2 || Math.abs(h - node.height) > 2) {
-        updateNodeSilent(node.id, { width: w, height: h });
+      const h = Math.max(MIN_TEXT_HEIGHT, htmlRef.current.offsetHeight);
+      if (Math.abs(h - (node.height || 0)) > 2) {
+        updateNodeSilent(node.id, { height: h });
       }
     }, 60);
     return () => clearTimeout(timer);
   }, [renderedHtml, node.id, node.width, node.height, updateNodeSilent]);
+
+  const clampTextWidth = (w: number) =>
+    Math.min(MAX_TEXT_WIDTH, Math.max(MIN_TEXT_WIDTH, w));
+
+  const handleWidthResizeMove = (
+    e: Konva.KonvaEventObject<DragEvent>,
+    side: 'left' | 'right',
+  ) => {
+    e.cancelBubble = true;
+    const handle = e.target;
+    const hx = handle.x() + 5; // handle center in local coords
+    const current = useCanvasStore.getState().nodes.find((n) => n.id === node.id);
+    if (!current) return;
+
+    let newW = current.width;
+    let newX = current.x;
+
+    if (side === 'right') {
+      newW = clampTextWidth(hx);
+    } else {
+      // Keep right edge fixed while dragging left edge
+      newW = clampTextWidth(current.width - hx);
+      newX = current.x + (current.width - newW);
+    }
+
+    updateNodeSilent(node.id, { x: newX, y: current.y, width: newW });
+
+    // Snap handle back to edge (re-render will also correct)
+    handle.x(side === 'right' ? newW - 5 : -5);
+    handle.y(Math.max(MIN_TEXT_HEIGHT, current.height || MIN_TEXT_HEIGHT) / 2 - 5);
+  };
 
   const handleDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
     // Ctrl+Alt+drag: duplicate the node, drag the duplicate
@@ -195,12 +231,17 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
   }
 
   const hasContent = data.text && data.text.trim().length > 0;
+  const boxW = Math.max(node.width, MIN_TEXT_WIDTH);
+  const boxH = Math.max(node.height || MIN_TEXT_HEIGHT, MIN_TEXT_HEIGHT);
+  const showWidthHandles = isSelected && isInteractive;
 
   return (
     <Group
       ref={groupRef}
       x={node.x}
       y={node.y}
+      width={boxW}
+      height={boxH}
       draggable={isInteractive}
       listening={isInteractive}
       onDragStart={handleDragStart}
@@ -220,13 +261,13 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
         if (stage) stage.container().style.cursor = 'default';
       }}
     >
-      {/* Invisible hit area for click/dblclick — sized generously to catch clicks */}
+      {/* Invisible hit area for click/dblclick — matches intentional box size */}
       <Rect
         id={node.id}
         x={-4}
         y={-4}
-        width={Math.max(node.width, 120) + 8}
-        height={Math.max(node.height || 30, 24) + 8}
+        width={boxW + 8}
+        height={boxH + 8}
         fill="transparent"
         onClick={handleClick}
         onTap={handleClick}
@@ -277,9 +318,9 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
             setContextMenu({ x: e.clientX, y: e.clientY });
           }}
           style={{
-            minWidth: 60,
-            maxWidth: 800,
-            width: 'max-content',
+            minWidth: MIN_TEXT_WIDTH,
+            width: boxW,
+            boxSizing: 'border-box',
             fontSize: data.fontSize,
             fontFamily: data.fontFamily,
             fontWeight: data.fontStyle?.includes('bold') ? 'bold' : 'normal',
@@ -312,6 +353,54 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
           />
         )}
       </Html>
+
+      {/* Width-only resize handles (height stays content-driven) */}
+      {showWidthHandles &&
+        (
+          [
+            { side: 'left' as const, cx: 0 },
+            { side: 'right' as const, cx: boxW },
+          ] as const
+        ).map(({ side, cx }) => (
+          <Rect
+            key={`text-w-${side}`}
+            name={`text-width-handle-${side}`}
+            x={cx - 5}
+            y={boxH / 2 - 5}
+            width={10}
+            height={10}
+            fill="#ffffff"
+            stroke="#2563eb"
+            strokeWidth={1}
+            cornerRadius={2}
+            draggable
+            onMouseDown={(e) => {
+              e.cancelBubble = true;
+            }}
+            onMouseEnter={(e) => {
+              e.target.getStage()!.container().style.cursor = 'ew-resize';
+            }}
+            onMouseLeave={(e) => {
+              e.target.getStage()!.container().style.cursor = 'default';
+            }}
+            onDragStart={(e) => {
+              e.cancelBubble = true;
+              // One undo entry for the whole resize gesture
+              undoBatchStart(useCanvasStore.getState().nodes);
+            }}
+            onDragMove={(e) => handleWidthResizeMove(e, side)}
+            onDragEnd={(e) => {
+              e.cancelBubble = true;
+              undoBatchEnd();
+              // Snap handle to final edge
+              const current = useCanvasStore.getState().nodes.find((n) => n.id === node.id);
+              if (current) {
+                e.target.x(side === 'right' ? current.width - 5 : -5);
+                e.target.y(Math.max(MIN_TEXT_HEIGHT, current.height || MIN_TEXT_HEIGHT) / 2 - 5);
+              }
+            }}
+          />
+        ))}
     </Group>
   );
 }

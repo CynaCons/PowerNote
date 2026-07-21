@@ -1,14 +1,15 @@
 /**
  * Test 16: Text Resize Reflow
- * Covers: REQ-TEXT-008 — Text shall reflow (word-wrap) when the text
- * block width is changed via resize
+ * Covers: REQ-TEXT-008 — Text shall reflow (word-wrap) within the block width
  *
- * Verifies that after placing text with known content, the store
- * reflects a reasonable width (200) and positive height, confirming
- * the reflow fix is working correctly.
+ * Verifies that text blocks wrap within their intentional width and that
+ * height grows with constrained width.
  */
 import { test, expect } from '@playwright/test';
 import { getCanvasStore, waitForCanvasReady, clickCanvas, activateTool } from '../helpers';
+
+/** Matches src/utils/pageLayout.ts DEFAULT_TEXT_WIDTH */
+const DEFAULT_TEXT_WIDTH = 794;
 
 test.describe('16 - Text Resize Reflow (REQ-TEXT-008)', () => {
   test.beforeEach(async ({ page }) => {
@@ -16,8 +17,7 @@ test.describe('16 - Text Resize Reflow (REQ-TEXT-008)', () => {
     await waitForCanvasReady(page);
   });
 
-  test('placed text node has default width of 200', async ({ page }) => {
-    // Place a text node
+  test('placed text node has page default width', async ({ page }) => {
     await activateTool(page, 'text');
     await clickCanvas(page, 400, 300);
 
@@ -28,51 +28,76 @@ test.describe('16 - Text Resize Reflow (REQ-TEXT-008)', () => {
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.waitForTimeout(300);
 
-    // Verify the node width is the default 200
     const store = await getCanvasStore(page);
     expect(store.nodes).toHaveLength(1);
-    expect(store.nodes[0].width).toBeGreaterThanOrEqual(60);
+    expect(store.nodes[0].width).toBe(DEFAULT_TEXT_WIDTH);
   });
 
   test('placed text with long content has positive height', async ({ page }) => {
-    // Place a text node with a longer sentence
     await activateTool(page, 'text');
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
     await expect(textarea).toBeVisible({ timeout: 2000 });
 
-    await textarea.fill('This is a longer sentence that should cause the text to wrap within the default width of the text block');
+    await textarea.fill(
+      'This is a longer sentence that should cause the text to wrap within the intentional width of the text block',
+    );
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.waitForTimeout(300);
 
-    // Verify the node has a reasonable height (positive, indicating reflow worked)
     const store = await getCanvasStore(page);
     expect(store.nodes).toHaveLength(1);
-    expect(store.nodes[0].width).toBeGreaterThanOrEqual(60);
+    expect(store.nodes[0].width).toBe(DEFAULT_TEXT_WIDTH);
     expect(store.nodes[0].height).toBeGreaterThan(0);
   });
 
-  test('text node height scales with content length', async ({ page }) => {
-    // Add two text nodes via store — one short, one long
+  test('narrower width produces taller block for same content', async ({ page }) => {
     await page.evaluate(() => {
       const s = (window as any).__POWERNOTE_STORES__.canvas.getState();
+      const text =
+        'This is a much longer piece of text that should wrap to multiple lines when the width is constrained';
       s.addNode({
-        id: 'short-text', type: 'text', x: 100, y: 100, width: 200, height: 30,
-        data: { text: 'Short', fontSize: 16, fontFamily: 'sans-serif', fontStyle: 'normal', fill: '#1a1a1a' },
+        id: 'wide-text',
+        type: 'text',
+        x: 100,
+        y: 100,
+        width: 500,
+        height: 30,
+        data: {
+          text,
+          fontSize: 16,
+          fontFamily: 'sans-serif',
+          fontStyle: 'normal',
+          fill: '#1a1a1a',
+        },
       });
       s.addNode({
-        id: 'long-text', type: 'text', x: 100, y: 200, width: 200, height: 30,
-        data: { text: 'This is a much longer piece of text that should wrap to multiple lines when the width is constrained to 200 pixels', fontSize: 16, fontFamily: 'sans-serif', fontStyle: 'normal', fill: '#1a1a1a' },
+        id: 'narrow-text',
+        type: 'text',
+        x: 100,
+        y: 400,
+        width: 120,
+        height: 30,
+        data: {
+          text,
+          fontSize: 16,
+          fontFamily: 'sans-serif',
+          fontStyle: 'normal',
+          fill: '#1a1a1a',
+        },
       });
     });
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(300);
 
     const store = await getCanvasStore(page);
     expect(store.nodes).toHaveLength(2);
-
-    // Both should have positive height
-    expect(store.nodes[0].height).toBeGreaterThan(0);
-    expect(store.nodes[1].height).toBeGreaterThan(0);
+    const wide = store.nodes.find((n: any) => n.id === 'wide-text');
+    const narrow = store.nodes.find((n: any) => n.id === 'narrow-text');
+    expect(wide.width).toBe(500);
+    expect(narrow.width).toBe(120);
+    // Narrow box should reflow to more lines → greater or equal height
+    expect(narrow.height).toBeGreaterThanOrEqual(wide.height);
+    expect(narrow.height).toBeGreaterThan(0);
   });
 });
