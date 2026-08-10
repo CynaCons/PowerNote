@@ -8,6 +8,10 @@ import { useGroupStore } from './useGroupStore';
 
 const MAX_HISTORY = 50;
 
+/** Viewport zoom bounds — shared by wheel zoom, pinch zoom and the zoom bar. */
+export const MIN_SCALE = 0.1;
+export const MAX_SCALE = 5.0;
+
 interface CanvasState {
   nodes: CanvasNode[];
   viewport: Viewport;
@@ -33,6 +37,8 @@ interface CanvasState {
   _stageRef: { current: any | null };
   setStageRef: (stage: any) => void;
   zoomToFit: () => void;
+  /** Zoom to an absolute scale, anchored on the centre of the visible canvas. */
+  setZoom: (scale: number) => void;
 
   // Clipboard
   copySelectedNodes: () => void;
@@ -195,6 +201,25 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     _konvaStageRef = stage;
   },
 
+  setZoom: (scale) => {
+    const { viewport } = get();
+    const clamped = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
+    if (clamped === viewport.scale) return;
+
+    // Anchor on the centre of the visible canvas so the middle of the view
+    // stays put — the same feel as cursor-anchored wheel zoom.
+    const container = _konvaStageRef?.container();
+    const cx = (container?.clientWidth ?? 0) / 2;
+    const cy = (container?.clientHeight ?? 0) / 2;
+    const k = clamped / viewport.scale;
+
+    get().setViewport({
+      x: cx - (cx - viewport.x) * k,
+      y: cy - (cy - viewport.y) * k,
+      scale: clamped,
+    });
+  },
+
   zoomToFit: () => {
     const nodes = get().nodes;
     if (nodes.length === 0) return;
@@ -223,7 +248,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       (ch - padding * 2) / contentH,
       2,
     );
-    const clampedScale = Math.max(0.1, Math.min(5, scale));
+    const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
 
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;

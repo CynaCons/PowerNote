@@ -1,0 +1,128 @@
+/* ── Floating zoom control (bottom-right of the canvas) ──── */
+.zoom-bar {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 3px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  user-select: none;
+}
+
+.zoom-bar button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.zoom-bar__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.zoom-bar__btn:hover:not(:disabled) {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.zoom-bar__btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.zoom-bar__value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 58px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.zoom-bar__value:hover {
+  background: var(--color-hover);
+}
+
+.zoom-bar__chevron {
+  color: var(--color-text-muted);
+  transition: transform 0.15s ease;
+}
+
+.zoom-bar__chevron--open {
+  transform: rotate(180deg);
+}
+
+/* ── Presets menu ─────────────────────────────────────────── */
+.zoom-bar__menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  min-width: 190px;
+  padding: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+}
+
+.zoom-bar__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: var(--color-text) !important;
+  text-align: left;
+}
+
+.zoom-bar__item:hover {
+  background: var(--color-hover);
+}
+
+.zoom-bar__item kbd {
+  margin-left: auto;
+  font-family: inherit;
+  font-size: 10.5px;
+  color: var(--color-text-muted);
+}
+
+.zoom-bar__item--preset {
+  height: 28px;
+  font-variant-numeric: tabular-nums;
+}
+
+.zoom-bar__check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  flex: 0 0 13px;
+  color: var(--color-primary);
+}
+
+.zoom-bar__separator {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--color-border);
+}

@@ -23,3 +23,10 @@ Provide an infinite, pannable, zoomable canvas as the primary workspace for plac
 | REQ-CANVAS-015 | Dragging any node in a multi-selection shall move all selected nodes (and selected strokes) together | Must | T74, T93 |
 | REQ-CANVAS-016 | Pressing Escape or clicking the background shall clear the multi-selection | Must | T74 |
 | REQ-CANVAS-017 | Scrolling without Ctrl shall pan the canvas vertically; Shift+scroll shall pan horizontally | Must | — |
+| REQ-CANVAS-018 | A floating zoom bar shall be displayed at the bottom-right of the canvas, showing the current zoom level as a percentage | Must | T99 |
+| REQ-CANVAS-019 | The zoom readout shall track the viewport scale regardless of how the zoom changed (wheel, pinch, bar or shortcut) | Must | T99 |
+| REQ-CANVAS-020 | The zoom bar shall provide + and − buttons that step the zoom by a factor of 1.25 | Must | T99 |
+| REQ-CANVAS-021 | Zoom applied from the bar or shortcuts shall be anchored on the centre of the visible canvas | Must | T99 |
+| REQ-CANVAS-022 | The + / − buttons shall be disabled once the zoom reaches its 5.0x / 0.1x bound | Should | T99 |
+| REQ-CANVAS-023 | Clicking the zoom readout shall open a menu offering zoom-to-fit, actual size, and the presets 25/50/75/100/150/200/400%, dismissed by outside click or Escape | Must | T99 |
+| REQ-CANVAS-024 | Shift+1 shall zoom to fit and Shift+0 shall reset to 100%; neither shall fire while a text field has focus | Must | T99 |

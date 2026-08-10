@@ -375,7 +375,8 @@
 | v0.25.2 | **tagged** — Absolute file:// path; clear stale FSA on local open |
 | v0.26.0 | **shipped** — Default text width = one page; manual widen |
 | v0.27.0 | **shipped** — Shape & drawing groups (flat + isolation) |
-| v0.28.0 | **current** — Agent bridge: MCP writes notes into the live app |
+| v0.28.0 | **shipped** — Agent bridge: MCP writes notes into the live app |
+| v0.28.1 | **current** — Floating zoom control bar |
 
 ---
 
@@ -920,6 +921,16 @@
 - [x] Tests: T98 (11 cases) + powernote-mcp `npm test` displacement suite; stubBridgeUrl helper makes bridge tests hermetic; 323 pass / 1 pre-existing failure (85-settings-persist, predates this work)
 - [x] docs/SRS_AGENT.md REQ-AGENT-016..025 + README columns/displacement sections
 - [x] Version bump 0.28.0, tag v0.28.0
+### v0.28.1 — Floating zoom control bar (ACTIVE)
+**Goal:** Give the canvas a visible zoom readout and mouse-only zoom controls. Ctrl+wheel and pinch already work, but there is no % indicator, no click-to-zoom, and no reset-to-100%.
+- [x] Visual prototypes: 4 variants (A compact pill, B slider bar, C dropdown pill, D auto-hide rail) mounted live in the app behind ?zoomproto=1 (src/components/canvas/ZoomBarPrototypes.tsx — throwaway)
+- [x] User picks a variant (BLOCKED — awaiting decision before implementation)
+- [x] Implement chosen ZoomBar in src/components/canvas/, delete the prototype harness + its AppShell hook
+- [x] docs/SRS_CANVAS.md — new REQ-CANVAS-NNN for zoom readout / step zoom / reset-to-100% / fit, with test refs
+- [x] E2E test (next free number) — zoom bar % tracks viewport.scale, buttons step and clamp at 10%/500%
+- [x] Fix latent stage-ref race: InfiniteCanvas registered the Konva stage on a 100ms setTimeout keyed on dimensions, so for ~100ms after mount/resize zoomToFit silently no-oped and centre-anchored zoom fell back to the origin — now registered synchronously in the post-commit effect
+- [x] setZoom action on useCanvasStore (centre-anchored, clamped) + MIN_SCALE/MAX_SCALE exported from the store and reused by InfiniteCanvas wheel/pinch instead of local duplicates
+- [x] Version bump 0.28.1 (package.json + src/version.ts), dist-template rebuilt so the in-app updater serves 0.28.1, tag v0.28.1
 ## Future (Backlog)
 > Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 

@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { Stage, Layer, Group as KonvaGroup, Rect as KonvaRect, Ellipse, Line as KonvaLine } from 'react-konva';
 import type Konva from 'konva';
-import { useCanvasStore } from '../../stores/useCanvasStore';
+import { useCanvasStore, MIN_SCALE, MAX_SCALE } from '../../stores/useCanvasStore';
 import { useToolStore } from '../../stores/useToolStore';
 import { getToolConfig } from '../../utils/toolConfig';
 import { useDrawStore } from '../../stores/useDrawStore';
@@ -22,8 +22,6 @@ import { useGroupStore } from '../../stores/useGroupStore';
 import type { BackgroundMode, CanvasBgColor } from '../../types/data';
 import './InfiniteCanvas.css';
 
-const MIN_SCALE = 0.1;
-const MAX_SCALE = 5.0;
 const ZOOM_FACTOR = 1.05;
 
 export type { CanvasBgColor };
@@ -73,14 +71,14 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
 
   useCanvasDragDrop(containerRef, stageRef, dimensions);
 
-  // ── Register stage ref for zoom-to-fit ──────────────────────
+  // ── Register stage ref for zoom-to-fit and the zoom bar ─────
+  // Runs after commit, so the Stage already exists — registering
+  // synchronously avoids a window where zoom actions find no stage
+  // and fall back to origin-anchored scaling.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (stageRef.current) {
-        useCanvasStore.getState().setStageRef(stageRef.current);
-      }
-    }, 100);
-    return () => clearTimeout(timer);
+    if (stageRef.current) {
+      useCanvasStore.getState().setStageRef(stageRef.current);
+    }
   }, [dimensions]);
 
   // ── Resize observer ────────────────────────────────────────

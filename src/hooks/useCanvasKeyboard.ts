@@ -78,6 +78,18 @@ export function useCanvasKeyboard(
         }
       }
 
+      // Shift+1: zoom to fit / Shift+0: actual size
+      if (e.shiftKey && !e.ctrlKey && !e.metaKey && (e.key === '!' || e.key === '1')) {
+        e.preventDefault();
+        useCanvasStore.getState().zoomToFit();
+        return;
+      }
+      if (e.shiftKey && !e.ctrlKey && !e.metaKey && (e.key === ')' || e.key === '0')) {
+        e.preventDefault();
+        useCanvasStore.getState().setZoom(1);
+        return;
+      }
+
       // V: select tool
       if (e.key === 'v' || e.key === 'V') {
         if (!e.ctrlKey && !e.metaKey) {

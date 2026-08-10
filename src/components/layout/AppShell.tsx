@@ -7,6 +7,7 @@ import { BottomToolbar } from '../toolbar/BottomToolbar';
 import { SearchPanel } from '../search/SearchPanel';
 import { SettingsPanel } from '../settings/SettingsPanel';
 import { NotebookLibraryPanel } from './NotebookLibraryPanel';
+import { ZoomBar } from '../canvas/ZoomBar';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
@@ -87,6 +88,7 @@ export function AppShell() {
             onClose={() => setSearchOpen(false)}
             onNavigateToResult={handleNavigateToResult}
           />
+          <ZoomBar />
         </div>
       </div>
       {isSettingsOpen && (
