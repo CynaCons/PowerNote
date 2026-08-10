@@ -374,7 +374,8 @@
 | v0.25.1 | **tagged** — Live update swap + bound HTML file path |
 | v0.25.2 | **tagged** — Absolute file:// path; clear stale FSA on local open |
 | v0.26.0 | **shipped** — Default text width = one page; manual widen |
-| v0.27.0 | **current** — Shape & drawing groups (flat + isolation) |
+| v0.27.0 | **shipped** — Shape & drawing groups (flat + isolation) |
+| v0.28.0 | **current** — Agent bridge: MCP writes notes into the live app |
 
 ---
 
@@ -879,21 +880,6 @@
 
 ---
 
-## Future (Backlog)
-> Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
-
-- **Editable Gantt (PowerPlanner)** — Today the embed is intentionally read-only (`pointerEvents: none` + read-only `GanttRenderer`). Future: double-click / edit mode to change tasks & dates, persist `node.data.doc` on save, optional deep-link into PowerPlanner for full editing
-- **Collapsible Containers** — Canvas-in-canvas named frames (deferred from v0.2); flat shape/stroke groups land in v0.27.0 first
-- **Template Gallery** — Pre-built page templates (meeting notes, project plan, etc.)
-- **Advanced Diagram Tools** — Connectors, flowcharts, mind maps
-- **Mobile App** — React Native or PWA for tablet/phone
-- **Plugin System** — Community extensions
-- **Database/Table Blocks** — Notion-style structured data on canvas
-
-See `docs/VISION.md` for deferred post-MVP items (cloud sync, collaboration, paid tier) that depend on cloud deployment infrastructure.
-
----
-
 ## v0.27 — Shape & Drawing Groups
 > Durable flat groups for shapes + freehand strokes; move as a unit; isolation mode to edit members.
 
@@ -914,3 +900,35 @@ See `docs/VISION.md` for deferred post-MVP items (cloud sync, collaboration, pai
 ---
 
 **Last updated:** 2026-07-21 (v0.27.0 shape & drawing groups shipped)
+
+### v0.28.0 — Agent bridge — MCP writes notes into the live app (COMPLETE)
+**Goal:** Let an external agent create pages and fill them with markdown blocks (bullets, checklists, headings) in the running PowerNote app, via an MCP server that hosts a WebSocket the app dials out to.
+- [x] Bridge protocol + WS client in app (src/bridge/): connect, handshake, dispatch, ack/error
+- [x] Command handlers over stores: list_pages, read_page, create_section, create_page, append_block, update_block
+- [x] Markdown block layout: x=PAGE_MARGIN, width=A4_WIDTH, y stacked below last block; height measured synchronously offscreen via shared renderMarkdown util (TextNode's own measure lands 60ms late — too slow for back-to-back agent appends)
+- [x] Settings toggle "Agent bridge" (OFF by default, flag in localStorage not in the notebook) + connection status indicator
+- [x] MCP server (powernote-mcp/, Node ESM): hosts WS on 127.0.0.1:41777, exposes the 6 note tools, registered in .mcp.json
+- [x] docs/SRS_AGENT.md — REQ-AGENT-001..025 with test refs
+- [x] E2E tests T94+ (bridge connect, append block, checklist round-trip, persistence) + smoke + full Playwright green
+
+**Fixes from the live demo** (found before the feature ever shipped, so folded into this release):
+- [x] Fix connection flip-flop: server sends `displaced` frame before closing the older client; displaced client stands down permanently instead of reconnecting
+- [x] Displacement clears the persisted enable flag + Settings explains why and how to reclaim; in-flight requests to a displaced notebook fail fast
+- [x] Column targeting: `column` param on append_block/create_page, per-column independent stacking, read_page reports column and orders column-major
+- [x] Fix systematic height under-measurement: probe now applies the renderer's inline styles (font-size/line-height/padding), not just the CSS class — drift 46 vs 34 on an H1, now 0
+- [x] Extract markdownBoxStyle into renderMarkdown util so TextNode and the measurement probe share one style definition
+- [x] Tests: T98 (11 cases) + powernote-mcp `npm test` displacement suite; stubBridgeUrl helper makes bridge tests hermetic; 323 pass / 1 pre-existing failure (85-settings-persist, predates this work)
+- [x] docs/SRS_AGENT.md REQ-AGENT-016..025 + README columns/displacement sections
+- [x] Version bump 0.28.0, tag v0.28.0
+## Future (Backlog)
+> Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
+
+- **Editable Gantt (PowerPlanner)** — Today the embed is intentionally read-only (`pointerEvents: none` + read-only `GanttRenderer`). Future: double-click / edit mode to change tasks & dates, persist `node.data.doc` on save, optional deep-link into PowerPlanner for full editing
+- **Collapsible Containers** — Canvas-in-canvas named frames (deferred from v0.2); flat shape/stroke groups land in v0.27.0 first
+- **Template Gallery** — Pre-built page templates (meeting notes, project plan, etc.)
+- **Advanced Diagram Tools** — Connectors, flowcharts, mind maps
+- **Mobile App** — React Native or PWA for tablet/phone
+- **Plugin System** — Community extensions
+- **Database/Table Blocks** — Notion-style structured data on canvas
+
+See `docs/VISION.md` for deferred post-MVP items (cloud sync, collaboration, paid tier) that depend on cloud deployment infrastructure.

@@ -8,6 +8,10 @@
         "PYTHONIOENCODING": "utf-8",
         "PYTHONUNBUFFERED": "1"
       }
+    },
+    "powernote-notes": {
+      "command": "node",
+      "args": ["powernote-mcp/server.js"]
     }
   }
 }

@@ -18,8 +18,7 @@ import {
 import { multiDragStart, multiDragMove, multiDragEnd } from '../../utils/multiDrag';
 import { TextEditor } from './TextEditor';
 import { calculateSnap, type SnapLine } from './SnapGuides';
-import { marked } from 'marked';
-import { preprocessMath, restoreMath } from '../../utils/mathParser';
+import { markdownToHtml, markdownBoxStyle } from '../../utils/renderMarkdown';
 
 // Handle powernote:// internal links
 function handleInternalLink(href: string) {
@@ -40,12 +39,6 @@ function handleInternalLink(href: string) {
   canvas.loadPageNodes(page?.nodes ?? []);
   useDrawStore.getState().loadPageStrokes(page?.strokes ?? []);
 }
-
-// Configure marked for GFM + task lists
-marked.setOptions({
-  breaks: true,
-  gfm: true,
-});
 
 // Toggle a checkbox in raw markdown text by its index
 function toggleCheckbox(text: string, checkboxIndex: number): string {
@@ -84,18 +77,7 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
   const isInteractive = isNodeInteractive(activeTool);
 
   // Parse markdown to HTML (with math pre-processing and clickable checkboxes)
-  const renderedHtml = useMemo(() => {
-    if (!data.text) return '';
-    // 1) Extract $$...$$ and $...$ math blocks, replace with placeholders
-    const { text: textWithoutMath, blocks } = preprocessMath(data.text);
-    // 2) Run marked on the cleaned text
-    let html = marked.parse(textWithoutMath) as string;
-    // 3) Restore math placeholders with KaTeX-rendered HTML
-    html = restoreMath(html, blocks);
-    // 4) Remove disabled attribute from task-list checkboxes so clicks work
-    return html.replace(/<input\s+disabled=""\s+type="checkbox"/g, '<input type="checkbox"')
-               .replace(/<input\s+checked=""\s+disabled=""\s+type="checkbox"/g, '<input checked="" type="checkbox"');
-  }, [data.text]);
+  const renderedHtml = useMemo(() => markdownToHtml(data.text), [data.text]);
 
   // Height auto-sizes to laid-out content at the intentional width.
   // Width is intentional (page default or user resize) — never shrink-to-content.
@@ -318,22 +300,7 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
             e.stopPropagation();
             setContextMenu({ x: e.clientX, y: e.clientY });
           }}
-          style={{
-            minWidth: MIN_TEXT_WIDTH,
-            width: boxW,
-            boxSizing: 'border-box',
-            fontSize: data.fontSize,
-            fontFamily: data.fontFamily,
-            fontWeight: data.fontStyle?.includes('bold') ? 'bold' : 'normal',
-            fontStyle: data.fontStyle?.includes('italic') ? 'italic' : 'normal',
-            color: hasContent ? data.fill : '#999999',
-            padding: 4,
-            lineHeight: '1.4',
-            wordWrap: 'break-word',
-            overflowWrap: 'break-word',
-            pointerEvents: 'none',
-            userSelect: 'none',
-          }}
+          style={markdownBoxStyle(data, boxW, hasContent ? data.fill : '#999999')}
           dangerouslySetInnerHTML={{
             __html: hasContent ? renderedHtml : '<p>Double-click to edit</p>',
           }}

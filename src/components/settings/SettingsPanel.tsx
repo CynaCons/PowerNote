@@ -7,6 +7,8 @@ import { getCurrentHandle } from '../../utils/fileHandleStore';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
+import { useBridgeStore, type BridgeStatus } from '../../stores/useBridgeStore';
+import { DEFAULT_BRIDGE_URL } from '../../bridge/protocol';
 import { showToast } from '../layout/Toast';
 import './SettingsPanel.css';
 
@@ -26,9 +28,25 @@ const BG_COLORS: { value: CanvasBgColor; label: string; preview: string }[] = [
 
 type UpdateStatus = 'idle' | 'checking' | 'available' | 'updating-live' | 'updating-download' | 'failed';
 
+const BRIDGE_STATUS_LABEL: Record<BridgeStatus, { text: string; color: string }> = {
+  off: { text: 'Off', color: '#64748b' },
+  connecting: { text: 'Waiting for agent server…', color: '#d97706' },
+  connected: { text: 'Connected', color: '#16a34a' },
+  error: { text: 'Cannot reach server', color: '#dc2626' },
+  displaced: { text: 'Another notebook took over', color: '#d97706' },
+};
+
 export function SettingsPanel({ backgroundMode, onChangeBackgroundMode, bgColor, onChangeBgColor }: SettingsPanelProps) {
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
   const [updateInfo, setUpdateInfo] = useState<{ version: string; url?: string; releaseUrl?: string } | null>(null);
+
+  const bridgeEnabled = useBridgeStore((s) => s.enabled);
+  const bridgeStatus = useBridgeStore((s) => s.status);
+  const bridgeUrl = useBridgeStore((s) => s.url);
+  const bridgeCommandCount = useBridgeStore((s) => s.commandCount);
+  const bridgeLastCommand = useBridgeStore((s) => s.lastCommand);
+  const setBridgeEnabled = useBridgeStore((s) => s.setEnabled);
+  const setBridgeUrl = useBridgeStore((s) => s.setUrl);
 
   const handleCheckUpdate = async () => {
     setUpdateStatus('checking');
@@ -136,6 +154,79 @@ export function SettingsPanel({ backgroundMode, onChangeBackgroundMode, bgColor,
             ))}
           </div>
         </div>
+      </div>
+
+      <div className="settings-panel__section" style={{ marginTop: 12, borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
+        <span className="settings-panel__label">Agent bridge</span>
+
+        <label className="settings-panel__radio" style={{ marginTop: 4 }}>
+          <input
+            type="checkbox"
+            checked={bridgeEnabled}
+            onChange={(e) => setBridgeEnabled(e.target.checked)}
+            data-testid="settings-bridge-toggle"
+          />
+          <span>Let a local agent write into this notebook</span>
+        </label>
+
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6 }}>
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              backgroundColor: BRIDGE_STATUS_LABEL[bridgeStatus].color,
+              flexShrink: 0,
+            }}
+          />
+          <span
+            style={{ fontSize: 12, color: BRIDGE_STATUS_LABEL[bridgeStatus].color }}
+            data-testid="settings-bridge-status"
+            data-status={bridgeStatus}
+          >
+            {BRIDGE_STATUS_LABEL[bridgeStatus].text}
+          </span>
+          {bridgeCommandCount > 0 && (
+            <span style={{ fontSize: 12, color: '#64748b' }} data-testid="settings-bridge-count">
+              · {bridgeCommandCount} command{bridgeCommandCount === 1 ? '' : 's'}
+              {bridgeLastCommand ? ` (last: ${bridgeLastCommand})` : ''}
+            </span>
+          )}
+        </div>
+
+        {bridgeEnabled && (
+          <input
+            type="text"
+            value={bridgeUrl}
+            placeholder={DEFAULT_BRIDGE_URL}
+            onChange={(e) => setBridgeUrl(e.target.value)}
+            data-testid="settings-bridge-url"
+            style={{
+              marginTop: 6,
+              width: '100%',
+              fontSize: 12,
+              padding: '4px 6px',
+              border: '1px solid #e2e8f0',
+              borderRadius: 4,
+              fontFamily: 'ui-monospace, monospace',
+            }}
+          />
+        )}
+
+        {bridgeStatus === 'displaced' && (
+          <span
+            style={{ fontSize: 11, color: '#d97706', marginTop: 6, display: 'block' }}
+            data-testid="settings-bridge-displaced-hint"
+          >
+            Another notebook connected to the bridge, so this one stopped. Tick the
+            box again to take the connection back.
+          </span>
+        )}
+
+        <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 6, display: 'block' }}>
+          Off by default. Only enable on your own machine — anything that can reach
+          this port can edit the notebook.
+        </span>
       </div>
 
       <div className="settings-panel__section" style={{ marginTop: 12, borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>

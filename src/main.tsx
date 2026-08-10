@@ -121,4 +121,31 @@ Promise.all([
   (window as any).__POWERNOTE_GROUP_OPS__ = groupOps;
 });
 
+// Agent bridge — dials out to the local MCP server, but only if the user has
+// turned it on for this machine. Off by default so a standalone notebook
+// opened elsewhere never tries to connect.
+Promise.all([
+  import('./bridge/client'),
+  import('./bridge/commands'),
+  import('./stores/useBridgeStore'),
+]).then(async ([{ initBridge, handleServerFrame }, { runBridgeCommand }, { useBridgeStore }]) => {
+  // Wait for fonts before the bridge accepts anything. Block layout is computed
+  // from a real offscreen measurement, so a font that lands later changes text
+  // metrics after blocks have already been positioned — TextNode then corrects
+  // the heights but nothing re-positions, leaving blocks overlapping.
+  try {
+    await document.fonts?.ready;
+  } catch {
+    // ignored — font loading is best-effort, layout falls back to current metrics
+  }
+  initBridge();
+  // Exposed so E2E tests can exercise bridge commands and server frames
+  // without standing up a real WebSocket server.
+  (window as any).__POWERNOTE_BRIDGE__ = {
+    runBridgeCommand,
+    handleServerFrame,
+    store: useBridgeStore,
+  };
+});
+
 createRoot(document.getElementById('root')!).render(<App />);

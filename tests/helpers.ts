@@ -50,6 +50,91 @@ export async function getToolStore(page: Page) {
 }
 
 /**
+ * Wait for the agent bridge module to finish its dynamic import.
+ */
+export async function waitForBridgeReady(page: Page) {
+  await page.waitForFunction(() => Boolean((window as any).__POWERNOTE_BRIDGE__));
+}
+
+/**
+ * Run an agent bridge command in-page, bypassing the WebSocket transport.
+ * Exercises the same handler the socket would dispatch to.
+ */
+export async function runBridge<T = any>(
+  page: Page,
+  cmd: string,
+  params: Record<string, unknown> = {},
+): Promise<T> {
+  return page.evaluate(
+    ({ cmd, params }) => {
+      const bridge = (window as any).__POWERNOTE_BRIDGE__;
+      if (!bridge) throw new Error('Bridge not exposed on window');
+      return bridge.runBridgeCommand(cmd, params);
+    },
+    { cmd, params },
+  );
+}
+
+/**
+ * Point the bridge at a port nothing is listening on, so enabling it dials into
+ * the void instead of reaching a real server.
+ *
+ * Required for any test that enables the bridge: the default port is 41777, and
+ * if a real powernote-notes server happens to be running there, every parallel
+ * worker connects to it and they displace each other — which makes bridge
+ * status assertions flaky in a way that has nothing to do with the test.
+ *
+ * Must be called BEFORE page.goto() — the store reads the URL from localStorage
+ * when it is created.
+ */
+export async function stubBridgeUrl(page: Page, url = 'ws://127.0.0.1:9') {
+  await page.addInitScript((u) => {
+    try {
+      localStorage.setItem('powernote-bridge-url', u);
+    } catch {
+      // ignored — private mode
+    }
+  }, url);
+}
+
+/**
+ * Push a frame at the app exactly as the bridge server would, without standing
+ * up a real WebSocket. Accepts an object (serialized for you) or a raw string,
+ * so malformed input can be tested too.
+ */
+export async function sendServerFrame(page: Page, frame: object | string) {
+  const raw = typeof frame === 'string' ? frame : JSON.stringify(frame);
+  await page.evaluate(async (raw) => {
+    const bridge = (window as any).__POWERNOTE_BRIDGE__;
+    if (!bridge) throw new Error('Bridge not exposed on window');
+    await bridge.handleServerFrame(raw);
+  }, raw);
+}
+
+/**
+ * Run a bridge command expected to fail; returns the error code + message.
+ */
+export async function runBridgeExpectingError(
+  page: Page,
+  cmd: string,
+  params: Record<string, unknown> = {},
+): Promise<{ code: string; message: string }> {
+  return page.evaluate(
+    async ({ cmd, params }) => {
+      const bridge = (window as any).__POWERNOTE_BRIDGE__;
+      if (!bridge) throw new Error('Bridge not exposed on window');
+      try {
+        await bridge.runBridgeCommand(cmd, params);
+      } catch (err: any) {
+        return { code: err.code ?? 'UNKNOWN', message: String(err.message ?? err) };
+      }
+      throw new Error(`Expected "${cmd}" to throw, but it succeeded`);
+    },
+    { cmd, params },
+  );
+}
+
+/**
  * Click on the Konva canvas at specific viewport coordinates
  */
 export async function clickCanvas(page: Page, x: number, y: number) {
