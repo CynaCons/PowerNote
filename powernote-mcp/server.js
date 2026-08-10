@@ -126,6 +126,20 @@ wss.on('connection', (socket) => {
 
 class BridgeUnavailable extends Error {}
 
+/**
+ * Commands that reach the network need more than the default budget: the
+ * update path downloads a ~2.4MB single-file build from GitHub before it can
+ * answer, which routinely outlasts 10s on a slow link.
+ */
+const SLOW_COMMAND_TIMEOUT_MS = Number(
+  process.env.POWERNOTE_BRIDGE_SLOW_TIMEOUT_MS || 120_000,
+);
+const SLOW_COMMANDS = new Set(['check_update', 'run_update', 'save_notebook']);
+
+function timeoutFor(cmd) {
+  return SLOW_COMMANDS.has(cmd) ? SLOW_COMMAND_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
+}
+
 function callApp(cmd, params) {
   return new Promise((resolve, reject) => {
     if (!app || app.readyState !== app.OPEN) {
@@ -139,10 +153,11 @@ function callApp(cmd, params) {
     }
 
     const id = randomUUID();
+    const budget = timeoutFor(cmd);
     const timer = setTimeout(() => {
       pending.delete(id);
-      reject(new Error(`Notebook did not respond to "${cmd}" within ${REQUEST_TIMEOUT_MS}ms`));
-    }, REQUEST_TIMEOUT_MS);
+      reject(new Error(`Notebook did not respond to "${cmd}" within ${budget}ms`));
+    }, budget);
 
     pending.set(id, { resolve, reject, timer });
     app.send(JSON.stringify({ v: PROTOCOL_VERSION, id, cmd, params }));
@@ -262,10 +277,111 @@ const TOOLS = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'rename_page',
+    description:
+      'Retitle a page in the sidebar. If the page still opens with the "# Old title" ' +
+      'heading block that create_page wrote, that block is retitled too so the two ' +
+      'do not drift apart; a hand-edited heading is left alone.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'New page title.' },
+        pageId: {
+          type: 'string',
+          description: 'Page to rename. Defaults to the page currently open.',
+        },
+        updateHeading: {
+          type: 'boolean',
+          description: 'Also rewrite the matching canvas H1. Default true.',
+        },
+      },
+      required: ['title'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'move_page',
+    description:
+      'Move a page into a different section. Section ids come from list_pages. ' +
+      'A section must keep at least one page, so moving the only page out of a ' +
+      'section is refused — create another page there first.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        toSectionId: { type: 'string', description: 'Destination section id.' },
+        pageId: {
+          type: 'string',
+          description: 'Page to move. Defaults to the page currently open.',
+        },
+        toIndex: {
+          type: 'integer',
+          minimum: 0,
+          description:
+            'Position within the destination section. Defaults to last.',
+        },
+      },
+      required: ['toSectionId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'rename_notebook',
+    description:
+      'Rename the notebook itself (the title shown in the app and used for future ' +
+      'Save As filenames). This does NOT rename the .html file already on disk — ' +
+      'that keeps its current name until the user saves to a new location. The ' +
+      'result reports the bound filename so you can tell them.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: { type: 'string', description: 'New notebook name.' },
+      },
+      required: ['filename'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'save_notebook',
+    description:
+      'Write the notebook back to the file it was opened from. Only works when the ' +
+      'notebook is already bound to a file: the Save As picker needs a click from ' +
+      'the user, which an agent cannot supply. Call this after a batch of edits so ' +
+      'the work is on disk.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'check_update',
+    description:
+      'Check whether a newer PowerNote release exists on GitHub. Reports the running ' +
+      'version and the latest one. Note "checked": when false the API was unreachable ' +
+      'or rate limited and the status is unknown — that is not the same as up to date.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'run_update',
+    description:
+      'Install the latest PowerNote release into the current notebook file. This ' +
+      'rewrites the .html on disk and reloads the app, which drops this bridge ' +
+      'connection until the notebook reconnects. Ask the user before calling it, ' +
+      'then pass confirm:true. A safety backup is downloaded first where the browser ' +
+      'allows it. Run check_update first.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        confirm: {
+          type: 'boolean',
+          description: 'Must be true. Confirms the user agreed to the overwrite + reload.',
+        },
+      },
+      required: ['confirm'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 const server = new Server(
-  { name: 'powernote-notes', version: '0.28.0' },
+  { name: 'powernote-notes', version: '0.29.0' },
   { capabilities: { tools: {} } },
 );
 

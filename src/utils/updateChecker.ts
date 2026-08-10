@@ -44,6 +44,22 @@ declare global {
 }
 
 /**
+ * Compare dotted numeric versions. Returns >0 when `a` is newer than `b`.
+ * Non-numeric suffixes are ignored — good enough for the x.y.z tags we ship.
+ */
+export function compareVersions(a: string, b: string): number {
+  const parts = (v: string) =>
+    v.split('.').map((p) => Number.parseInt(p, 10) || 0);
+  const av = parts(a);
+  const bv = parts(b);
+  for (let i = 0; i < Math.max(av.length, bv.length); i++) {
+    const diff = (av[i] ?? 0) - (bv[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+/**
  * Check GitHub for a newer release of PowerNote.
  * Returns null if the check fails (offline, CORS blocked, etc.)
  */
@@ -75,9 +91,14 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
       return null;
     }
 
-    if (latest === currentVersion) {
-      console.log('[PowerNote Update] Already up to date');
-      return { available: false };
+    // Only a strictly NEWER release counts. Plain inequality would treat a
+    // local build that runs ahead of the published tag as an available
+    // "update" and offer to install an older one over it.
+    if (compareVersions(latest, currentVersion) <= 0) {
+      console.log(
+        `[PowerNote Update] Already up to date (running ${currentVersion}, latest release ${latest})`,
+      );
+      return { available: false, latestVersion: latest };
     }
 
     const asset = data.assets?.find((a: any) => a.name === ASSET_NAME);

@@ -23,7 +23,13 @@ export type BridgeCommandName =
   | 'create_section'
   | 'create_page'
   | 'append_block'
-  | 'update_block';
+  | 'update_block'
+  | 'rename_page'
+  | 'move_page'
+  | 'rename_notebook'
+  | 'save_notebook'
+  | 'check_update'
+  | 'run_update';
 
 /** Sent by the app immediately after the socket opens. */
 export interface BridgeHello {
@@ -64,6 +70,8 @@ export type BridgeErrorCode =
   | 'BAD_PARAMS'
   | 'NOT_FOUND'
   | 'UNSUPPORTED'
+  /** Command is valid but the app cannot run it in its current state. */
+  | 'PRECONDITION'
   | 'INTERNAL';
 
 export interface BridgeOk<T = unknown> {
@@ -137,6 +145,63 @@ export interface AppendBlockResult {
 
 export interface UpdateBlockResult {
   blockId: string;
+}
+
+export interface RenamePageResult {
+  sectionId: string;
+  pageId: string;
+  title: string;
+  previousTitle: string;
+  /** Set when the canvas H1 was rewritten to match the new title. */
+  headingBlockId?: string;
+}
+
+export interface MovePageResult {
+  pageId: string;
+  title: string;
+  fromSectionId: string;
+  toSectionId: string;
+  /** Final position of the page within the target section. */
+  index: number;
+}
+
+export interface RenameNotebookResult {
+  filename: string;
+  previousFilename: string;
+  /**
+   * The bound file on disk is NOT renamed — the handle keeps its own name.
+   * Present when a file is bound, so the agent can say so.
+   */
+  boundFilename?: string;
+}
+
+export interface SaveNotebookResult {
+  filename: string;
+  /** Name of the file actually written on disk. */
+  savedTo: string;
+  saveRevision: number;
+}
+
+export interface CheckUpdateResult {
+  currentVersion: string;
+  /** False when up to date OR when the check could not run — see `checked`. */
+  available: boolean;
+  /** False when GitHub was unreachable or rate-limited. */
+  checked: boolean;
+  latestVersion?: string;
+  releaseUrl?: string;
+  message?: string;
+}
+
+export interface RunUpdateResult {
+  fromVersion: string;
+  toVersion: string;
+  mode: 'live-swap' | 'download';
+  /**
+   * True for live-swap: the app reloads shortly after this response is sent,
+   * which drops the bridge connection until the notebook reconnects.
+   */
+  reloading: boolean;
 }
 
 export function isBridgeErr(r: BridgeResponse): r is BridgeErr {

@@ -282,6 +282,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
 
     movePageToSection: (pageId, fromSectionId, toSectionId, toIndex) => {
       set((state) => {
+        // Guard: don't leave a section empty. Bail out entirely rather than
+        // skipping just the removal — doing the insert anyway would leave the
+        // same page id living in two sections.
+        const from = state.workspace.sections.find((s) => s.id === fromSectionId);
+        if (!from || from.pages.length <= 1) return state;
+
         let movedPage: Page | undefined;
         const sections = state.workspace.sections.map((s) => {
           if (s.id === fromSectionId) {
@@ -292,14 +298,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
               }
               return true;
             });
-            // Guard: don't leave a section empty
-            if (pages.length === 0) return s;
             return { ...s, pages };
           }
           return s;
         });
 
         if (!movedPage) return state;
+        // Unknown target would drop the page on the floor — it has already been
+        // filtered out of its old section by this point.
+        if (!sections.some((s) => s.id === toSectionId)) return state;
 
         const finalSections = sections.map((s) => {
           if (s.id === toSectionId) {
@@ -310,7 +317,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
           return s;
         });
 
-        return { isDirty: true, workspace: { ...state.workspace, sections: finalSections } };
+        // savePageNodes writes into activeSectionId → activePageId. If the page
+        // being moved is the open one, its section id has to follow it or the
+        // next flush silently matches nothing and the canvas content is lost.
+        const activeFollows = state.activePageId === pageId;
+
+        return {
+          isDirty: true,
+          ...(activeFollows ? { activeSectionId: toSectionId } : {}),
+          workspace: { ...state.workspace, sections: finalSections },
+        };
       });
     },
   };

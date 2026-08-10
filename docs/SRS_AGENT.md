@@ -1,7 +1,7 @@
 # SRS: Agent Bridge
 
 **Project:** PowerNote  
-**Version:** 0.28.0  
+**Version:** 0.29.0  
 **Date:** 2026-08-10
 
 ## Purpose
@@ -75,6 +75,17 @@ Added after the feature was demoed live and before it shipped.
 | REQ-AGENT-023 | A non-integer or negative column shall be rejected with `BAD_PARAMS` | Must | T98 |
 | REQ-AGENT-024 | Block height measurement shall apply the renderer's inline styles, so a placed block's height needs no post-render correction | Must | T96, T98 |
 | REQ-AGENT-025 | An unrecognised or malformed server frame shall be ignored without disturbing the bridge | Should | T98 |
+| REQ-AGENT-026 | An agent shall rename a page (`rename_page`), defaulting to the open page | Must | T100 |
+| REQ-AGENT-027 | `rename_page` shall also retitle the page's canvas H1 when that block still matches the previous title, and shall leave a hand-edited heading untouched | Must | T100 |
+| REQ-AGENT-028 | An agent shall move a page to another section (`move_page`), appending to the end unless `toIndex` is given | Must | T100 |
+| REQ-AGENT-029 | `move_page` shall refuse with `PRECONDITION` when the move would leave the source section with no pages, and shall leave the notebook unchanged | Must | T100 |
+| REQ-AGENT-030 | When the moved page is the open one, its section shall follow it, so subsequent writes still reach the page rather than being dropped by `savePageNodes` | Must | T100 |
+| REQ-AGENT-031 | An agent shall rename the notebook (`rename_notebook`); the file already on disk keeps its own name, which the result shall report | Must | T100 |
+| REQ-AGENT-032 | An agent shall persist the notebook to its bound file (`save_notebook`) | Must | T100 |
+| REQ-AGENT-033 | `save_notebook` shall fail with `PRECONDITION` when no file is bound, rather than opening a Save As picker the bridge cannot drive | Must | T100 |
+| REQ-AGENT-034 | An agent shall query update status (`check_update`), reporting current and latest version | Must | T100 |
+| REQ-AGENT-035 | `check_update` shall distinguish "up to date" from "could not check" via a `checked` flag, so an unreachable API is never reported as current | Must | T100 |
+| REQ-AGENT-036 | `run_update` shall require `confirm: true`, refuse when no newer installable release exists, and acknowledge before the live-swap reload drops the connection | Must | T100 |
 
 ## Related
 

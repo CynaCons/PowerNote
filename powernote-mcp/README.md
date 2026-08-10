@@ -48,6 +48,12 @@ socket on their machine.
 | `create_page` | New titled page, opened. Also writes an `# Title` block unless `withHeading: false`. |
 | `append_block` | Append a markdown block to the bottom of a page. The main way to write. |
 | `update_block` | Replace an existing block's markdown, by id. |
+| `rename_page` | Retitle a page, and its `# Title` block if that still matches. |
+| `move_page` | Move a page into another section. |
+| `rename_notebook` | Rename the notebook in the app (not the file on disk). |
+| `save_notebook` | Write the notebook back to the file it was opened from. |
+| `check_update` | Is a newer PowerNote release available? |
+| `run_update` | Install it. Overwrites the file and reloads the app. |
 
 ### Blocks, not rows
 
@@ -67,12 +73,41 @@ blocks column-major — all of column 0 top to bottom, then column 1.
 Markdown is rendered live, so `- [ ]` checkboxes arrive as real checkboxes the
 user can click, and clicking one writes back into the block's markdown.
 
+### Saving, and what the agent cannot do
+
+Edits land in the live app immediately, but they are only on disk once the
+notebook is saved. `save_notebook` overwrites the file the notebook was opened
+from — and only that file. It cannot Save As: the browser's file picker needs a
+real click, so a notebook that was never saved has nothing for the agent to
+write to, and the tool says so instead of quietly doing nothing.
+
+`rename_notebook` is the same story from the other side. It renames the notebook
+*inside* the app; the `.html` on disk keeps the name it already had until the
+user saves it somewhere new. The result includes the bound filename so the agent
+can tell the user the two now differ.
+
+### Updates
+
+`check_update` compares the running build against the latest GitHub release.
+Read the `checked` field before trusting `available`: when GitHub is unreachable
+or rate-limiting, `checked` is `false` and the status is simply unknown — not
+"up to date".
+
+`run_update` downloads the new build, injects the current notebook into it,
+overwrites the file on disk and reloads the app. That drops this bridge until
+the notebook reconnects, so the tool acknowledges *before* reloading rather than
+letting the agent time out on a success. It requires `confirm: true`; ask the
+user first. A safety backup is downloaded beforehand where the browser permits
+it — an unattended browser may block the download, so the backup is best-effort,
+not a guarantee.
+
 ## Config
 
 | Env var | Default | Purpose |
 |---------|---------|---------|
 | `POWERNOTE_BRIDGE_PORT` | `41777` | WebSocket port (loopback only). |
 | `POWERNOTE_BRIDGE_TIMEOUT_MS` | `10000` | How long to wait for the app to answer. |
+| `POWERNOTE_BRIDGE_SLOW_TIMEOUT_MS` | `120000` | Budget for the network-bound tools (`check_update`, `run_update`, `save_notebook`). |
 
 If the port is taken the server says so on stderr rather than dying silently.
 

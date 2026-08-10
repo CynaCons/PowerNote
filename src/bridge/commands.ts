@@ -21,12 +21,22 @@ import type {
   AppendBlockResult,
   BridgeCommandName,
   BridgeErrorCode,
+  CheckUpdateResult,
   CreatePageResult,
   CreateSectionResult,
   ListPagesResult,
+  MovePageResult,
   PageContent,
+  RenameNotebookResult,
+  RenamePageResult,
+  RunUpdateResult,
+  SaveNotebookResult,
   UpdateBlockResult,
 } from './protocol';
+import { APP_VERSION } from '../version';
+import { checkForUpdate, performUpdate } from '../utils/updateChecker';
+import { isFSASupported } from '../utils/fileSystemAccess';
+import { getCurrentHandle } from '../utils/fileHandleStore';
 
 export class BridgeCommandError extends Error {
   code: BridgeErrorCode;
@@ -261,6 +271,239 @@ async function updateBlock(params: Record<string, unknown>): Promise<UpdateBlock
   return { blockId };
 }
 
+// ── Notebook management ─────────────────────────────────────
+
+function renamePage(params: Record<string, unknown>): RenamePageResult {
+  flush();
+  const title = requireString(params, 'title');
+  const { section, page } = resolvePage(optionalString(params, 'pageId'));
+  const previousTitle = page.title;
+  const updateHeading = params.updateHeading !== false;
+
+  useWorkspaceStore.getState().renamePage(section.id, page.id, title);
+
+  // The sidebar title and the canvas H1 are separate pieces of state, so a
+  // rename would leave them disagreeing. Only rewrite a heading that still
+  // matches the old title — a hand-edited one is the user's, not ours.
+  let headingBlockId: string | undefined;
+  if (updateHeading) {
+    const heading = orderedTextNodes(page.nodes)[0];
+    const headingText = heading && (heading.data as TextNodeData).text.trim();
+    if (heading && headingText === `# ${previousTitle}`) {
+      navigateToPage(section.id, page.id);
+      const previous = heading.data as TextNodeData;
+      const updated: TextNodeData = { ...previous, text: `# ${title}` };
+      useCanvasStore.getState().updateNode(heading.id, {
+        data: updated,
+        height: blockHeight(updated.text, heading.width || A4_WIDTH, updated),
+      });
+      headingBlockId = heading.id;
+    }
+  }
+  flush();
+
+  return { sectionId: section.id, pageId: page.id, title, previousTitle, headingBlockId };
+}
+
+function movePage(params: Record<string, unknown>): MovePageResult {
+  flush();
+  const toSectionId = requireString(params, 'toSectionId');
+  const { section: from, page } = resolvePage(optionalString(params, 'pageId'));
+
+  const ws = useWorkspaceStore.getState();
+  const target = ws.workspace.sections.find((s) => s.id === toSectionId);
+  if (!target) {
+    throw new BridgeCommandError('NOT_FOUND', `No section with id "${toSectionId}"`);
+  }
+  if (from.id === toSectionId) {
+    throw new BridgeCommandError(
+      'BAD_PARAMS',
+      `Page "${page.id}" is already in section "${toSectionId}"`,
+    );
+  }
+  // The store refuses to empty a section, so say why rather than no-op silently.
+  if (from.pages.length <= 1) {
+    throw new BridgeCommandError(
+      'PRECONDITION',
+      `"${from.title}" would be left with no pages. Every section must keep at least one — ` +
+        'create another page there first, or move a different page.',
+    );
+  }
+
+  const rawIndex = params.toIndex;
+  if (rawIndex !== undefined && rawIndex !== null) {
+    if (typeof rawIndex !== 'number' || !Number.isInteger(rawIndex) || rawIndex < 0) {
+      throw new BridgeCommandError('BAD_PARAMS', '"toIndex" must be a non-negative integer');
+    }
+  }
+  const index = Math.min(
+    typeof rawIndex === 'number' ? rawIndex : target.pages.length,
+    target.pages.length,
+  );
+
+  useWorkspaceStore.getState().movePageToSection(page.id, from.id, toSectionId, index);
+  flush();
+
+  return {
+    pageId: page.id,
+    title: page.title,
+    fromSectionId: from.id,
+    toSectionId,
+    index,
+  };
+}
+
+async function renameNotebook(
+  params: Record<string, unknown>,
+): Promise<RenameNotebookResult> {
+  flush();
+  const filename = requireString(params, 'filename');
+  const previousFilename = useWorkspaceStore.getState().workspace.filename;
+
+  useWorkspaceStore.getState().updateWorkspace({ filename });
+  useWorkspaceStore.getState().markDirty();
+
+  // Renaming inside the app does not rename the file on disk — the FSA handle
+  // keeps whatever name it was opened under. Report it so the agent can say so.
+  let boundFilename: string | undefined;
+  if (isFSASupported()) {
+    const handle = await getCurrentHandle();
+    boundFilename = handle?.name;
+  }
+
+  return { filename, previousFilename, boundFilename };
+}
+
+async function saveNotebookCmd(): Promise<SaveNotebookResult> {
+  flush();
+  const { saveNotebook } = await import('../utils/saveNotebook');
+  const outcome = await saveNotebook(false, { existingFileOnly: true });
+
+  if (!outcome.ok) {
+    if (outcome.reason === 'busy') {
+      throw new BridgeCommandError('PRECONDITION', 'A save is already in progress');
+    }
+    if (outcome.reason === 'no-bound-file') {
+      throw new BridgeCommandError(
+        'PRECONDITION',
+        'This notebook is not bound to a file on disk, so there is nothing to overwrite. ' +
+          'The Save As picker needs a user gesture the bridge cannot provide — ask the user ' +
+          'to save once from the app, then this command will work.',
+      );
+    }
+    throw new BridgeCommandError('INTERNAL', `Save failed (${outcome.reason})`);
+  }
+
+  return {
+    filename: useWorkspaceStore.getState().workspace.filename,
+    savedTo: outcome.savedTo,
+    saveRevision: outcome.revision,
+  };
+}
+
+// ── App updates ─────────────────────────────────────────────
+
+async function checkUpdate(): Promise<CheckUpdateResult> {
+  const info = await checkForUpdate(APP_VERSION);
+
+  // checkForUpdate returns null for offline / CORS / rate-limit. That is not
+  // the same as "up to date", and conflating them would have the agent report
+  // a current version it never actually verified.
+  if (info === null) {
+    return {
+      currentVersion: APP_VERSION,
+      available: false,
+      checked: false,
+      message:
+        'Could not reach the GitHub releases API (offline, CORS-blocked, or rate limited). ' +
+        'Update status is unknown.',
+    };
+  }
+
+  if (!info.available) {
+    const latest = info.latestVersion ?? APP_VERSION;
+    return {
+      currentVersion: APP_VERSION,
+      available: false,
+      checked: true,
+      latestVersion: latest,
+      message:
+        latest === APP_VERSION
+          ? `PowerNote ${APP_VERSION} is the latest release.`
+          : `Nothing to install — running ${APP_VERSION}, ahead of the latest release ${latest}.`,
+    };
+  }
+
+  return {
+    currentVersion: APP_VERSION,
+    available: true,
+    checked: true,
+    latestVersion: info.latestVersion,
+    releaseUrl: info.releaseUrl,
+    message: `PowerNote ${info.latestVersion} is available (running ${APP_VERSION}).`,
+  };
+}
+
+async function runUpdate(params: Record<string, unknown>): Promise<RunUpdateResult> {
+  if (params.confirm !== true) {
+    throw new BridgeCommandError(
+      'BAD_PARAMS',
+      'run_update rewrites the notebook file on disk and reloads the app. ' +
+        'Pass confirm:true once the user has agreed.',
+    );
+  }
+
+  const info = await checkForUpdate(APP_VERSION);
+  if (info === null) {
+    throw new BridgeCommandError(
+      'PRECONDITION',
+      'Could not reach the GitHub releases API, so there is no update to install.',
+    );
+  }
+  if (!info.available || !info.latestVersion) {
+    throw new BridgeCommandError(
+      'PRECONDITION',
+      `Already on the latest release (${APP_VERSION}).`,
+    );
+  }
+  if (!info.downloadUrl) {
+    throw new BridgeCommandError(
+      'PRECONDITION',
+      `Release ${info.latestVersion} has no PowerNote.html asset to install.`,
+    );
+  }
+
+  // Persist first: performUpdate injects the in-memory workspace into the new
+  // template, so anything unflushed would be silently dropped by the swap.
+  flush();
+  const workspace = useWorkspaceStore.getState().workspace;
+
+  // The live-swap path reloads the page. Reloading synchronously would tear the
+  // socket down before the response frame is flushed, so the agent would see a
+  // timeout on a successful update. Defer it just past the ack.
+  const result = await performUpdate(
+    info.downloadUrl,
+    workspace,
+    APP_VERSION,
+    info.latestVersion,
+    { reload: () => setTimeout(() => window.location.reload(), 500) },
+  );
+
+  if (!result.ok) {
+    throw new BridgeCommandError(
+      'INTERNAL',
+      'Update failed — could not download or write the new version. See the app console.',
+    );
+  }
+
+  return {
+    fromVersion: APP_VERSION,
+    toVersion: info.latestVersion,
+    mode: result.mode,
+    reloading: result.mode === 'live-swap',
+  };
+}
+
 // ── Dispatch ────────────────────────────────────────────────
 
 type Handler = (params: Record<string, unknown>) => unknown | Promise<unknown>;
@@ -272,6 +515,12 @@ const HANDLERS: Record<BridgeCommandName, Handler> = {
   create_page: createPage,
   append_block: appendBlock,
   update_block: updateBlock,
+  rename_page: renamePage,
+  move_page: movePage,
+  rename_notebook: renameNotebook,
+  save_notebook: saveNotebookCmd,
+  check_update: checkUpdate,
+  run_update: runUpdate,
 };
 
 export async function runBridgeCommand(

@@ -11,6 +11,20 @@ import { getCurrentHandle, setCurrentHandle, addRecentHandle } from './fileHandl
 import { APP_VERSION } from '../version';
 import { showToast } from '../components/layout/Toast';
 
+export type SaveOutcome =
+  | { ok: true; savedTo: string; revision: number }
+  | { ok: false; reason: 'busy' | 'no-bound-file' | 'cancelled' | 'failed' };
+
+export interface SaveNotebookOptions {
+  /**
+   * Only overwrite an already-bound file; never fall back to the Save As
+   * picker or a download. The agent bridge needs this: the picker requires a
+   * user gesture it cannot produce, so without the guard an agent-triggered
+   * save would silently do nothing.
+   */
+  existingFileOnly?: boolean;
+}
+
 /**
  * Unified save flow. Tries File System Access API first (fast path:
  * overwrite existing handle, or Save As picker for new file), falls back
@@ -18,10 +32,13 @@ import { showToast } from '../components/layout/Toast';
  *
  * @param forceSaveAs If true, always show the Save As picker (ignores current handle).
  */
-export async function saveNotebook(forceSaveAs: boolean = false): Promise<void> {
+export async function saveNotebook(
+  forceSaveAs: boolean = false,
+  options: SaveNotebookOptions = {},
+): Promise<SaveOutcome> {
   const wsStore = useWorkspaceStore.getState();
   // Guard against double-trigger while a save is already running
-  if (wsStore.isSaving) return;
+  if (wsStore.isSaving) return { ok: false, reason: 'busy' };
 
   wsStore.setSaving(true);
   try {
@@ -55,10 +72,15 @@ export async function saveNotebook(forceSaveAs: boolean = false): Promise<void> 
         if (ok) {
           useWorkspaceStore.getState().markClean();
           showToast(`Saved to ${handle.name}`, 'success');
-          return;
+          return { ok: true, savedTo: handle.name, revision };
         }
         // Fall through to Save As if permission denied or write failed
       }
+    }
+
+    // No bound file (or the write failed) and the caller cannot show a picker.
+    if (options.existingFileOnly) {
+      return { ok: false, reason: 'no-bound-file' };
     }
 
     // ── Save As: show picker for new location ───────────────
@@ -70,10 +92,10 @@ export async function saveNotebook(forceSaveAs: boolean = false): Promise<void> 
         await addRecentHandle(ws.filename, newHandle);
         useWorkspaceStore.getState().markClean();
         showToast(`Saved to ${newHandle.name}`, 'success');
-        return;
+        return { ok: true, savedTo: newHandle.name, revision };
       }
       // User cancelled the picker — do nothing (workspace stays dirty)
-      return;
+      return { ok: false, reason: 'cancelled' };
     }
 
     // ── Fallback: legacy versioned download ─────────────────
@@ -81,9 +103,11 @@ export async function saveNotebook(forceSaveAs: boolean = false): Promise<void> 
     downloadFile(html, versionedFilename);
     useWorkspaceStore.getState().markClean();
     showToast(`Downloaded ${versionedFilename}`, 'success');
+    return { ok: true, savedTo: versionedFilename, revision };
   } catch (err) {
     console.error('[saveNotebook] Failed:', err);
     showToast('Failed to save notebook', 'error');
+    return { ok: false, reason: 'failed' };
   } finally {
     useWorkspaceStore.getState().setSaving(false);
   }

@@ -376,7 +376,8 @@
 | v0.26.0 | **shipped** — Default text width = one page; manual widen |
 | v0.27.0 | **shipped** — Shape & drawing groups (flat + isolation) |
 | v0.28.0 | **shipped** — Agent bridge: MCP writes notes into the live app |
-| v0.28.1 | **current** — Floating zoom control bar |
+| v0.28.1 | **tagged** — Floating zoom control bar |
+| v0.29.0 | **current** — Agent bridge: notebook management + update control |
 
 ---
 
@@ -931,6 +932,22 @@
 - [x] Fix latent stage-ref race: InfiniteCanvas registered the Konva stage on a 100ms setTimeout keyed on dimensions, so for ~100ms after mount/resize zoomToFit silently no-oped and centre-anchored zoom fell back to the origin — now registered synchronously in the post-commit effect
 - [x] setZoom action on useCanvasStore (centre-anchored, clamped) + MIN_SCALE/MAX_SCALE exported from the store and reused by InfiniteCanvas wheel/pinch instead of local duplicates
 - [x] Version bump 0.28.1 (package.json + src/version.ts), dist-template rebuilt so the in-app updater serves 0.28.1, tag v0.28.1
+### v0.29.0 — Agent bridge — notebook management + update control (ACTIVE)
+**Goal:** The agent can create and fill pages but cannot manage the notebook around them: no rename, no reorganising, no way to persist to disk, no visibility of app updates. Add rename_page, move_page, rename_notebook, save_notebook, check_update and run_update.
+- [x] protocol.ts — 6 new BridgeCommandNames + result payload types
+- [x] rename_page — retitle in the sidebar; also rewrite the canvas H1 when it still matches the old title (opt out via updateHeading:false)
+- [x] move_page — move a page between sections, with active-page tracking so savePageNodes keeps writing to the right place
+- [x] Fix latent movePageToSection bug: the "don't leave a section empty" guard skipped removal but still inserted into the target, duplicating the page id across two sections. Dead code until now — move_page is its first caller
+- [x] rename_notebook — renames inside the app only; the bound file on disk keeps its name until a Save As (documented in the tool description)
+- [x] save_notebook — existing-file fast path only; errors when no FSA handle is bound, since the Save As picker needs a user gesture the bridge cannot provide
+- [x] check_update — report current vs latest GitHub release; distinguish "up to date" from "check failed" (rate limit / offline)
+- [x] run_update — requires confirm:true; acks before the live-swap reload so the agent gets a response instead of a dropped socket
+- [x] powernote-mcp: 6 TOOLS entries + server version bump + README section
+- [x] docs/SRS_AGENT.md REQ-AGENT-026+ and E2E T100, full suite green
+- [x] Fix downgrade hazard in checkForUpdate: it compared versions by inequality, so a build ahead of the published tag reported the OLDER release as an available update — and run_update would have installed it. Now a strict semver comparison (compareVersions); also fixes the same false prompt in the Settings panel and startup banner
+- [x] saveNotebook gains an existingFileOnly option + SaveOutcome return, so the bridge reuses the real save path instead of duplicating revision stamping
+- [x] Longer request budget for the network-bound tools (POWERNOTE_BRIDGE_SLOW_TIMEOUT_MS, default 120s) — a 2.4MB update download does not fit the 10s default
+- [x] Version bump 0.29.0 (package.json, src/version.ts, powernote-mcp package + server + lockfile, SRS_AGENT header), dist-template rebuilt, tag v0.29.0
 ## Future (Backlog)
 > Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 
