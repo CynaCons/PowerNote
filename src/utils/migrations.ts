@@ -1,6 +1,7 @@
 import type { WorkspaceData, WorkspaceSettings, CanvasBgColor, BackgroundMode } from '../types/data';
 import { APP_VERSION } from '../version';
 import { DEFAULT_WORKSPACE_SETTINGS } from './defaults';
+import { ensurePageScrolls } from './scrolls';
 
 /**
  * Registry of data migrations keyed by the version they upgrade FROM.
@@ -12,7 +13,7 @@ const migrations: Record<string, (data: any) => any> = {
   // '0.15.0': (data) => { /* transform data from 0.15 → 0.16 format */ return data; },
 };
 
-const VALID_BG_MODES: BackgroundMode[] = ['pages', 'grid', 'none'];
+const VALID_BG_MODES: BackgroundMode[] = ['pages', 'scroll', 'grid', 'none'];
 const VALID_BG_COLORS: CanvasBgColor[] = ['#ffffff', '#f5f5f5', '#e5e5e5', 'paper'];
 
 /** Ensure `settings` exists with sane defaults (older notebooks omit it). */
@@ -26,6 +27,25 @@ export function ensureWorkspaceSettings(data: WorkspaceData): WorkspaceData {
     : DEFAULT_WORKSPACE_SETTINGS.bgColor;
   const settings: WorkspaceSettings = { backgroundMode, bgColor };
   return { ...data, settings };
+}
+
+/**
+ * Give every page scroll records (v0.31+). Pages written by an older build
+ * have none, so this is where they gain their stable ids — once, on load.
+ */
+export function ensurePageScrollRecords(data: WorkspaceData): WorkspaceData {
+  return {
+    ...data,
+    sections: data.sections.map((section) => ({
+      ...section,
+      pages: section.pages.map(ensurePageScrolls),
+    })),
+  };
+}
+
+/** Hydration steps every load runs, regardless of which version wrote the file. */
+function hydrate(data: WorkspaceData): WorkspaceData {
+  return ensurePageScrollRecords(ensureWorkspaceSettings(data));
 }
 
 /**
@@ -50,8 +70,8 @@ export function migrateWorkspace(data: WorkspaceData): WorkspaceData {
   const fromVersion = data.editorVersion || '0.0.0';
 
   if (compareSemver(fromVersion, APP_VERSION) >= 0) {
-    // Already current or newer — just ensure version + settings defaults
-    return ensureWorkspaceSettings({ ...data, editorVersion: APP_VERSION });
+    // Already current or newer — just ensure version + hydration defaults
+    return hydrate({ ...data, editorVersion: APP_VERSION });
   }
 
   // Apply migrations in version order
@@ -65,5 +85,5 @@ export function migrateWorkspace(data: WorkspaceData): WorkspaceData {
   }
 
   migrated.editorVersion = APP_VERSION;
-  return ensureWorkspaceSettings(migrated);
+  return hydrate(migrated);
 }

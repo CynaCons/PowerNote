@@ -922,7 +922,7 @@
 - [x] Tests: T98 (11 cases) + powernote-mcp `npm test` displacement suite; stubBridgeUrl helper makes bridge tests hermetic; 323 pass / 1 pre-existing failure (85-settings-persist, predates this work)
 - [x] docs/SRS_AGENT.md REQ-AGENT-016..025 + README columns/displacement sections
 - [x] Version bump 0.28.0, tag v0.28.0
-### v0.28.1 — Floating zoom control bar (ACTIVE)
+### v0.28.1 — Floating zoom control bar (2026-08-11) (COMPLETE)
 **Goal:** Give the canvas a visible zoom readout and mouse-only zoom controls. Ctrl+wheel and pinch already work, but there is no % indicator, no click-to-zoom, and no reset-to-100%.
 - [x] Visual prototypes: 4 variants (A compact pill, B slider bar, C dropdown pill, D auto-hide rail) mounted live in the app behind ?zoomproto=1 (src/components/canvas/ZoomBarPrototypes.tsx — throwaway)
 - [x] User picks a variant (BLOCKED — awaiting decision before implementation)
@@ -932,7 +932,7 @@
 - [x] Fix latent stage-ref race: InfiniteCanvas registered the Konva stage on a 100ms setTimeout keyed on dimensions, so for ~100ms after mount/resize zoomToFit silently no-oped and centre-anchored zoom fell back to the origin — now registered synchronously in the post-commit effect
 - [x] setZoom action on useCanvasStore (centre-anchored, clamped) + MIN_SCALE/MAX_SCALE exported from the store and reused by InfiniteCanvas wheel/pinch instead of local duplicates
 - [x] Version bump 0.28.1 (package.json + src/version.ts), dist-template rebuilt so the in-app updater serves 0.28.1, tag v0.28.1
-### v0.29.0 — Agent bridge — notebook management + update control (ACTIVE)
+### v0.29.0 — Agent bridge — notebook management + update control (2026-08-11) (COMPLETE)
 **Goal:** The agent can create and fill pages but cannot manage the notebook around them: no rename, no reorganising, no way to persist to disk, no visibility of app updates. Add rename_page, move_page, rename_notebook, save_notebook, check_update and run_update.
 - [x] protocol.ts — 6 new BridgeCommandNames + result payload types
 - [x] rename_page — retitle in the sidebar; also rewrite the canvas H1 when it still matches the old title (opt out via updateHeading:false)
@@ -948,6 +948,37 @@
 - [x] saveNotebook gains an existingFileOnly option + SaveOutcome return, so the bridge reuses the real save path instead of duplicating revision stamping
 - [x] Longer request budget for the network-bound tools (POWERNOTE_BRIDGE_SLOW_TIMEOUT_MS, default 120s) — a 2.4MB update download does not fit the 10s default
 - [x] Version bump 0.29.0 (package.json, src/version.ts, powernote-mcp package + server + lockfile, SRS_AGENT header), dist-template rebuilt, tag v0.29.0
+### v0.30.0 — Scroll guide style + agent-controlled canvas look (2026-08-11) (COMPLETE)
+**Goal:** Agents can read and change the notebook's canvas look (guide style + background colour) over the bridge, and a new "Scroll" guide style renders the page column as one continuous vertical sheet with light page separators instead of detached A4 cards. Notebook-level settings persistence (v0.26) and agent-triggered save_notebook (v0.29) already exist — this iteration verifies them against the new surface rather than rebuilding them.
+- [x] Add `scroll` to the `BackgroundMode` union and to `VALID_BG_MODES` in migrations so older/newer files validate it
+- [x] Add scroll geometry to `pageLayout.ts` (separator inset, trailing headroom) so PageGuides and the bridge share one source of truth
+- [x] `renderScroll()` in PageGuides.tsx — one continuous sheet per occupied column, page separators every A4_HEIGHT, no vertical PAGE_GAP
+- [x] Settings panel: fourth "Scroll" radio under Guide style (`data-testid="settings-bg-scroll"`)
+- [x] T101 — E2E: scroll style renders continuous sheet, survives page navigation, round-trips through save → open (Covers REQ-SETTINGS-005)
+- [x] Bridge protocol: add `get_background` / `set_background` command names + `BackgroundResult` payload to `bridge/protocol.ts`
+- [x] Bridge handlers: `getBackground` / `setBackground` in `bridge/commands.ts` — validate guideStyle + color against the allowed sets, write via `updateSettings` (marks dirty, feeds auto-save), reject unknown values with BAD_PARAMS listing the valid options
+- [x] MCP server: register `get_background` + `set_background` tools with enum-constrained schemas; bump `powernote-mcp` version and document them in its README tool table
+- [x] T102 — E2E: agent sets guide style + background colour over the bridge, canvas re-renders, notebook goes dirty; unknown values rejected (Covers REQ-SETTINGS-006, REQ-AGENT-023)
+- [x] T103 — E2E: agent `set_background` → `save_notebook` → reopen the written file keeps the scroll style (proves the existing persistence + save path covers agent-set look)
+- [x] SRS_SETTINGS: REQ-SETTINGS-005 (scroll guide style) and REQ-SETTINGS-006 (canvas look readable/writable by an agent) with test refs
+- [x] SRS_AGENT: requirement for `get_background` / `set_background` + note that agent-set look persists through the normal auto-save/save path
+- [x] Bump APP_VERSION to 0.30.0, full `npx playwright test` green, dev smoke test with no console errors
+- [x] Fix flaky T85 "settings round-trip through save → open": the fixed `waitForTimeout(500)` after `setInputFiles` is too tight on slower machines (FileReader + hydrate). Wait on the "Notebook opened" toast / poll the store instead
+### v0.31.0 — Named scrolls — identity for parallel columns (PROPOSED) (2026-08-11) (COMPLETE)
+**Goal:** Agents can already write into parallel columns via append_block(column:N), but a column has no identity: no id, no title, no defined start, and no way to discover what scrolls a page holds. Give each scroll a stable id, a title rendered at its top, and a bridge API to list/create/rename/target them — so two agents (or an agent and the user) can work side by side on one page without colliding. Design pending sign-off.
+- [x] `ScrollRecord { id, title, column }` in types/data.ts + `Page.scrolls?: ScrollRecord[]` — records own identity, membership stays derived from geometry
+- [x] Backfill on load: synthesize a record for every occupied column of every page so existing notebooks gain stable scroll ids exactly once (extend the `ensureWorkspaceSettings` hydration step)
+- [x] `scrollOf(node, scrolls)` / `scrollBand(record)` in bridge/blocks.ts, layered over the existing `columnOf` band test — one source of truth for "which scroll is this block in"
+- [x] Scroll header in PageGuides: title + hairline rule drawn in the guide layer (chrome, not a text node), `SCROLL_HEADER_HEIGHT` reserved so `BLOCK_TOP_INSET` starts below it
+- [x] Workspace store ops: `createScroll` / `renameScroll` / `deleteScroll` / `reorderScroll`, each moving the affected blocks' x atomically with the band change so derived membership never breaks
+- [x] Double-click a scroll header to rename it inline (mirrors the hierarchy panel's rename affordance)
+- [x] Bridge: `list_scrolls`, `create_scroll`, `rename_scroll` commands + protocol payloads
+- [x] Bridge: `append_block` gains `scrollId` (with `column` kept as a working deprecated alias); `read_page` returns `scrollId` per block plus the page's scroll list
+- [x] MCP server: register the scroll tools; description must steer agents to list_scrolls → target by scrollId rather than guessing a column index
+- [x] T104 — scroll identity: ids survive save → open, reorder and insert keep membership intact, header renders the title
+- [x] T105 — two agent sessions append to different scrollIds on one page concurrently; neither's blocks land in the other's band
+- [x] New `docs/SRS_SCROLL.md` (REQ-SCROLL-001..) covering identity, titles, derived membership and the agent surface; cross-reference from SRS_AGENT
+- [x] Surface scroll names to the user beyond the canvas header: list a page's scrolls under it in the hierarchy panel, and show the active scroll name in the TopBar breadcrumb
 ## Future (Backlog)
 > Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 

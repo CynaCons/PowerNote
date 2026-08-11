@@ -90,6 +90,25 @@ export interface DrawOptions {
 
 // ── Hierarchy types ─────────────────────────────────────────
 
+/**
+ * A named vertical scroll — one column band on a page (v0.31+).
+ *
+ * The record owns IDENTITY only: a stable id and a title. Membership is
+ * deliberately NOT stored. Which blocks belong to a scroll is derived from
+ * their `x`, using the same band test the page guides draw with, so dragging a
+ * block into another scroll's band moves it there — which is what dragging it
+ * there means. Storing membership would let the two disagree, and an agent
+ * appending to the "owning" scroll would then stack under a block that is no
+ * longer visually in it.
+ */
+export interface ScrollRecord {
+  id: string;
+  /** Shown on the canvas header and in the sidebar. Empty = unnamed, no header drawn. */
+  title: string;
+  /** Band index. 0 is the leftmost scroll. */
+  column: number;
+}
+
 export interface Page {
   id: string;
   title: string;
@@ -97,6 +116,8 @@ export interface Page {
   strokes?: Stroke[];
   /** Optional group records for this page (ids only; members use groupId). */
   groups?: GroupRecord[];
+  /** Named scroll bands (v0.31+). Hydrated for older pages on load. */
+  scrolls?: ScrollRecord[];
 }
 
 export interface Section {
@@ -105,8 +126,11 @@ export interface Section {
   pages: Page[];
 }
 
-/** Canvas guide overlay: A4 pages, dot/line grid, or blank */
-export type BackgroundMode = 'pages' | 'grid' | 'none';
+/**
+ * Canvas guide overlay: detached A4 page cards, one continuous vertical scroll
+ * of A4 pages, dot/line grid, or blank.
+ */
+export type BackgroundMode = 'pages' | 'scroll' | 'grid' | 'none';
 
 /** Canvas fill color presets (including paper texture tone) */
 export type CanvasBgColor = '#ffffff' | '#f5f5f5' | '#e5e5e5' | 'paper';

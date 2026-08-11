@@ -11,26 +11,39 @@
  *     mutating command must `flush()` afterwards or the edit can sit unsaved.
  */
 
-import type { CanvasNode, TextNodeData } from '../types/data';
+import type {
+  BackgroundMode,
+  CanvasBgColor,
+  CanvasNode,
+  TextNodeData,
+  WorkspaceSettings,
+} from '../types/data';
+import { DEFAULT_WORKSPACE_SETTINGS } from '../utils/defaults';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useCanvasStore } from '../stores/useCanvasStore';
 import { useDrawStore } from '../stores/useDrawStore';
 import { createBlockNode, blockHeight, columnOf, orderedTextNodes } from './blocks';
 import { A4_WIDTH } from '../utils/pageLayout';
+import { scrollById } from '../utils/scrolls';
 import type {
   AppendBlockResult,
+  BackgroundResult,
   BridgeCommandName,
   BridgeErrorCode,
   CheckUpdateResult,
   CreatePageResult,
+  CreateScrollResult,
   CreateSectionResult,
   ListPagesResult,
+  ListScrollsResult,
   MovePageResult,
   PageContent,
   RenameNotebookResult,
   RenamePageResult,
+  RenameScrollResult,
   RunUpdateResult,
   SaveNotebookResult,
+  ScrollSummary,
   UpdateBlockResult,
 } from './protocol';
 import { APP_VERSION } from '../version';
@@ -110,6 +123,58 @@ function requireString(params: Record<string, unknown>, key: string): string {
 }
 
 /**
+ * Resolve where a write lands, preferring an explicit scroll over a raw column.
+ *
+ * `scrollId` is the supported way to target a band: it survives reordering, and
+ * it fails loudly when the agent is holding a stale id. `column` predates
+ * scrolls and stays working, but it is positional — an agent using it can
+ * silently write into a scroll that moved under it.
+ */
+function resolveColumn(
+  params: Record<string, unknown>,
+  page: import('../types/data').Page,
+): number {
+  const scrollId = optionalString(params, 'scrollId');
+  if (scrollId) {
+    const scroll = scrollById(page.scrolls, scrollId);
+    if (!scroll) {
+      const known = (page.scrolls ?? [])
+        .map((s) => `"${s.id}"${s.title ? ` (${s.title})` : ''}`)
+        .join(', ');
+      throw new BridgeCommandError(
+        'NOT_FOUND',
+        `No scroll with id "${scrollId}" on page "${page.title}". ` +
+          (known ? `Known scrolls: ${known}.` : 'This page has no scrolls.') +
+          ' Call list_scrolls to refresh.',
+      );
+    }
+    return scroll.column;
+  }
+  return optionalColumn(params);
+}
+
+/** Scroll id covering a column band, if the page has a record for it. */
+function scrollIdForColumn(
+  page: import('../types/data').Page,
+  column: number,
+): string | undefined {
+  return page.scrolls?.find((s) => s.column === column)?.id;
+}
+
+function summariseScrolls(page: import('../types/data').Page): ScrollSummary[] {
+  return [...(page.scrolls ?? [])]
+    .sort((a, b) => a.column - b.column)
+    .map((scroll) => ({
+      scrollId: scroll.id,
+      title: scroll.title,
+      column: scroll.column,
+      blockCount: page.nodes.filter(
+        (n) => n.type === 'text' && columnOf(n) === scroll.column,
+      ).length,
+    }));
+}
+
+/**
  * A4 column index to write into. 0 is the leftmost page guide; 1 is the guide
  * immediately to its right, and so on.
  */
@@ -159,11 +224,16 @@ function readPage(params: Record<string, unknown>): PageContent {
     sectionId: section.id,
     pageId: page.id,
     title: page.title,
-    blocks: orderedTextNodes(page.nodes).map((node) => ({
-      blockId: node.id,
-      markdown: (node.data as TextNodeData).text,
-      column: columnOf(node),
-    })),
+    blocks: orderedTextNodes(page.nodes).map((node) => {
+      const column = columnOf(node);
+      return {
+        blockId: node.id,
+        markdown: (node.data as TextNodeData).text,
+        column,
+        scrollId: scrollIdForColumn(page, column),
+      };
+    }),
+    scrolls: summariseScrolls(page),
   };
 }
 
@@ -219,8 +289,8 @@ async function createPage(params: Record<string, unknown>): Promise<CreatePageRe
 async function appendBlock(params: Record<string, unknown>): Promise<AppendBlockResult> {
   flush();
   const markdown = requireString(params, 'markdown');
-  const column = optionalColumn(params);
   const { section, page } = resolvePage(optionalString(params, 'pageId'));
+  const column = resolveColumn(params, page);
 
   navigateToPage(section.id, page.id);
 
@@ -228,7 +298,66 @@ async function appendBlock(params: Record<string, unknown>): Promise<AppendBlock
   useCanvasStore.getState().addNode(node);
   flush();
 
-  return { sectionId: section.id, pageId: page.id, blockId: node.id, column };
+  return {
+    sectionId: section.id,
+    pageId: page.id,
+    blockId: node.id,
+    column,
+    scrollId: scrollIdForColumn(page, column),
+  };
+}
+
+// ── Scrolls ─────────────────────────────────────────────────
+
+function listScrolls(params: Record<string, unknown>): ListScrollsResult {
+  flush();
+  const { section, page } = resolvePage(optionalString(params, 'pageId'));
+  return {
+    sectionId: section.id,
+    pageId: page.id,
+    pageTitle: page.title,
+    scrolls: summariseScrolls(page),
+  };
+}
+
+function createScrollCmd(params: Record<string, unknown>): CreateScrollResult {
+  flush();
+  const title = requireString(params, 'title');
+  const { section, page } = resolvePage(optionalString(params, 'pageId'));
+
+  const record = useWorkspaceStore.getState().createScroll(page.id, title);
+  if (!record) {
+    throw new BridgeCommandError('INTERNAL', `Could not create a scroll on page "${page.id}"`);
+  }
+
+  return {
+    sectionId: section.id,
+    pageId: page.id,
+    scrollId: record.id,
+    title: record.title,
+    column: record.column,
+  };
+}
+
+function renameScrollCmd(params: Record<string, unknown>): RenameScrollResult {
+  flush();
+  const scrollId = requireString(params, 'scrollId');
+  const title = requireString(params, 'title');
+
+  const { workspace } = useWorkspaceStore.getState();
+  for (const section of workspace.sections) {
+    for (const page of section.pages) {
+      const scroll = scrollById(page.scrolls, scrollId);
+      if (!scroll) continue;
+      useWorkspaceStore.getState().renameScroll(page.id, scrollId, title);
+      return { scrollId, title, previousTitle: scroll.title };
+    }
+  }
+
+  throw new BridgeCommandError(
+    'NOT_FOUND',
+    `No scroll with id "${scrollId}" in this notebook. Call list_scrolls to refresh.`,
+  );
 }
 
 async function updateBlock(params: Record<string, unknown>): Promise<UpdateBlockResult> {
@@ -269,6 +398,90 @@ async function updateBlock(params: Record<string, unknown>): Promise<UpdateBlock
   flush();
 
   return { blockId };
+}
+
+// ── Canvas look ─────────────────────────────────────────────
+
+const GUIDE_STYLES: BackgroundMode[] = ['pages', 'scroll', 'grid', 'none'];
+
+/**
+ * Agent-facing colour names ↔ stored `CanvasBgColor`.
+ *
+ * The hex values are accepted too: an agent that has read the notebook file
+ * will have seen `"#f5f5f5"`, and rejecting what we ourselves persisted would
+ * be a needless trap.
+ */
+const COLOR_BY_NAME: Record<string, CanvasBgColor> = {
+  white: '#ffffff',
+  'light-gray': '#f5f5f5',
+  gray: '#e5e5e5',
+  paper: 'paper',
+};
+
+const NAME_BY_COLOR: Record<CanvasBgColor, string> = {
+  '#ffffff': 'white',
+  '#f5f5f5': 'light-gray',
+  '#e5e5e5': 'gray',
+  paper: 'paper',
+};
+
+function currentSettings(): WorkspaceSettings {
+  return useWorkspaceStore.getState().workspace.settings ?? DEFAULT_WORKSPACE_SETTINGS;
+}
+
+function describeBackground(settings: WorkspaceSettings) {
+  return { guideStyle: settings.backgroundMode, color: NAME_BY_COLOR[settings.bgColor] };
+}
+
+function getBackground(): BackgroundResult {
+  return describeBackground(currentSettings());
+}
+
+function setBackground(params: Record<string, unknown>): BackgroundResult {
+  flush();
+  const previous = describeBackground(currentSettings());
+  const updates: Partial<WorkspaceSettings> = {};
+
+  const guideStyle = optionalString(params, 'guideStyle');
+  if (guideStyle !== undefined) {
+    if (!GUIDE_STYLES.includes(guideStyle as BackgroundMode)) {
+      throw new BridgeCommandError(
+        'BAD_PARAMS',
+        `"${guideStyle}" is not a guide style. Valid values: ${GUIDE_STYLES.join(', ')}.`,
+      );
+    }
+    updates.backgroundMode = guideStyle as BackgroundMode;
+  }
+
+  const color = optionalString(params, 'color');
+  if (color !== undefined) {
+    const resolved =
+      COLOR_BY_NAME[color] ??
+      (color in NAME_BY_COLOR ? (color as CanvasBgColor) : undefined);
+    if (!resolved) {
+      throw new BridgeCommandError(
+        'BAD_PARAMS',
+        `"${color}" is not a background colour. Valid values: ` +
+          `${Object.keys(COLOR_BY_NAME).join(', ')}.`,
+      );
+    }
+    updates.bgColor = resolved;
+  }
+
+  // Both optional individually, but a call that changes nothing is a mistake
+  // worth surfacing rather than a successful no-op.
+  if (Object.keys(updates).length === 0) {
+    throw new BridgeCommandError(
+      'BAD_PARAMS',
+      'Pass at least one of "guideStyle" or "color".',
+    );
+  }
+
+  // updateSettings marks the notebook dirty, so the normal auto-save pipeline
+  // persists this exactly like a change made from the settings panel.
+  useWorkspaceStore.getState().updateSettings(updates);
+
+  return { ...describeBackground(currentSettings()), previous };
 }
 
 // ── Notebook management ─────────────────────────────────────
@@ -517,6 +730,11 @@ const HANDLERS: Record<BridgeCommandName, Handler> = {
   update_block: updateBlock,
   rename_page: renamePage,
   move_page: movePage,
+  list_scrolls: listScrolls,
+  create_scroll: createScrollCmd,
+  rename_scroll: renameScrollCmd,
+  get_background: getBackground,
+  set_background: setBackground,
   rename_notebook: renameNotebook,
   save_notebook: saveNotebookCmd,
   check_update: checkUpdate,

@@ -120,6 +120,16 @@ export function SettingsPanel({ backgroundMode, onChangeBackgroundMode, bgColor,
           <label className="settings-panel__radio">
             <input
               type="radio" name="bg-mode"
+              checked={backgroundMode === 'scroll'}
+              onChange={() => onChangeBackgroundMode('scroll')}
+              data-testid="settings-bg-scroll"
+            />
+            <span>Scroll</span>
+          </label>
+
+          <label className="settings-panel__radio">
+            <input
+              type="radio" name="bg-mode"
               checked={backgroundMode === 'grid'}
               onChange={() => onChangeBackgroundMode('grid')}
               data-testid="settings-bg-grid"

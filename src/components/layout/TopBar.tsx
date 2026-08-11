@@ -13,6 +13,7 @@ import { setCurrentHandle, addRecentHandle, clearCurrentHandle } from '../../uti
 import { useFileBindingStore } from '../../stores/useFileBindingStore';
 import { saveNotebook } from '../../utils/saveNotebook';
 import { canRevert, revertNotebook } from '../../utils/revertNotebook';
+import { scrollOf } from '../../utils/scrolls';
 import { useRef, useState, useEffect } from 'react';
 import { showToast } from './Toast';
 import './TopBar.css';
@@ -33,6 +34,20 @@ export function TopBar() {
 
   const activeSection = workspace.sections.find((s) => s.id === activeSectionId);
   const activePage = activeSection?.pages.find((p) => p.id === activePageId);
+
+  // There is no "current scroll" — a scroll is a place, not a mode. The nearest
+  // honest answer is the scroll the selection is standing in, so the crumb
+  // appears only while exactly one block is selected, and only if it is named.
+  const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds);
+  const canvasNodes = useCanvasStore((s) => s.nodes);
+  const selectedScrollTitle =
+    selectedNodeIds.length === 1
+      ? (() => {
+          const node = canvasNodes.find((n) => n.id === selectedNodeIds[0]);
+          if (!node) return undefined;
+          return scrollOf(node, activePage?.scrolls)?.title || undefined;
+        })()
+      : undefined;
 
   // beforeunload warning for unsaved changes
   useEffect(() => {
@@ -225,6 +240,14 @@ export function TopBar() {
               <ChevronRight size={14} className="top-bar__separator" />
               <span className="top-bar__crumb top-bar__crumb--active" data-testid="topbar-page">
                 {activePage.title}
+              </span>
+            </>
+          )}
+          {selectedScrollTitle && (
+            <>
+              <ChevronRight size={14} className="top-bar__separator" />
+              <span className="top-bar__crumb top-bar__crumb--active" data-testid="topbar-scroll">
+                {selectedScrollTitle}
               </span>
             </>
           )}

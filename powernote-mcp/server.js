@@ -248,16 +248,81 @@ const TOOLS = [
           type: 'string',
           description: 'Page to append to. Defaults to the page currently open.',
         },
+        scrollId: {
+          type: 'string',
+          description:
+            'Scroll (named column) to write into. THIS IS THE PREFERRED WAY to choose ' +
+            'where a block lands — call list_scrolls first and pass an id from it. ' +
+            'Each scroll stacks independently, so two workstreams can fill different ' +
+            'scrolls on one page without ever interleaving. Defaults to the leftmost.',
+        },
         column: {
           type: 'integer',
           minimum: 0,
           description:
-            'Which A4 page guide to write into: 0 is the leftmost (default), 1 is the ' +
-            'guide immediately to its right, and so on. Each column stacks ' +
-            'independently, so filling column 1 does not depend on how long column 0 is.',
+            'Raw A4 page-guide index: 0 is the leftmost, 1 the guide to its right. ' +
+            'Legacy fallback — prefer scrollId, which keeps pointing at the same ' +
+            'scroll after scrolls are reordered. Ignored when scrollId is given.',
         },
       },
       required: ['markdown'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'list_scrolls',
+    description:
+      'List the scrolls (named vertical columns) on a page, with how many blocks ' +
+      'each holds. Call this before writing when a page may have more than one ' +
+      'workstream on it: passing the returned scrollId to append_block keeps your ' +
+      'blocks in their own column instead of stacking under someone else\'s. ' +
+      'A block belongs to whichever scroll it physically sits in, so a block the ' +
+      'user drags to another scroll moves with it.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pageId: {
+          type: 'string',
+          description: 'Page to inspect. Defaults to the page currently open.',
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'create_scroll',
+    description:
+      'Create a new named scroll on a page — a fresh vertical column to the right ' +
+      'of the existing ones, with its title shown at the top on the canvas. Use ' +
+      'this to keep a separate workstream (say "Open questions" beside "Research ' +
+      'log") from interleaving with what is already there. Returns a scrollId to ' +
+      'pass to append_block.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Title shown at the top of the scroll.' },
+        pageId: {
+          type: 'string',
+          description: 'Page to add the scroll to. Defaults to the page currently open.',
+        },
+      },
+      required: ['title'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'rename_scroll',
+    description:
+      'Rename a scroll. The new title appears immediately at the top of that ' +
+      'column on the canvas. Naming a previously untitled scroll is how its ' +
+      'header first appears.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        scrollId: { type: 'string', description: 'Scroll to rename (from list_scrolls).' },
+        title: { type: 'string', description: 'New title.' },
+      },
+      required: ['scrollId', 'title'],
       additionalProperties: false,
     },
   },
@@ -342,6 +407,40 @@ const TOOLS = [
     },
   },
   {
+    name: 'get_background',
+    description:
+      'Read the notebook\'s canvas look: which guide style is active and which ' +
+      'background colour. Call before set_background when you intend to restore ' +
+      'the previous look afterwards.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'set_background',
+    description:
+      'Change the notebook\'s canvas look. "scroll" renders each column as one ' +
+      'continuous vertical sheet with light page separators — best for long ' +
+      'reading and for notes an agent is filling in. "pages" shows detached A4 ' +
+      'cards, "grid" a dot grid, "none" a blank canvas. The setting is stored in ' +
+      'the notebook itself, so it survives closing and reopening. Pass at least ' +
+      'one of guideStyle or color.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        guideStyle: {
+          type: 'string',
+          enum: ['pages', 'scroll', 'grid', 'none'],
+          description: 'Guide overlay to use.',
+        },
+        color: {
+          type: 'string',
+          enum: ['white', 'light-gray', 'gray', 'paper'],
+          description: 'Canvas background colour. "paper" is a warm off-white.',
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'save_notebook',
     description:
       'Write the notebook back to the file it was opened from. Only works when the ' +
@@ -381,7 +480,7 @@ const TOOLS = [
 ];
 
 const server = new Server(
-  { name: 'powernote-notes', version: '0.29.0' },
+  { name: 'powernote-notes', version: '0.31.0' },
   { capabilities: { tools: {} } },
 );
 

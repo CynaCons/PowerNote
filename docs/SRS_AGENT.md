@@ -1,8 +1,8 @@
 # SRS: Agent Bridge
 
 **Project:** PowerNote  
-**Version:** 0.29.0  
-**Date:** 2026-08-10
+**Version:** 0.31.0  
+**Date:** 2026-08-11
 
 ## Purpose
 
@@ -86,9 +86,15 @@ Added after the feature was demoed live and before it shipped.
 | REQ-AGENT-034 | An agent shall query update status (`check_update`), reporting current and latest version | Must | T100 |
 | REQ-AGENT-035 | `check_update` shall distinguish "up to date" from "could not check" via a `checked` flag, so an unreachable API is never reported as current | Must | T100 |
 | REQ-AGENT-036 | `run_update` shall require `confirm: true`, refuse when no newer installable release exists, and acknowledge before the live-swap reload drops the connection | Must | T100 |
+| REQ-AGENT-037 | An agent shall list, create and rename scrolls, and target one by `scrollId` when appending, so two workstreams can share a page without interleaving | Must | T105 |
+| REQ-AGENT-038 | An unknown `scrollId` shall be rejected with `NOT_FOUND` naming the known scrolls, and shall not fall back to another column | Must | T105 |
+| REQ-AGENT-039 | An agent shall read and set the canvas look (`get_background`, `set_background`); background colour shall be addressed by name (`white`, `light-gray`, `gray`, `paper`), with the stored hex accepted as an alias | Must | T102 |
+| REQ-AGENT-040 | `set_background` shall validate before writing: an unknown guide style or colour shall be rejected with `BAD_PARAMS` listing the valid values, leaving the notebook unchanged, and a call setting neither field shall be an error rather than a silent no-op | Must | T102 |
+| REQ-AGENT-041 | An agent-set canvas look shall persist through the normal auto-save/save path, requiring no persistence path of its own | Must | T103 |
 
 ## Related
 
+- REQ-SCROLL family — scroll identity, titles and derived band membership
 - REQ-TEXT family — markdown rendering and clickable checkboxes in text nodes
 - REQ-HIERARCHY family — section/page structure and navigation
 - REQ-FILE family — auto-save and notebook persistence

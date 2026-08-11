@@ -10,6 +10,7 @@ import { SelectionTransformer } from './SelectionTransformer';
 import { ContextMenu } from './ContextMenu';
 import { SnapGuides, type SnapLine } from './SnapGuides';
 import { PageGuides } from './PageGuides';
+import { ScrollHeaders } from './ScrollHeaders';
 import { DrawingLayer } from './DrawingLayer';
 import { TrashButton } from './TrashButton';
 import { GroupIsolationBar } from './GroupIsolationBar';
@@ -19,10 +20,14 @@ import { useCanvasKeyboard } from '../../hooks/useCanvasKeyboard';
 import { useContextMenu } from '../../hooks/useContextMenu';
 import { useCanvasDragDrop } from '../../hooks/useCanvasDragDrop';
 import { useGroupStore } from '../../stores/useGroupStore';
-import type { BackgroundMode, CanvasBgColor } from '../../types/data';
+import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
+import type { BackgroundMode, CanvasBgColor, ScrollRecord } from '../../types/data';
 import './InfiniteCanvas.css';
 
 const ZOOM_FACTOR = 1.05;
+
+/** Stable empty array — a fresh [] each render would loop the store subscription. */
+const EMPTY_SCROLLS: ScrollRecord[] = [];
 
 export type { CanvasBgColor };
 
@@ -50,6 +55,16 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
   const setViewport = useCanvasStore((s) => s.setViewport);
 
   const activeTool = useToolStore((s) => s.activeTool);
+
+  // Scroll records live on the workspace page, not the canvas store — subscribe
+  // so a rename or a new scroll repaints without waiting for a node change.
+  const activePageId = useWorkspaceStore((s) => s.activePageId);
+  const activeScrolls = useWorkspaceStore(
+    (s) =>
+      s.workspace.sections
+        .find((sec) => sec.id === s.activeSectionId)
+        ?.pages.find((p) => p.id === s.activePageId)?.scrolls ?? EMPTY_SCROLLS,
+  );
 
   // ── Extracted hooks ─────────────────────────────────────────
   const {
@@ -288,6 +303,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
         >
           <Layer>
             <PageGuides mode={backgroundMode} nodes={nodes} />
+            <ScrollHeaders mode={backgroundMode} scrolls={activeScrolls} pageId={activePageId} />
           </Layer>
           <Layer>
             {/* Shape preview ghost while dragging — uses same coordinate system as ShapeNode */}

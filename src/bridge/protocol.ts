@@ -11,6 +11,8 @@
  * like user edits — there is no external-write/auto-save collision to resolve.
  */
 
+import type { BackgroundMode } from '../types/data';
+
 export const BRIDGE_PROTOCOL_VERSION = 1;
 
 /** Loopback only — the bridge must never be reachable off-machine. */
@@ -26,6 +28,11 @@ export type BridgeCommandName =
   | 'update_block'
   | 'rename_page'
   | 'move_page'
+  | 'list_scrolls'
+  | 'create_scroll'
+  | 'rename_scroll'
+  | 'get_background'
+  | 'set_background'
   | 'rename_notebook'
   | 'save_notebook'
   | 'check_update'
@@ -107,6 +114,17 @@ export interface BlockSummary {
   markdown: string;
   /** A4 page-guide column the block sits in (0 = leftmost). */
   column: number;
+  /** Scroll the block sits in, derived from its position. */
+  scrollId?: string;
+}
+
+/** A named column band. Blocks belong to it by position, not by a stored link. */
+export interface ScrollSummary {
+  scrollId: string;
+  title: string;
+  /** 0 = leftmost band. */
+  column: number;
+  blockCount: number;
 }
 
 export interface PageContent {
@@ -114,6 +132,43 @@ export interface PageContent {
   pageId: string;
   title: string;
   blocks: BlockSummary[];
+  scrolls: ScrollSummary[];
+}
+
+export interface ListScrollsResult {
+  sectionId: string;
+  pageId: string;
+  pageTitle: string;
+  scrolls: ScrollSummary[];
+}
+
+export interface CreateScrollResult {
+  sectionId: string;
+  pageId: string;
+  scrollId: string;
+  title: string;
+  column: number;
+}
+
+export interface RenameScrollResult {
+  scrollId: string;
+  title: string;
+  previousTitle: string;
+}
+
+/**
+ * The notebook's canvas look.
+ *
+ * `color` is an agent-facing NAME ("paper", "light-gray") rather than the hex
+ * stored in `WorkspaceSettings.bgColor`. The app offers four presets, not free
+ * colour, so a name is both easier for a model to reason about and impossible
+ * to get subtly wrong by a digit.
+ */
+export interface BackgroundResult {
+  guideStyle: BackgroundMode;
+  color: string;
+  /** Only present on set_background, so the agent can report what it changed. */
+  previous?: { guideStyle: BackgroundMode; color: string };
 }
 
 export interface ListPagesResult {
@@ -141,6 +196,8 @@ export interface AppendBlockResult {
   pageId: string;
   blockId: string;
   column: number;
+  /** Scroll the block landed in, when the page has a record for that band. */
+  scrollId?: string;
 }
 
 export interface UpdateBlockResult {

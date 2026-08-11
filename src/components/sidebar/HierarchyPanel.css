@@ -141,12 +141,48 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* Wrap so the scroll list drops onto its own line under the page row,
+     without restructuring the row that carries the drag + active styling. */
+  flex-wrap: wrap;
   width: 100%;
   padding: 0 4px 0 0;
   border-radius: 4px;
   color: var(--color-text-muted);
   font-size: 13px;
   transition: all 0.15s ease;
+}
+
+/* ── Scrolls under a page ────────────────────────── */
+.hierarchy-scrolls {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 4px 30px;
+}
+
+.hierarchy-scroll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 4px;
+  border: none;
+  background: none;
+  text-align: left;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.hierarchy-scroll:hover {
+  color: var(--color-text);
+}
+
+.hierarchy-scroll__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .hierarchy-page:hover {

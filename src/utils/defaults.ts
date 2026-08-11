@@ -19,6 +19,9 @@ export function createPage(title = 'Untitled Page'): Page {
     id: generateId(),
     title,
     nodes: [],
+    // Untitled so no header is drawn until someone names it, but present from
+    // birth so an agent always has a scroll id to append to.
+    scrolls: [{ id: generateId(), title: '', column: 0 }],
   };
 }
 

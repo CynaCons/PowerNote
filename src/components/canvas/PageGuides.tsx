@@ -5,6 +5,10 @@ import {
   A4_HEIGHT,
   PAGE_GAP,
   PAGE_MARGIN as MARGIN,
+  SCROLL_HEADROOM_PAGES,
+  SCROLL_SEPARATOR_TICK,
+  columnAt,
+  columnLeft,
 } from '../../utils/pageLayout';
 
 export type { BackgroundMode };
@@ -12,6 +16,10 @@ export type { BackgroundMode };
 // Grid mode spacing
 const GRID_SPACING = 100;
 const GRID_EXTENT = 5000; // how far grid lines extend
+
+// Scroll mode: pages stacked with no vertical gap, so the column reads as one
+// continuous sheet and a page boundary is just a rule across it. Geometry lives
+// in pageLayout so the guides and the bridge measure from the same numbers.
 
 interface PageGuidesProps {
   mode: BackgroundMode;
@@ -104,6 +112,106 @@ function renderPages(nodes: CanvasNode[]) {
   return elements;
 }
 
+/**
+ * Vertical + horizontal extent of the scroll, in whole pages.
+ *
+ * Columns still sit `A4_WIDTH + PAGE_GAP` apart — scroll only removes the gap
+ * BETWEEN stacked pages, so a multi-column page keeps its existing layout and
+ * each column becomes its own scroll.
+ */
+function scrollExtent(nodes: CanvasNode[]) {
+  const columns = new Set<number>([0]);
+  let minY = 0;
+  let maxY = 0;
+
+  for (const node of nodes) {
+    const colStart = columnAt(node.x);
+    const colEnd = columnAt(node.x + (node.width || 200));
+    for (let c = colStart; c <= colEnd; c++) columns.add(c);
+    minY = Math.min(minY, node.y);
+    maxY = Math.max(maxY, node.y + (node.height || 30));
+  }
+
+  return {
+    columns,
+    firstRow: Math.floor(minY / A4_HEIGHT),
+    lastRow: Math.floor(maxY / A4_HEIGHT) + SCROLL_HEADROOM_PAGES,
+  };
+}
+
+function renderScroll(nodes: CanvasNode[]) {
+  const { columns, firstRow, lastRow } = scrollExtent(nodes);
+  const elements: JSX.Element[] = [];
+
+  const top = firstRow * A4_HEIGHT;
+  const height = (lastRow - firstRow + 1) * A4_HEIGHT;
+
+  for (const col of columns) {
+    const x = columnLeft(col);
+
+    elements.push(
+      <Rect
+        key={`scroll-bg-${col}`}
+        name="scroll-sheet"
+        x={x}
+        y={top}
+        width={A4_WIDTH}
+        height={height}
+        fill="#ffffff"
+        shadowColor="rgba(0,0,0,0.08)"
+        shadowBlur={8}
+        shadowOffsetY={2}
+        cornerRadius={2}
+        listening={false}
+      />,
+      // One dashed outline around the whole strip, not per page — the point of
+      // scroll mode is that the pages inside it do not look detached.
+      <Rect
+        key={`scroll-border-${col}`}
+        x={x}
+        y={top}
+        width={A4_WIDTH}
+        height={height}
+        stroke="#d4d4d4"
+        strokeWidth={0.5}
+        dash={[6, 4]}
+        cornerRadius={2}
+        listening={false}
+      />,
+    );
+
+    for (let row = firstRow + 1; row <= lastRow; row++) {
+      const y = row * A4_HEIGHT;
+      elements.push(
+        <Line
+          key={`scroll-sep-${col}-${row}`}
+          name="scroll-separator"
+          points={[x, y, x + A4_WIDTH, y]}
+          stroke="#ededed"
+          strokeWidth={1}
+          listening={false}
+        />,
+        <Line
+          key={`scroll-tick-l-${col}-${row}`}
+          points={[x, y, x + SCROLL_SEPARATOR_TICK, y]}
+          stroke="#cfcfcf"
+          strokeWidth={1}
+          listening={false}
+        />,
+        <Line
+          key={`scroll-tick-r-${col}-${row}`}
+          points={[x + A4_WIDTH - SCROLL_SEPARATOR_TICK, y, x + A4_WIDTH, y]}
+          stroke="#cfcfcf"
+          strokeWidth={1}
+          listening={false}
+        />,
+      );
+    }
+  }
+
+  return elements;
+}
+
 function renderGrid() {
   const elements: JSX.Element[] = [];
   const start = -GRID_EXTENT;
@@ -145,5 +253,6 @@ function renderGrid() {
 export function PageGuides({ mode, nodes }: PageGuidesProps) {
   if (mode === 'none') return null;
   if (mode === 'grid') return <Group listening={false}>{renderGrid()}</Group>;
+  if (mode === 'scroll') return <Group listening={false}>{renderScroll(nodes)}</Group>;
   return <Group listening={false}>{renderPages(nodes)}</Group>;
 }

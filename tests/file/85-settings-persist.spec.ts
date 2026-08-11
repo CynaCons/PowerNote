@@ -95,7 +95,14 @@ test.describe('85 - Settings persist in HTML (REQ-SETTINGS-002..004)', () => {
 
     const fileInput = page.locator('[data-testid="file-input"]');
     await fileInput.setInputFiles(tmpPath);
-    await page.waitForTimeout(500);
+    // Poll rather than sleep: the open path is FileReader → parse → hydrate, and
+    // a fixed wait that is merely usually long enough fails on a slower machine.
+    await expect
+      .poll(
+        async () => (await getWorkspaceStore(page)).workspace.settings?.backgroundMode,
+        { timeout: 5000 },
+      )
+      .toBe('grid');
 
     ws = await getWorkspaceStore(page);
     expect(ws.workspace.settings?.backgroundMode).toBe('grid');

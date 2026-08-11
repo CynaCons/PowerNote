@@ -5,6 +5,7 @@ import type {
   Section,
   Page,
   CanvasNode,
+  ScrollRecord,
 } from '../types/data';
 import {
   createWorkspace,
@@ -12,6 +13,9 @@ import {
   createPage,
   DEFAULT_WORKSPACE_SETTINGS,
 } from '../utils/defaults';
+import { generateId } from '../utils/ids';
+import { columnAt } from '../utils/pageLayout';
+import { compactColumns, nextFreeColumn } from '../utils/scrolls';
 
 interface WorkspaceState {
   workspace: WorkspaceData;
@@ -49,10 +53,40 @@ interface WorkspaceState {
   savePageNodes: (nodes: CanvasNode[]) => void;
   savePageStrokes: (strokes: import('../types/data').Stroke[]) => void;
 
+  // Scroll (column band) actions — see utils/scrolls.ts for the model
+  createScroll: (pageId: string, title: string) => ScrollRecord | null;
+  renameScroll: (pageId: string, scrollId: string, title: string) => void;
+  /** Removes the record; `withBlocks` also deletes the blocks sitting in its band. */
+  deleteScroll: (pageId: string, scrollId: string, withBlocks: boolean) => void;
+  reorderScroll: (pageId: string, scrollId: string, toIndex: number) => void;
+
   // Reorder
   reorderSection: (fromIndex: number, toIndex: number) => void;
   reorderPage: (sectionId: string, fromIndex: number, toIndex: number) => void;
   movePageToSection: (pageId: string, fromSectionId: string, toSectionId: string, toIndex: number) => void;
+}
+
+/** Rewrite one page anywhere in the notebook, leaving the rest untouched. */
+function mapPage(
+  workspace: WorkspaceData,
+  pageId: string,
+  fn: (page: Page) => Page,
+): WorkspaceData {
+  return {
+    ...workspace,
+    sections: workspace.sections.map((s) => ({
+      ...s,
+      pages: s.pages.map((p) => (p.id === pageId ? fn(p) : p)),
+    })),
+  };
+}
+
+function findPage(workspace: WorkspaceData, pageId: string): Page | undefined {
+  for (const section of workspace.sections) {
+    const page = section.pages.find((p) => p.id === pageId);
+    if (page) return page;
+  }
+  return undefined;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
@@ -253,6 +287,102 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
           ),
         },
       }));
+    },
+
+    createScroll: (pageId, title) => {
+      const page = findPage(get().workspace, pageId);
+      if (!page) return null;
+
+      const record: ScrollRecord = {
+        id: generateId(),
+        title,
+        column: nextFreeColumn(page.scrolls ?? []),
+      };
+      set((state) => ({
+        isDirty: true,
+        workspace: mapPage(state.workspace, pageId, (p) => ({
+          ...p,
+          scrolls: [...(p.scrolls ?? []), record],
+        })),
+      }));
+      return record;
+    },
+
+    renameScroll: (pageId, scrollId, title) => {
+      set((state) => ({
+        isDirty: true,
+        workspace: mapPage(state.workspace, pageId, (p) => ({
+          ...p,
+          scrolls: (p.scrolls ?? []).map((s) =>
+            s.id === scrollId ? { ...s, title } : s,
+          ),
+        })),
+      }));
+    },
+
+    deleteScroll: (pageId, scrollId, withBlocks) => {
+      set((state) => {
+        const page = findPage(state.workspace, pageId);
+        const target = page?.scrolls?.find((s) => s.id === scrollId);
+        if (!page || !target) return state;
+
+        const remaining = (page.scrolls ?? []).filter((s) => s.id !== scrollId);
+        // A page always keeps one scroll — otherwise there is nowhere to append.
+        if (remaining.length === 0) return state;
+
+        const keptNodes = withBlocks
+          ? page.nodes.filter((n) => columnAt(n.x) !== target.column)
+          : page.nodes;
+
+        // Close the gap the removed band leaves, moving the surviving blocks
+        // with their scrolls so membership survives the renumber. Sorted first
+        // because compactColumns reads array order as the target order.
+        const compacted = compactColumns(
+          [...remaining].sort((a, b) => a.column - b.column),
+          keptNodes,
+        );
+
+        return {
+          isDirty: true,
+          workspace: mapPage(state.workspace, pageId, (p) => ({
+            ...p,
+            scrolls: compacted.scrolls,
+            nodes: compacted.nodes,
+          })),
+        };
+      });
+    },
+
+    reorderScroll: (pageId, scrollId, toIndex) => {
+      set((state) => {
+        const page = findPage(state.workspace, pageId);
+        const scrolls = page?.scrolls;
+        if (!page || !scrolls) return state;
+
+        const ordered = [...scrolls].sort((a, b) => a.column - b.column);
+        const from = ordered.findIndex((s) => s.id === scrollId);
+        if (from < 0) return state;
+
+        const to = Math.max(0, Math.min(toIndex, ordered.length - 1));
+        if (to === from) return state;
+
+        const [moved] = ordered.splice(from, 1);
+        ordered.splice(to, 0, moved);
+
+        // compactColumns reads each record's CURRENT column to find its blocks,
+        // then renumbers by array order — so the spliced array is exactly the
+        // instruction it needs, and blocks follow their scroll.
+        const compacted = compactColumns(ordered, page.nodes);
+
+        return {
+          isDirty: true,
+          workspace: mapPage(state.workspace, pageId, (p) => ({
+            ...p,
+            scrolls: compacted.scrolls,
+            nodes: compacted.nodes,
+          })),
+        };
+      });
     },
 
     reorderSection: (fromIndex, toIndex) => {

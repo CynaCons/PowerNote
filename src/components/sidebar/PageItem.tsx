@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { FileText, Pencil, X } from 'lucide-react';
+import { Columns2, FileText, Pencil, X } from 'lucide-react';
 import type { Page } from '../../types/data';
 import './HierarchyPanel.css';
 
@@ -132,6 +132,51 @@ export function PageItem({
           <X size={12} />
         </button>
       </div>
+      <ScrollList page={page} isActive={isActive} sectionId={sectionId} onNavigate={onNavigate} />
+    </div>
+  );
+}
+
+/**
+ * Named scrolls listed under their page — the sidebar half of scroll identity.
+ *
+ * Only named ones appear: every pre-v0.31 page is backfilled with an untitled
+ * scroll, so listing those would add a meaningless row under every page in the
+ * notebook. Nothing renders at all unless a page has at least one named scroll,
+ * which keeps single-column notebooks looking exactly as they did.
+ */
+function ScrollList({
+  page,
+  isActive,
+  sectionId,
+  onNavigate,
+}: {
+  page: Page;
+  isActive: boolean;
+  sectionId: string;
+  onNavigate: (sectionId: string, pageId: string) => void;
+}) {
+  const named = [...(page.scrolls ?? [])]
+    .filter((s) => s.title)
+    .sort((a, b) => a.column - b.column);
+  if (named.length === 0) return null;
+
+  return (
+    <div className="hierarchy-scrolls" data-testid={`page-scrolls-${page.id}`}>
+      {named.map((scroll) => (
+        <button
+          key={scroll.id}
+          className="hierarchy-scroll"
+          data-testid={`scroll-${scroll.id}`}
+          title={scroll.title}
+          onClick={() => {
+            if (!isActive) onNavigate(sectionId, page.id);
+          }}
+        >
+          <Columns2 size={12} />
+          <span className="hierarchy-scroll__title">{scroll.title}</span>
+        </button>
+      ))}
     </div>
   );
 }

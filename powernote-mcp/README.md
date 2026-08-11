@@ -50,6 +50,11 @@ socket on their machine.
 | `update_block` | Replace an existing block's markdown, by id. |
 | `rename_page` | Retitle a page, and its `# Title` block if that still matches. |
 | `move_page` | Move a page into another section. |
+| `list_scrolls` | The named scrolls (columns) on a page, with block counts. Call before writing to a shared page. |
+| `create_scroll` | New titled scroll to the right of the existing ones. Returns a `scrollId`. |
+| `rename_scroll` | Retitle a scroll. The title shows at the top of the column on the canvas. |
+| `get_background` | The notebook's current guide style and background colour. |
+| `set_background` | Change the guide style (`pages`/`scroll`/`grid`/`none`) and/or colour. Stored in the notebook. |
 | `rename_notebook` | Rename the notebook in the app (not the file on disk). |
 | `save_notebook` | Write the notebook back to the file it was opened from. |
 | `check_update` | Is a newer PowerNote release available? |
@@ -62,13 +67,25 @@ logical unit — a whole list, a whole paragraph — rather than one per line.
 Blocks are full page width and stack down a column; their height is measured
 against the real renderer at write time, so they never overlap.
 
-### Columns
+### Scrolls (columns)
 
-`append_block` and `create_page` take an optional `column` (0 = the leftmost A4
-page guide, 1 = the guide immediately right of it, and so on). Columns stack
-independently, so writing into column 1 starts at the top of the page regardless
-of how long column 0 is. `read_page` reports each block's column and returns
-blocks column-major — all of column 0 top to bottom, then column 1.
+A page is divided into vertical bands. Each band can be a named **scroll**, with
+its title drawn at the top of the column in the app. Scrolls stack
+independently, so writing into a second scroll starts at the top of the page
+regardless of how long the first one is — which is what makes it safe for two
+workstreams to share a page.
+
+Target one with `append_block({ scrollId })`, using an id from `list_scrolls`.
+`read_page` reports each block's `scrollId` and returns blocks column-major —
+all of the leftmost scroll top to bottom, then the next.
+
+Membership is **positional**: a block belongs to whichever scroll it physically
+sits in, so a block the user drags into another scroll moves with it, and
+nothing can end up filed under a scroll it is not visibly in.
+
+`append_block` and `create_page` still accept a raw `column` integer (0 = the
+leftmost band). It keeps working, but prefer `scrollId` — a column index points
+at a position, and positions shift when scrolls are reordered.
 
 Markdown is rendered live, so `- [ ]` checkboxes arrive as real checkboxes the
 user can click, and clicking one writes back into the block's markdown.

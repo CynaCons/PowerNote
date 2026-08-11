@@ -13,7 +13,7 @@
  */
 
 import type { CanvasNode, TextNodeData } from '../types/data';
-import { A4_WIDTH, PAGE_GAP, PAGE_MARGIN, MIN_TEXT_HEIGHT } from '../utils/pageLayout';
+import { A4_WIDTH, MIN_TEXT_HEIGHT, columnAt, columnLeft } from '../utils/pageLayout';
 import { defaultTextOptions } from '../utils/defaults';
 import { generateId } from '../utils/ids';
 import { measureMarkdownHeight } from '../utils/renderMarkdown';
@@ -63,15 +63,16 @@ export function blockHeight(
 
 /** Left edge of an A4 page-guide column, matching PageGuides. */
 export function columnX(column: number): number {
-  return PAGE_MARGIN + column * (A4_WIDTH + PAGE_GAP);
+  return columnLeft(column);
 }
 
 /**
- * Which A4 column a node sits in. Uses the same floor-division as PageGuides so
- * the bridge and the visible guides always agree on where column boundaries are.
+ * Which A4 column a node sits in. Resolves through the same `columnAt` the
+ * page guides and scroll records use, so the bridge and the visible guides
+ * always agree on where column boundaries are.
  */
 export function columnOf(node: CanvasNode): number {
-  return Math.floor((node.x - PAGE_MARGIN) / (A4_WIDTH + PAGE_GAP));
+  return columnAt(node.x);
 }
 
 /**
