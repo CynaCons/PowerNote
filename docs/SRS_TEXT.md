@@ -41,3 +41,5 @@ Allow users to create, edit, move, and delete markdown-capable text blocks on th
 | REQ-TEXT-027 | Underline shall be persisted as `<u>...</u>` HTML inside the markdown source and rendered as an underline by the markdown renderer | Should | T84 |
 | REQ-TEXT-028 | While editing, the text editor wrap width shall equal the node’s intentional width (not a temporary stub narrower than the node) | Must | T92 |
 | REQ-TEXT-029 | When a text block is selected (not editing), left/right resize handles shall change width; height remains content-driven after reflow | Must | T92 |
+| REQ-TEXT-030 | Markdown headings shall render visually larger and heavier than body text — `#` at 1.6em/700, `##` at 1.3em/600, `###` at 1.1em/600 | Must | T58 |
+| REQ-TEXT-031 | Heading sizes shall be expressed relative to the block's own `fontSize`, so changing a block's font size scales its headings with it | Must | T58 |

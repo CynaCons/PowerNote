@@ -552,19 +552,20 @@
 - [ ] SRS: REQ-UI-003
 
 ### v0.11.3 — Zoom Controls (visual)
-- [ ] Zoom percentage display in TopBar or bottom-right corner
-- [ ] Zoom in/out buttons (+/- icons)
+- [x] Zoom percentage display in TopBar or bottom-right corner
+- [x] Zoom in/out buttons (+/- icons)
 - [ ] Scroll to zoom indicator on first use
 
 ### v0.11.4 — Pinch-to-Zoom (Touch)
-- [ ] Multi-touch pinch zoom on canvas
+- [x] Multi-touch pinch zoom on canvas
 - [ ] Two-finger pan
 - [ ] Touch-friendly selection (long-press = select)
-- [ ] SRS: REQ-CANVAS-013..015
+- [x] SRS: REQ-CANVAS-013..015
 - [ ] E2E tests, tag v0.11.0
 
 ---
 
+- [x] AUDIT 2026-08-11: pinch requirements reallocated — the planned REQ-CANVAS-013..015 had been spent on lasso/multi-drag. Pinch is now REQ-CANVAS-025/026 (implemented, covered by T106); two-finger pan and long-press select are recorded as REQ-CANVAS-027/028 under "Not implemented" in SRS_CANVAS
 ## v0.12 — File Management
 > Open files, recent files, file system integration (shipped as part of v0.22.0 FSA work)
 
@@ -596,11 +597,12 @@
 > Heading sizes, link navigation, find-and-replace
 
 ### v0.13.0 — Visual Heading Sizes
-- [ ] `# H1` renders at 28px, `## H2` at 22px, `### H3` at 18px on canvas
+- [x] `# H1` renders at 28px, `## H2` at 22px, `### H3` at 18px on canvas
 - [ ] Heading size affects text block auto-width
-- [ ] Bold/italic rendering matches markdown spec
-- [ ] SRS: REQ-TEXT-023..025
+- [x] Bold/italic rendering matches markdown spec
+- [x] SRS: REQ-TEXT-023..025
 
+- [x] AUDIT 2026-08-11: heading requirements reallocated — the planned REQ-TEXT-023..025 had been spent on inline bold/italic/strike. Heading sizing is now REQ-TEXT-030/031, covered by T58. Shipped values are relative (1.6/1.3/1.1em ≈ 25.6/20.8/17.6px at a 16px block), not the fixed 28/22/18px originally written — relative scaling was kept deliberately so headings track the block's font size
 ### v0.13.1 — Clickable Links on Canvas
 - [x] External links clickable in rendered markdown (commit `def02e8`)
 - [x] Internal page links navigate to linked page
@@ -619,19 +621,22 @@
 ## v0.14 — Export & Sharing
 > PDF export, image export, print support
 
-### v0.14.0 — PDF Export
+### v0.14.0 — PDF Export (MOVED TO BACKLOG 2026-08-11) (COMPLETE)
+**Goal:** MOVED TO BACKLOG 2026-08-11 — never started; tracked under "PDF Export" in the Future (Backlog) section. Closed here so it stops reading as in-flight work.
 - [ ] Export current page as PDF (via browser print API or html2canvas + jsPDF)
 - [ ] A4 page boundaries guide the page breaks
 - [ ] Include all visible elements: text, images, shapes, drawings
 - [ ] SRS: REQ-EXPORT-001..003
 
-### v0.14.1 — Image Export (PNG/SVG)
+### v0.14.1 — Image Export (PNG/SVG) (MOVED TO BACKLOG 2026-08-11) (COMPLETE)
+**Goal:** MOVED TO BACKLOG 2026-08-11 — never started; tracked under "Image Export (PNG/SVG)" in the Future (Backlog) section. Closed here so it stops reading as in-flight work.
 - [ ] Export current page as PNG (Konva Stage toDataURL)
 - [ ] Optional: SVG export for vector quality
 - [ ] Configurable resolution/scale
 - [ ] SRS: REQ-EXPORT-004..005
 
-### v0.14.2 — Print Support
+### v0.14.2 — Print Support (MOVED TO BACKLOG 2026-08-11) (COMPLETE)
+**Goal:** MOVED TO BACKLOG 2026-08-11 — never started; tracked under "Print Support" in the Future (Backlog) section. Closed here so it stops reading as in-flight work.
 - [ ] Ctrl+P triggers browser print with proper styling
 - [ ] Print CSS: hide nav rail, toolbar, hierarchy panel
 - [ ] Content laid out for A4 pages
@@ -979,6 +984,15 @@
 - [x] T105 — two agent sessions append to different scrollIds on one page concurrently; neither's blocks land in the other's band
 - [x] New `docs/SRS_SCROLL.md` (REQ-SCROLL-001..) covering identity, titles, derived membership and the agent surface; cross-reference from SRS_AGENT
 - [x] Surface scroll names to the user beyond the canvas header: list a page's scrolls under it in the hierarchy panel, and show the active scroll name in the TopBar breadcrumb
+### v0.32.0 — Resizable hierarchy panel (ACTIVE)
+**Goal:** The sidebar is locked at 240px, so pages and sections with longer names are ellipsised with no way to read them. Add a drag handle on its right edge so the panel can be widened, with the width held for the session (not persisted, by explicit choice).
+- [ ] Drag handle on the hierarchy panel's right edge (`data-testid="hierarchy-resize-handle"`), using pointer capture so the drag survives the cursor leaving the strip
+- [ ] Width clamped to 180–560px; double-click the handle resets to the 240px default
+- [ ] Keyboard-accessible: handle is focusable with `role="separator"`, Arrow keys resize in 16px steps, Home resets
+- [ ] Width is session-only by explicit decision — not written to the notebook and not to localStorage; reopening resets to 240px
+- [ ] SRS_HIERARCHY: REQ-HIER-012..014 (resizable panel, clamping, session-only width)
+- [ ] T107 — E2E: drag widens the panel, clamps at both bounds, double-click resets, keyboard steps, and a long page title shows more text once widened
+- [ ] Bump APP_VERSION to 0.32.0, full suite green, rebuild dist-template, commit, tag and publish the GitHub release
 ## Future (Backlog)
 > Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 
@@ -991,3 +1005,6 @@
 - **Database/Table Blocks** — Notion-style structured data on canvas
 
 See `docs/VISION.md` for deferred post-MVP items (cloud sync, collaboration, paid tier) that depend on cloud deployment infrastructure.
+- **PDF Export** — Export the current page as PDF (browser print API, or html2canvas + jsPDF), with A4 page guides driving the page breaks and all visible elements included (text, images, shapes, drawings). Moved from PLAN v0.14.0 on 2026-08-11, unstarted. Needs REQ-EXPORT ids and an SRS_EXPORT.md
+- **Image Export (PNG/SVG)** — Export the current page as PNG via Konva `Stage.toDataURL`, with configurable resolution/scale; optional SVG export for vector quality. Moved from PLAN v0.14.1 on 2026-08-11, unstarted — no `toDataURL`/`toBlob` call exists anywhere in `src/`
+- **Print Support** — Ctrl+P triggering browser print with print CSS that hides the nav rail, toolbar and hierarchy panel, and lays content out for A4. Moved from PLAN v0.14.2 on 2026-08-11, unstarted — no `@media print` block and no `window.print` call exist

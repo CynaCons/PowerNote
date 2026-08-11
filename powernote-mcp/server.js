@@ -480,7 +480,7 @@ const TOOLS = [
 ];
 
 const server = new Server(
-  { name: 'powernote-notes', version: '0.31.0' },
+  { name: 'powernote-notes', version: '0.32.0' },
   { capabilities: { tools: {} } },
 );
 

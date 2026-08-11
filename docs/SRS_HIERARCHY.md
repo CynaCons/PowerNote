@@ -23,3 +23,7 @@ Organize the workspace into sections and pages, with a navigable hierarchy panel
 | REQ-HIER-009 | The user shall be able to rename pages via inline edit | Must | T14 |
 | REQ-HIER-010 | The user shall be able to delete pages (minimum 1 per section must remain) | Must | T15 |
 | REQ-HIER-011 | The TopBar breadcrumb shall reflect current section and page names in real time | Must | T08 |
+| REQ-HIER-012 | The hierarchy panel shall be resizable by dragging a handle on its right edge, so section and page names longer than the default width can be read | Must | T107 |
+| REQ-HIER-013 | Panel width shall be clamped to 180–560px; double-clicking the handle shall reset it to the 240px default | Must | T107 |
+| REQ-HIER-014 | The resize handle shall be keyboard operable: focusable, with Arrow keys resizing in 16px steps and Home resetting to the default | Should | T107 |
+| REQ-HIER-015 | Panel width shall be session-only — held in component state, written neither to the notebook file nor to localStorage, so a reload returns to the default | Must | T107 |

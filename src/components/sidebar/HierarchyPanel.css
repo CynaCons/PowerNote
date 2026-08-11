@@ -1,13 +1,37 @@
 /* ── Hierarchy Panel ──────────────────────────────── */
 .hierarchy-panel {
+  /* Inline width/minWidth from the component drive the real size; these are the
+     pre-mount fallback and the floor if the inline style ever goes missing. */
   width: 240px;
-  min-width: 240px;
+  min-width: 180px;
   height: 100%;
   background: var(--color-surface);
   border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  position: relative;
+}
+
+/* ── Resize handle ───────────────────────────────── */
+.hierarchy-panel__resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* Straddles the border so the grab target is reachable from either side. */
+  right: -2px;
+  width: 5px;
+  cursor: col-resize;
+  z-index: 5;
+  /* Stops the browser claiming the gesture for scrolling on touch. */
+  touch-action: none;
+}
+
+.hierarchy-panel__resize:hover,
+.hierarchy-panel__resize:focus-visible {
+  background: var(--color-primary);
+  opacity: 0.45;
+  outline: none;
 }
 
 .hierarchy-panel__header {
