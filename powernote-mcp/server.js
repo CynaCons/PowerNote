@@ -407,6 +407,89 @@ const TOOLS = [
     },
   },
   {
+    name: 'delete_page',
+    description:
+      'Delete a page and everything on it. Cannot be undone from here — the app ' +
+      'has no agent-facing undo — so ask the user before calling, then pass ' +
+      'confirm:true. Refuses when the page is the last one in its section.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pageId: {
+          type: 'string',
+          description: 'Page to delete. Defaults to the page currently open.',
+        },
+        confirm: {
+          type: 'boolean',
+          description: 'Must be true. Confirms the user agreed to the deletion.',
+        },
+      },
+      required: ['confirm'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'delete_section',
+    description:
+      'Delete a section AND every page inside it. This is the widest-reaching ' +
+      'delete available — confirm the page list with the user first (list_pages ' +
+      'shows what would go). Refuses when it is the notebook\'s only section.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sectionId: { type: 'string', description: 'Section to delete.' },
+        confirm: {
+          type: 'boolean',
+          description: 'Must be true. Confirms the user agreed to the deletion.',
+        },
+      },
+      required: ['sectionId', 'confirm'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'delete_scroll',
+    description:
+      'Delete a named scroll (a column). By default its blocks are KEPT and the ' +
+      'remaining scrolls close the gap — only the name and the band go. Pass ' +
+      'withBlocks:true to remove its content too. Refuses when it is the page\'s ' +
+      'only scroll.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        scrollId: { type: 'string', description: 'Scroll to delete (from list_scrolls).' },
+        withBlocks: {
+          type: 'boolean',
+          description: 'Also delete the blocks sitting in that scroll. Default false.',
+        },
+        confirm: {
+          type: 'boolean',
+          description: 'Must be true. Confirms the user agreed to the deletion.',
+        },
+      },
+      required: ['scrollId', 'confirm'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'delete_block',
+    description:
+      'Delete a single markdown block by id. Use read_page first to get block ids ' +
+      'and check you are removing the right one.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        blockId: { type: 'string', description: 'Block to delete (from read_page).' },
+        confirm: {
+          type: 'boolean',
+          description: 'Must be true. Confirms the user agreed to the deletion.',
+        },
+      },
+      required: ['blockId', 'confirm'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'get_background',
     description:
       'Read the notebook\'s canvas look: which guide style is active and which ' +
@@ -480,7 +563,7 @@ const TOOLS = [
 ];
 
 const server = new Server(
-  { name: 'powernote-notes', version: '0.32.0' },
+  { name: 'powernote-notes', version: '0.33.0' },
   { capabilities: { tools: {} } },
 );
 

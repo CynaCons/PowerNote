@@ -16,6 +16,7 @@ interface SectionItemProps {
   onDeletePage: (sectionId: string, pageId: string) => void;
   onReorderSection: (fromIndex: number, toIndex: number) => void;
   onReorderPage: (sectionId: string, fromIndex: number, toIndex: number) => void;
+  onOpenScroll: (sectionId: string, pageId: string, scrollId: string, column: number) => void;
 }
 
 export function SectionItem({
@@ -30,6 +31,7 @@ export function SectionItem({
   onDeletePage,
   onReorderSection,
   onReorderPage,
+  onOpenScroll,
 }: SectionItemProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -157,6 +159,7 @@ export function SectionItem({
               onRenamePage={onRenamePage}
               onDeletePage={onDeletePage}
               onReorderPage={(fromIdx, toIdx) => onReorderPage(section.id, fromIdx, toIdx)}
+              onOpenScroll={onOpenScroll}
             />
           ))}
         </div>

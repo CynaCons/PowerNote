@@ -21,6 +21,18 @@ interface WorkspaceState {
   workspace: WorkspaceData;
   activeSectionId: string;
   activePageId: string;
+  /**
+   * Scroll the outline and canvas focus follow (v0.33+).
+   *
+   * Runtime-only, like activeSectionId/activePageId — never serialized. Set by
+   * an explicit click (sidebar entry or canvas header) rather than inferred
+   * from the viewport, so it never changes under the user mid-read. Null means
+   * "fall back to the leftmost scroll on the active page".
+   */
+  activeScrollId: string | null;
+  setActiveScroll: (scrollId: string | null) => void;
+  /** The active scroll, resolving the null default to the leftmost one. */
+  getActiveScroll: () => ScrollRecord | undefined;
   isDirty: boolean;
   /** True while a manual Save / Save As is in flight */
   isSaving: boolean;
@@ -98,6 +110,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     workspace: initial,
     activeSectionId: firstSection.id,
     activePageId: firstPage.id,
+    activeScrollId: null,
     isDirty: false,
     isSaving: false,
     markDirty: () => set({ isDirty: true }),
@@ -116,6 +129,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
           },
         };
       }),
+
+    setActiveScroll: (scrollId) => set({ activeScrollId: scrollId }),
+
+    getActiveScroll: () => {
+      const { activeScrollId } = get();
+      const page = get().getActivePage();
+      const scrolls = page?.scrolls;
+      if (!scrolls || scrolls.length === 0) return undefined;
+
+      // A stale id (page switched, scroll deleted) must not blank the outline —
+      // fall back to the leftmost rather than showing nothing.
+      const chosen = activeScrollId
+        ? scrolls.find((s) => s.id === activeScrollId)
+        : undefined;
+      return chosen ?? [...scrolls].sort((a, b) => a.column - b.column)[0];
+    },
 
     getActiveSection: () => {
       const { workspace, activeSectionId } = get();
@@ -241,6 +270,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       set({
         activeSectionId: sectionId,
         activePageId: section.pages[0].id,
+        // Scroll ids are page-scoped, so carrying one across a page change
+        // would leave the outline pointing at a scroll that is not here.
+        activeScrollId: null,
       });
     },
 
@@ -248,6 +280,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       set({
         activeSectionId: sectionId,
         activePageId: pageId,
+        activeScrollId: null,
       });
     },
 

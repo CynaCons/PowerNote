@@ -34,6 +34,7 @@ import type {
   CreatePageResult,
   CreateScrollResult,
   CreateSectionResult,
+  DeleteResult,
   ListPagesResult,
   ListScrollsResult,
   MovePageResult,
@@ -400,6 +401,154 @@ async function updateBlock(params: Record<string, unknown>): Promise<UpdateBlock
   return { blockId };
 }
 
+// ── Deletes ─────────────────────────────────────────────────
+
+/**
+ * Every delete verb demands `confirm: true`.
+ *
+ * The bridge has no undo an agent can reach, so a mistaken delete is final for
+ * anything not yet saved elsewhere. The flag makes destruction an explicit act
+ * rather than something a model can do by getting one argument wrong — the same
+ * guard `run_update` uses.
+ */
+function requireConfirm(params: Record<string, unknown>, what: string): void {
+  if (params.confirm !== true) {
+    throw new BridgeCommandError(
+      'BAD_PARAMS',
+      `Deleting ${what} cannot be undone from the bridge. Pass confirm:true once the user has agreed.`,
+    );
+  }
+}
+
+function deletePageCmd(params: Record<string, unknown>): DeleteResult {
+  flush();
+  requireConfirm(params, 'a page');
+  const { section, page } = resolvePage(optionalString(params, 'pageId'));
+
+  // The store silently refuses to empty a section; say why rather than
+  // reporting a success that did not happen.
+  if (section.pages.length <= 1) {
+    throw new BridgeCommandError(
+      'PRECONDITION',
+      `"${page.title}" is the only page in "${section.title}". Every section must keep at least ` +
+        'one page — create another there first, or delete the section instead.',
+    );
+  }
+
+  const wasActive = useWorkspaceStore.getState().activePageId === page.id;
+  useWorkspaceStore.getState().deletePage(section.id, page.id);
+
+  // deletePage moves activePageId but cannot touch the canvas store, so the
+  // deleted page's blocks would otherwise stay on screen and be flushed back
+  // onto whichever page became active.
+  if (wasActive) {
+    const ws = useWorkspaceStore.getState();
+    const nowActive = ws.workspace.sections
+      .find((s) => s.id === ws.activeSectionId)
+      ?.pages.find((p) => p.id === ws.activePageId);
+    useCanvasStore.getState().loadPageNodes(nowActive?.nodes ?? []);
+    useDrawStore.getState().loadPageStrokes(nowActive?.strokes ?? []);
+  }
+
+  return { deleted: 'page', id: page.id, title: page.title };
+}
+
+function deleteSectionCmd(params: Record<string, unknown>): DeleteResult {
+  flush();
+  requireConfirm(params, 'a section and every page in it');
+  const sectionId = requireString(params, 'sectionId');
+
+  const ws = useWorkspaceStore.getState();
+  const section = ws.workspace.sections.find((s) => s.id === sectionId);
+  if (!section) {
+    throw new BridgeCommandError('NOT_FOUND', `No section with id "${sectionId}"`);
+  }
+  if (ws.workspace.sections.length <= 1) {
+    throw new BridgeCommandError(
+      'PRECONDITION',
+      `"${section.title}" is the only section in this notebook, and a notebook must keep at least one.`,
+    );
+  }
+
+  const hadActive = section.pages.some((p) => p.id === ws.activePageId);
+  useWorkspaceStore.getState().deleteSection(sectionId);
+
+  if (hadActive) {
+    const next = useWorkspaceStore.getState();
+    const page = next.workspace.sections
+      .find((s) => s.id === next.activeSectionId)
+      ?.pages.find((p) => p.id === next.activePageId);
+    useCanvasStore.getState().loadPageNodes(page?.nodes ?? []);
+    useDrawStore.getState().loadPageStrokes(page?.strokes ?? []);
+  }
+
+  return { deleted: 'section', id: sectionId, title: section.title };
+}
+
+async function deleteScrollCmd(params: Record<string, unknown>): Promise<DeleteResult> {
+  flush();
+  const withBlocks = params.withBlocks === true;
+  requireConfirm(params, withBlocks ? 'a scroll and its blocks' : 'a scroll');
+  const scrollId = requireString(params, 'scrollId');
+
+  const { workspace } = useWorkspaceStore.getState();
+  for (const section of workspace.sections) {
+    for (const page of section.pages) {
+      const scroll = scrollById(page.scrolls, scrollId);
+      if (!scroll) continue;
+
+      if ((page.scrolls ?? []).length <= 1) {
+        throw new BridgeCommandError(
+          'PRECONDITION',
+          `"${scroll.title || scrollId}" is the only scroll on "${page.title}", and a page must ` +
+            'keep at least one for content to be appended to.',
+        );
+      }
+
+      const blocksRemoved = withBlocks
+        ? page.nodes.filter((n) => columnOf(n) === scroll.column).length
+        : 0;
+
+      const { deleteScroll } = await import('../utils/scrollOps');
+      deleteScroll(page.id, scrollId, withBlocks);
+
+      return {
+        deleted: 'scroll',
+        id: scrollId,
+        title: scroll.title,
+        blocksRemoved,
+      };
+    }
+  }
+
+  throw new BridgeCommandError(
+    'NOT_FOUND',
+    `No scroll with id "${scrollId}" in this notebook. Call list_scrolls to refresh.`,
+  );
+}
+
+function deleteBlockCmd(params: Record<string, unknown>): DeleteResult {
+  flush();
+  requireConfirm(params, 'a block');
+  const blockId = requireString(params, 'blockId');
+
+  const { workspace } = useWorkspaceStore.getState();
+  for (const section of workspace.sections) {
+    for (const page of section.pages) {
+      const node = page.nodes.find((n) => n.id === blockId);
+      if (!node) continue;
+
+      navigateToPage(section.id, page.id);
+      useCanvasStore.getState().deleteNode(blockId);
+      flush();
+
+      return { deleted: 'block', id: blockId };
+    }
+  }
+
+  throw new BridgeCommandError('NOT_FOUND', `No block with id "${blockId}"`);
+}
+
 // ── Canvas look ─────────────────────────────────────────────
 
 const GUIDE_STYLES: BackgroundMode[] = ['pages', 'scroll', 'grid', 'none'];
@@ -733,6 +882,10 @@ const HANDLERS: Record<BridgeCommandName, Handler> = {
   list_scrolls: listScrolls,
   create_scroll: createScrollCmd,
   rename_scroll: renameScrollCmd,
+  delete_page: deletePageCmd,
+  delete_section: deleteSectionCmd,
+  delete_scroll: deleteScrollCmd,
+  delete_block: deleteBlockCmd,
   get_background: getBackground,
   set_background: setBackground,
   rename_notebook: renameNotebook,

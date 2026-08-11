@@ -4,6 +4,7 @@ import { Html } from 'react-konva-utils';
 import type { BackgroundMode, ScrollRecord } from '../../types/data';
 import { A4_WIDTH, SCROLL_HEADER_HEIGHT, columnLeft } from '../../utils/pageLayout';
 import { renameScroll } from '../../utils/scrollOps';
+import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 
 interface ScrollHeadersProps {
   mode: BackgroundMode;
@@ -29,6 +30,8 @@ const TITLE_INSET = 16;
 export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const activeScrollId = useWorkspaceStore((s) => s.activeScrollId);
+  const setActiveScroll = useWorkspaceStore((s) => s.setActiveScroll);
 
   // Stop editing if the scroll disappears (page switch, delete) — the overlay
   // would otherwise hang over an empty band.
@@ -87,8 +90,17 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
 
         if (!scroll.title) return null;
 
+        const isActive = activeScrollId === scroll.id;
+
         return (
-          <Group key={`scroll-header-${scroll.id}`} onDblClick={() => setEditingId(scroll.id)}>
+          <Group
+            key={`scroll-header-${scroll.id}`}
+            onDblClick={() => setEditingId(scroll.id)}
+            // Single click makes it the scroll the outline follows. It does not
+            // move the viewport — you are already looking at it.
+            onClick={() => setActiveScroll(scroll.id)}
+            onTap={() => setActiveScroll(scroll.id)}
+          >
             {/* No id() on these nodes: useTextPlacement treats an unidentified
                 target as background, so a single click still places text or
                 clears selection straight through the header. */}
@@ -99,13 +111,13 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
               text={scroll.title}
               fontSize={15}
               fontFamily="Inter, system-ui, sans-serif"
-              fill="#64748b"
+              fill={isActive ? '#2563eb' : '#64748b'}
               ellipsis
               wrap="none"
             />
             <Line
               points={[x, SCROLL_HEADER_HEIGHT, x + A4_WIDTH, SCROLL_HEADER_HEIGHT]}
-              stroke="#e2e2e2"
+              stroke={isActive ? '#bfdbfe' : '#e2e2e2'}
               strokeWidth={1}
               listening={false}
             />

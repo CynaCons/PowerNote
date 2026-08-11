@@ -53,6 +53,10 @@ socket on their machine.
 | `list_scrolls` | The named scrolls (columns) on a page, with block counts. Call before writing to a shared page. |
 | `create_scroll` | New titled scroll to the right of the existing ones. Returns a `scrollId`. |
 | `rename_scroll` | Retitle a scroll. The title shows at the top of the column on the canvas. |
+| `delete_page` | Delete a page and its content. Requires `confirm`. |
+| `delete_section` | Delete a section and every page in it. Requires `confirm`. |
+| `delete_scroll` | Delete a scroll; keeps its blocks unless `withBlocks`. Requires `confirm`. |
+| `delete_block` | Delete one markdown block by id. Requires `confirm`. |
 | `get_background` | The notebook's current guide style and background colour. |
 | `set_background` | Change the guide style (`pages`/`scroll`/`grid`/`none`) and/or colour. Stored in the notebook. |
 | `rename_notebook` | Rename the notebook in the app (not the file on disk). |

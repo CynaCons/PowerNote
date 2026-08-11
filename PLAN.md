@@ -993,6 +993,18 @@
 - [x] SRS_HIERARCHY: REQ-HIER-012..014 (resizable panel, clamping, session-only width)
 - [x] T107 — E2E: drag widens the panel, clamps at both bounds, double-click resets, keyboard steps, and a long page title shows more text once widened
 - [x] Bump APP_VERSION to 0.32.0, full suite green, rebuild dist-template, commit, tag and publish the GitHub release
+### v0.33.0 — Document outline, active scroll, and agent deletes (ACTIVE)
+**Goal:** Promote the outline prototype into the sidebar as a real feature, scoped to one active scroll rather than the whole page. Introduce an explicit active-scroll concept set by clicking — in the sidebar or on the canvas header — which also drives navigation: clicking a scroll opens its page and moves the viewport to its start. Separately, give agents the delete verbs the bridge has never had: an agent can create pages, sections, scrolls and blocks but cannot remove any of them.
+- [ ] `activeScrollId` runtime state on the workspace store (alongside activeSectionId/activePageId — not serialized), defaulting to the leftmost scroll and re-resolving on page change
+- [ ] `utils/viewportFocus.ts` — shared viewport math for "show this scroll's start" and "jump to this heading", so the sidebar and the outline cannot drift apart
+- [ ] Clicking a scroll in the sidebar shall open its page, set it active, and move the viewport to the top of that scroll
+- [ ] Clicking a scroll's canvas header shall also make it active, and the active scroll shall be visually marked in both the sidebar and on the header
+- [ ] Sidebar "Outline" tab showing only the ACTIVE scroll's headings, derived live from markdown; entries jump to the heading without changing zoom. Drop the floating-overlay variant
+- [ ] Bridge + MCP: `delete_page`, `delete_section`, `delete_scroll` (with `withBlocks`), `delete_block` — every one requiring `confirm: true`, and surfacing the store's existing last-page/last-section/last-scroll guards as PRECONDITION rather than a silent no-op
+- [ ] T108 — outline + active scroll: outline tracks the active scroll only, sidebar click navigates and moves the viewport, heading jump preserves zoom
+- [ ] T109 — agent deletes: each verb removes the right thing, refuses without confirm, and reports the guard when the last page/section/scroll would go
+- [ ] SRS: new REQ-OUTLINE ids in a docs/SRS_OUTLINE.md, active-scroll requirements in SRS_SCROLL, delete verbs in SRS_AGENT
+- [ ] Bump APP_VERSION to 0.33.0, full suite green, rebuild dist-template, commit, tag and publish the GitHub release
 ## Future (Backlog)
 > Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 

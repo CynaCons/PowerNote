@@ -91,6 +91,11 @@ Added after the feature was demoed live and before it shipped.
 | REQ-AGENT-039 | An agent shall read and set the canvas look (`get_background`, `set_background`); background colour shall be addressed by name (`white`, `light-gray`, `gray`, `paper`), with the stored hex accepted as an alias | Must | T102 |
 | REQ-AGENT-040 | `set_background` shall validate before writing: an unknown guide style or colour shall be rejected with `BAD_PARAMS` listing the valid values, leaving the notebook unchanged, and a call setting neither field shall be an error rather than a silent no-op | Must | T102 |
 | REQ-AGENT-041 | An agent-set canvas look shall persist through the normal auto-save/save path, requiring no persistence path of its own | Must | T103 |
+| REQ-AGENT-042 | An agent shall delete pages, sections, scrolls and blocks (`delete_page`, `delete_section`, `delete_scroll`, `delete_block`) | Must | T109 |
+| REQ-AGENT-043 | Every delete verb shall require `confirm: true`, since the bridge exposes no undo; without it the call shall fail with `BAD_PARAMS` and change nothing | Must | T109 |
+| REQ-AGENT-044 | Deletes that the store refuses — the last page in a section, the last section, the last scroll on a page — shall report `PRECONDITION` naming the reason, never a silent no-op | Must | T109 |
+| REQ-AGENT-045 | `delete_scroll` shall preserve the blocks in its band unless `withBlocks: true`, and shall report how many blocks were removed | Must | T109 |
+| REQ-AGENT-046 | Deleting the open page shall reload the canvas from the newly active page, so the deleted page's blocks are not flushed onto it | Must | T109 |
 
 ## Related
 

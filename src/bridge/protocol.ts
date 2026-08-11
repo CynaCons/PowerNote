@@ -31,6 +31,10 @@ export type BridgeCommandName =
   | 'list_scrolls'
   | 'create_scroll'
   | 'rename_scroll'
+  | 'delete_page'
+  | 'delete_section'
+  | 'delete_scroll'
+  | 'delete_block'
   | 'get_background'
   | 'set_background'
   | 'rename_notebook'
@@ -154,6 +158,16 @@ export interface RenameScrollResult {
   scrollId: string;
   title: string;
   previousTitle: string;
+}
+
+/** What a delete removed. Deletes are irreversible over the bridge — there is
+ *  no agent-facing undo — so each result names exactly what went. */
+export interface DeleteResult {
+  deleted: 'page' | 'section' | 'scroll' | 'block';
+  id: string;
+  title?: string;
+  /** Blocks removed alongside the target (delete_scroll with withBlocks). */
+  blocksRemoved?: number;
 }
 
 /**

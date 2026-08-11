@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Columns2, FileText, Pencil, X } from 'lucide-react';
 import type { Page } from '../../types/data';
+import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import './HierarchyPanel.css';
 
 interface PageItemProps {
@@ -12,6 +13,7 @@ interface PageItemProps {
   onRenamePage: (sectionId: string, pageId: string, title: string) => void;
   onDeletePage: (sectionId: string, pageId: string) => void;
   onReorderPage: (fromIndex: number, toIndex: number) => void;
+  onOpenScroll: (sectionId: string, pageId: string, scrollId: string, column: number) => void;
 }
 
 export function PageItem({
@@ -23,6 +25,7 @@ export function PageItem({
   onRenamePage,
   onDeletePage,
   onReorderPage,
+  onOpenScroll,
 }: PageItemProps) {
   const [isRenaming, setIsRenaming] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -132,7 +135,12 @@ export function PageItem({
           <X size={12} />
         </button>
       </div>
-      <ScrollList page={page} isActive={isActive} sectionId={sectionId} onNavigate={onNavigate} />
+      <ScrollList
+        page={page}
+        isActive={isActive}
+        sectionId={sectionId}
+        onOpenScroll={onOpenScroll}
+      />
     </div>
   );
 }
@@ -149,13 +157,14 @@ function ScrollList({
   page,
   isActive,
   sectionId,
-  onNavigate,
+  onOpenScroll,
 }: {
   page: Page;
   isActive: boolean;
   sectionId: string;
-  onNavigate: (sectionId: string, pageId: string) => void;
+  onOpenScroll: (sectionId: string, pageId: string, scrollId: string, column: number) => void;
 }) {
+  const activeScrollId = useWorkspaceStore((s) => s.activeScrollId);
   const named = [...(page.scrolls ?? [])]
     .filter((s) => s.title)
     .sort((a, b) => a.column - b.column);
@@ -163,20 +172,24 @@ function ScrollList({
 
   return (
     <div className="hierarchy-scrolls" data-testid={`page-scrolls-${page.id}`}>
-      {named.map((scroll) => (
-        <button
-          key={scroll.id}
-          className="hierarchy-scroll"
-          data-testid={`scroll-${scroll.id}`}
-          title={scroll.title}
-          onClick={() => {
-            if (!isActive) onNavigate(sectionId, page.id);
-          }}
-        >
-          <Columns2 size={12} />
-          <span className="hierarchy-scroll__title">{scroll.title}</span>
-        </button>
-      ))}
+      {named.map((scroll) => {
+        // Only the open page can have an active scroll — highlighting one under
+        // a different page would claim a state that is not in effect.
+        const isActiveScroll = isActive && activeScrollId === scroll.id;
+        return (
+          <button
+            key={scroll.id}
+            className={`hierarchy-scroll${isActiveScroll ? ' hierarchy-scroll--active' : ''}`}
+            data-testid={`scroll-${scroll.id}`}
+            data-active={isActiveScroll ? 'true' : 'false'}
+            title={scroll.title}
+            onClick={() => onOpenScroll(sectionId, page.id, scroll.id, scroll.column)}
+          >
+            <Columns2 size={12} />
+            <span className="hierarchy-scroll__title">{scroll.title}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

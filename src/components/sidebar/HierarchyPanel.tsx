@@ -4,7 +4,11 @@ import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
 import { SectionItem } from './SectionItem';
+import { OutlineTab } from './OutlineTab';
+import { focusScrollStart } from '../../utils/viewportFocus';
 import './HierarchyPanel.css';
+
+type SidebarTab = 'notes' | 'outline';
 
 /** Panel width bounds. Session-only — deliberately not persisted anywhere. */
 const DEFAULT_WIDTH = 240;
@@ -32,10 +36,13 @@ export function HierarchyPanel({ isOpen }: HierarchyPanelProps) {
   const deletePage = useWorkspaceStore((s) => s.deletePage);
   const reorderSection = useWorkspaceStore((s) => s.reorderSection);
   const reorderPage = useWorkspaceStore((s) => s.reorderPage);
+  const setActiveScroll = useWorkspaceStore((s) => s.setActiveScroll);
 
   const canvasNodes = useCanvasStore((s) => s.nodes);
   const loadPageNodes = useCanvasStore((s) => s.loadPageNodes);
   const savePageStrokes = useWorkspaceStore((s) => s.savePageStrokes);
+
+  const [tab, setTab] = useState<SidebarTab>('notes');
 
   // ── Resize ────────────────────────────────────────────────
   const [width, setWidth] = useState(DEFAULT_WIDTH);
@@ -119,6 +126,24 @@ export function HierarchyPanel({ isOpen }: HierarchyPanelProps) {
     }
   };
 
+  /**
+   * Open a scroll from the sidebar: switch page if needed, mark it active, and
+   * move the viewport to its top.
+   *
+   * The focus runs after navigation because handleNavigate swaps the canvas
+   * contents — focusing first would scroll the page being left behind.
+   */
+  const handleOpenScroll = (
+    targetSectionId: string,
+    pageId: string,
+    scrollId: string,
+    column: number,
+  ) => {
+    if (pageId !== activePageId) handleNavigate(targetSectionId, pageId);
+    setActiveScroll(scrollId);
+    focusScrollStart(column);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -129,17 +154,49 @@ export function HierarchyPanel({ isOpen }: HierarchyPanelProps) {
       style={{ width, minWidth: width }}
     >
       <div className="hierarchy-panel__header">
-        <span className="hierarchy-panel__title">Notes</span>
-        <button
-          className="hierarchy-panel__add-section"
-          onClick={() => addSection()}
-          title="Add section"
-          data-testid="add-section-btn"
-        >
-          <Plus size={16} />
-        </button>
+        <div className="hierarchy-panel__tabs" role="tablist">
+          <button
+            className={`hierarchy-panel__tab${tab === 'notes' ? ' hierarchy-panel__tab--active' : ''}`}
+            role="tab"
+            aria-selected={tab === 'notes'}
+            onClick={() => setTab('notes')}
+            data-testid="sidebar-tab-notes"
+          >
+            Notes
+          </button>
+          <button
+            className={`hierarchy-panel__tab${tab === 'outline' ? ' hierarchy-panel__tab--active' : ''}`}
+            role="tab"
+            aria-selected={tab === 'outline'}
+            onClick={() => setTab('outline')}
+            data-testid="sidebar-tab-outline"
+          >
+            Outline
+          </button>
+        </div>
+        {/* Add-section belongs to the tree, not to the outline. */}
+        {tab === 'notes' && (
+          <button
+            className="hierarchy-panel__add-section"
+            onClick={() => addSection()}
+            title="Add section"
+            data-testid="add-section-btn"
+          >
+            <Plus size={16} />
+          </button>
+        )}
       </div>
-      <div className="hierarchy-panel__content">
+      {tab === 'outline' && (
+        <div className="hierarchy-panel__content">
+          <OutlineTab />
+        </div>
+      )}
+      <div
+        className="hierarchy-panel__content"
+        // Kept mounted while the Outline tab is showing: unmounting would drop
+        // every expanded-section and rename-in-progress state in the tree.
+        style={tab === 'notes' ? undefined : { display: 'none' }}
+      >
         {workspace.sections.map((section, sectionIndex) => (
           <SectionItem
             key={section.id}
@@ -154,6 +211,7 @@ export function HierarchyPanel({ isOpen }: HierarchyPanelProps) {
             onDeletePage={handleDeletePage}
             onReorderSection={reorderSection}
             onReorderPage={reorderPage}
+            onOpenScroll={handleOpenScroll}
           />
         ))}
       </div>

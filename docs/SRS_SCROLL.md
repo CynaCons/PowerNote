@@ -56,6 +56,8 @@ is that sequential writes from different workstreams land in different columns.
 | REQ-SCROLL-008 | A named scroll's title shall be shown at the top of its column on the canvas, in the hierarchy panel, and renameable by double-clicking the header; untitled scrolls shall render no header | Must | T104 |
 | REQ-SCROLL-009 | An unknown `scrollId` shall be rejected with NOT_FOUND and shall not fall back to another band | Must | T105 |
 | REQ-SCROLL-010 | The legacy `column` parameter shall keep working for `append_block` and `create_page` | Should | T105 |
+| REQ-SCROLL-011 | Exactly one scroll on the active page shall be *active*, set by an explicit click (sidebar entry or canvas header) and defaulting to the leftmost; it shall be marked in both places, and shall reset when the page changes | Must | T108 |
+| REQ-SCROLL-012 | Clicking a scroll in the sidebar shall open its page, make it active, and move the viewport to the top of that scroll | Must | T108 |
 
 ## Traceability
 
