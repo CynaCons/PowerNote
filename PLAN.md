@@ -984,15 +984,15 @@
 - [x] T105 — two agent sessions append to different scrollIds on one page concurrently; neither's blocks land in the other's band
 - [x] New `docs/SRS_SCROLL.md` (REQ-SCROLL-001..) covering identity, titles, derived membership and the agent surface; cross-reference from SRS_AGENT
 - [x] Surface scroll names to the user beyond the canvas header: list a page's scrolls under it in the hierarchy panel, and show the active scroll name in the TopBar breadcrumb
-### v0.32.0 — Resizable hierarchy panel (ACTIVE)
+### v0.32.0 — Resizable hierarchy panel (2026-08-11) (COMPLETE)
 **Goal:** The sidebar is locked at 240px, so pages and sections with longer names are ellipsised with no way to read them. Add a drag handle on its right edge so the panel can be widened, with the width held for the session (not persisted, by explicit choice).
-- [ ] Drag handle on the hierarchy panel's right edge (`data-testid="hierarchy-resize-handle"`), using pointer capture so the drag survives the cursor leaving the strip
-- [ ] Width clamped to 180–560px; double-click the handle resets to the 240px default
-- [ ] Keyboard-accessible: handle is focusable with `role="separator"`, Arrow keys resize in 16px steps, Home resets
-- [ ] Width is session-only by explicit decision — not written to the notebook and not to localStorage; reopening resets to 240px
-- [ ] SRS_HIERARCHY: REQ-HIER-012..014 (resizable panel, clamping, session-only width)
-- [ ] T107 — E2E: drag widens the panel, clamps at both bounds, double-click resets, keyboard steps, and a long page title shows more text once widened
-- [ ] Bump APP_VERSION to 0.32.0, full suite green, rebuild dist-template, commit, tag and publish the GitHub release
+- [x] Drag handle on the hierarchy panel's right edge (`data-testid="hierarchy-resize-handle"`), using pointer capture so the drag survives the cursor leaving the strip
+- [x] Width clamped to 180–560px; double-click the handle resets to the 240px default
+- [x] Keyboard-accessible: handle is focusable with `role="separator"`, Arrow keys resize in 16px steps, Home resets
+- [x] Width is session-only by explicit decision — not written to the notebook and not to localStorage; reopening resets to 240px
+- [x] SRS_HIERARCHY: REQ-HIER-012..014 (resizable panel, clamping, session-only width)
+- [x] T107 — E2E: drag widens the panel, clamps at both bounds, double-click resets, keyboard steps, and a long page title shows more text once widened
+- [x] Bump APP_VERSION to 0.32.0, full suite green, rebuild dist-template, commit, tag and publish the GitHub release
 ## Future (Backlog)
 > Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 
