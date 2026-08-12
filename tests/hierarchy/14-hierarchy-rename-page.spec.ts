@@ -26,7 +26,7 @@ test.describe('14 - Hierarchy Rename Page (REQ-HIER-009)', () => {
 
     // Rename input should appear
     const renameInput = page.locator('[data-testid="page-rename-input"]');
-    await expect(renameInput).toBeVisible({ timeout: 2000 });
+    await expect(renameInput).toBeVisible();
   });
 
   test('typing a new name and pressing Enter renames the page', async ({ page }) => {
@@ -38,7 +38,7 @@ test.describe('14 - Hierarchy Rename Page (REQ-HIER-009)', () => {
     await page.locator('[data-testid="rename-page-btn"]').first().click({ force: true });
 
     const renameInput = page.locator('[data-testid="page-rename-input"]');
-    await expect(renameInput).toBeVisible({ timeout: 2000 });
+    await expect(renameInput).toBeVisible();
 
     // Clear and type new name
     await renameInput.fill('My Custom Page');
@@ -62,7 +62,7 @@ test.describe('14 - Hierarchy Rename Page (REQ-HIER-009)', () => {
     await page.locator('[data-testid="rename-page-btn"]').first().click({ force: true });
 
     const renameInput = page.locator('[data-testid="page-rename-input"]');
-    await expect(renameInput).toBeVisible({ timeout: 2000 });
+    await expect(renameInput).toBeVisible();
 
     await renameInput.fill('Renamed Page');
     await renameInput.press('Enter');

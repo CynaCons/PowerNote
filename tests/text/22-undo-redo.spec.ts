@@ -75,7 +75,7 @@ test.describe('22 - Undo/Redo (REQ-CANVAS-007)', () => {
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
     await textarea.fill('Hello');
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.waitForTimeout(200);

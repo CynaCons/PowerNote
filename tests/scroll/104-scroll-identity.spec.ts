@@ -97,13 +97,14 @@ test.describe('104 - Scroll identity (REQ-SCROLL-001..008)', () => {
     expect(byId[first].column).toBe(1);
     expect(byId[second].column).toBe(2);
 
-    await page.locator('[data-testid="nav-hierarchy"]').click().catch(() => {});
+    // Unguarded on purpose: swallowing a failed click here would let the
+    // assertions below be skipped silently, and a caught action timeout is the
+    // one thing in this suite that a raised timeout ceiling would slow down.
+    await page.locator('[data-testid="nav-hierarchy"]').click();
     const list = page.locator(`[data-testid="page-scrolls-${p.id}"]`);
-    if (await list.isVisible().catch(() => false)) {
-      await expect(list.locator('.hierarchy-scroll')).toHaveCount(2);
-      await expect(list).toContainText('Research log');
-      await expect(list).toContainText('Open questions');
-    }
+    await expect(list.locator('.hierarchy-scroll')).toHaveCount(2);
+    await expect(list).toContainText('Research log');
+    await expect(list).toContainText('Open questions');
   });
 
   test('membership is positional — a block reports the scroll it sits in', async ({ page }) => {

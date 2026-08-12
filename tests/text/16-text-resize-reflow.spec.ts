@@ -22,7 +22,7 @@ test.describe('16 - Text Resize Reflow (REQ-TEXT-008)', () => {
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
 
     await textarea.fill('Short text');
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
@@ -38,7 +38,7 @@ test.describe('16 - Text Resize Reflow (REQ-TEXT-008)', () => {
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
 
     await textarea.fill(
       'This is a longer sentence that should cause the text to wrap within the intentional width of the text block',

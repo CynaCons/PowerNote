@@ -21,7 +21,7 @@ test.describe('32 - Text Editor Features (REQ-TEXT-017, REQ-TEXT-018)', () => {
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
 
     // Type a bullet item and press Enter
     await textarea.fill('');
@@ -41,7 +41,7 @@ test.describe('32 - Text Editor Features (REQ-TEXT-017, REQ-TEXT-018)', () => {
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
 
     // Type an indented line: first indent with Tab, then type content
     await textarea.fill('');

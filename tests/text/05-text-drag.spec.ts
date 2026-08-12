@@ -20,7 +20,7 @@ test.describe('05 - Text Drag (REQ-TEXT-006)', () => {
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
 
     await textarea.fill('Drag me');
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());

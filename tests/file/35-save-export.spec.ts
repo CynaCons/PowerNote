@@ -27,7 +27,7 @@ test.describe('35 - Save / Export (REQ-FILE-001..003)', () => {
     await activateTool(page, 'text');
     await clickCanvas(page, 400, 300);
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
     await textarea.fill('# Export Test\nThis content should be in the file');
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.waitForTimeout(300);

@@ -21,7 +21,7 @@ test.describe('06 - Text Delete (REQ-TEXT-009, REQ-TEXT-010)', () => {
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
 
     await textarea.fill('Delete me');
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());

@@ -1005,6 +1005,13 @@
 - [x] T109 — agent deletes: each verb removes the right thing, refuses without confirm, and reports the guard when the last page/section/scroll would go
 - [x] SRS: new REQ-OUTLINE ids in a docs/SRS_OUTLINE.md, active-scroll requirements in SRS_SCROLL, delete verbs in SRS_AGENT
 - [x] Bump APP_VERSION to 0.33.0, full suite green, rebuild dist-template, commit, tag and publish the GitHub release
+### v0.33.1 — Test suite timeout hardening (2026-08-11) (COMPLETE)
+**Goal:** A cluster of text tests (26, 58, 59, 73, 83, 92) failed intermittently across three full-suite runs and passed serially every time. Cause: 41 hand-written `{ timeout: 2000 }` assertion waits, all BELOW Playwright's 5000ms default, which fail correct-but-slow runs when the machine is busy. Raise the ceilings so load costs time rather than green.
+- [x] Remove all 41 sub-default `{ timeout: 2000 }` assertion overrides across 20 files so they inherit one config-level `expect.timeout`
+- [x] playwright.config.ts: test `timeout` 15s→30s, `actionTimeout` 5s→10s, explicit `expect.timeout` 10s, with the reasoning recorded in-file
+- [x] Retries deliberately left at 0 — a retry converts an intermittent bug into a green run, which defeats the suite's purpose
+- [x] Drop the one `.click().catch(() => {})` in T104 — a swallowed action timeout is the only pattern a raised ceiling can slow, and it was hiding whether the assertions ran at all
+- [x] Verified under the failing condition: 414 passed with a dev server, preview browser and a build running alongside (6.4m — heavier than any run that previously failed)
 ## Future (Backlog)
 > Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 

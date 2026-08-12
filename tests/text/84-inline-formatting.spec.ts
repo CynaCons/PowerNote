@@ -17,7 +17,7 @@ test.describe('84 - Extended inline formatting (REQ-TEXT-025..027, REQ-TOOL-007)
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
     await textarea.fill('Hello brave world');
   });
 

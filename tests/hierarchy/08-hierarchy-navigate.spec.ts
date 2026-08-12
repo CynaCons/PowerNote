@@ -62,7 +62,7 @@ test.describe('08 - Hierarchy Navigate (REQ-HIER-004, REQ-HIER-011)', () => {
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
     await textarea.fill('Page 2 content');
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.waitForTimeout(300);

@@ -19,7 +19,7 @@ test.describe('92 - Text Page Default Width + Resize (REQ-TEXT-020/028/029)', ()
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
 
     const store = await getCanvasStore(page);
     expect(store.nodes).toHaveLength(1);
@@ -36,7 +36,7 @@ test.describe('92 - Text Page Default Width + Resize (REQ-TEXT-020/028/029)', ()
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
     await textarea.fill(
       'The quick brown fox jumps over the lazy dog and keeps wrapping at page width',
     );
@@ -52,7 +52,7 @@ test.describe('92 - Text Page Default Width + Resize (REQ-TEXT-020/028/029)', ()
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
     await textarea.fill('Resize me wider than a page');
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.waitForTimeout(200);

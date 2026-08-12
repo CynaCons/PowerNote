@@ -20,7 +20,7 @@ test.describe('83 - Partial bold/italic (REQ-TEXT-022/023, REQ-TOOL-007)', () =>
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
     await textarea.fill('hello world');
 
     // Select just the word "world" (chars 6..11) inside the textarea
@@ -57,7 +57,7 @@ test.describe('83 - Partial bold/italic (REQ-TEXT-022/023, REQ-TOOL-007)', () =>
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
     await textarea.fill('keep stress calm');
 
     // Select "stress" (chars 5..11)
@@ -88,7 +88,7 @@ test.describe('83 - Partial bold/italic (REQ-TEXT-022/023, REQ-TOOL-007)', () =>
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
 
     // Fresh block: place the cursor with nothing highlighted
     await page.evaluate(() => {
@@ -123,7 +123,7 @@ test.describe('83 - Partial bold/italic (REQ-TEXT-022/023, REQ-TOOL-007)', () =>
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
     await textarea.fill('hello');
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.waitForTimeout(200);

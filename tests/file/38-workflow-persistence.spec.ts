@@ -100,7 +100,7 @@ test.describe('38 - Workflow Persistence: EV Motor Control Report', () => {
     // Rename Section 1 → "Introduction"
     await page.locator('[data-testid="rename-section-btn"]').first().click({ force: true });
     const sectionInput = page.locator('[data-testid="section-rename-input"]');
-    await expect(sectionInput).toBeVisible({ timeout: 2000 });
+    await expect(sectionInput).toBeVisible();
     await sectionInput.fill('Introduction');
     await sectionInput.press('Enter');
     await page.waitForTimeout(200);
@@ -108,7 +108,7 @@ test.describe('38 - Workflow Persistence: EV Motor Control Report', () => {
     // Rename Page 1 → "Overview"
     await page.locator('[data-testid="rename-page-btn"]').first().click({ force: true });
     const pageInput = page.locator('[data-testid="page-rename-input"]');
-    await expect(pageInput).toBeVisible({ timeout: 2000 });
+    await expect(pageInput).toBeVisible();
     await pageInput.fill('Overview');
     await pageInput.press('Enter');
     await page.waitForTimeout(200);
@@ -132,7 +132,7 @@ test.describe('38 - Workflow Persistence: EV Motor Control Report', () => {
     // Rename it
     await page.locator('[data-testid="rename-section-btn"]').nth(1).click({ force: true });
     const section2Input = page.locator('[data-testid="section-rename-input"]');
-    await expect(section2Input).toBeVisible({ timeout: 2000 });
+    await expect(section2Input).toBeVisible();
     await section2Input.fill('Motor Control Theory');
     await section2Input.press('Enter');
     await page.waitForTimeout(200);
@@ -161,7 +161,7 @@ test.describe('38 - Workflow Persistence: EV Motor Control Report', () => {
     // Rename third section
     await page.locator('[data-testid="rename-section-btn"]').nth(2).click({ force: true });
     const section3Input = page.locator('[data-testid="section-rename-input"]');
-    await expect(section3Input).toBeVisible({ timeout: 2000 });
+    await expect(section3Input).toBeVisible();
     await section3Input.fill('Testing & Validation');
     await section3Input.press('Enter');
     await page.waitForTimeout(200);

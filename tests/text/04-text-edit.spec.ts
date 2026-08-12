@@ -20,7 +20,7 @@ test.describe('04 - Text Edit (REQ-TEXT-003, REQ-TEXT-004, REQ-TEXT-005)', () =>
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
 
     await textarea.fill('Hello World');
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
@@ -37,7 +37,7 @@ test.describe('04 - Text Edit (REQ-TEXT-003, REQ-TEXT-004, REQ-TEXT-005)', () =>
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
 
     await textarea.fill('Escape test');
     await textarea.press('Escape');
@@ -59,7 +59,7 @@ test.describe('04 - Text Edit (REQ-TEXT-003, REQ-TEXT-004, REQ-TEXT-005)', () =>
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
 
     await textarea.fill('Blur commit test');
 
@@ -78,7 +78,7 @@ test.describe('04 - Text Edit (REQ-TEXT-003, REQ-TEXT-004, REQ-TEXT-005)', () =>
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
 
     await textarea.fill('Edit me');
     // Blur by clicking elsewhere — but first deactivate text tool to avoid placing new nodes
@@ -90,12 +90,12 @@ test.describe('04 - Text Edit (REQ-TEXT-003, REQ-TEXT-004, REQ-TEXT-005)', () =>
     await page.waitForTimeout(300);
 
     // Textarea should be gone after commit
-    await expect(textarea).not.toBeVisible({ timeout: 2000 });
+    await expect(textarea).not.toBeVisible();
 
     // Double-click at the same canvas position to re-edit
     await dblClickCanvas(page, 400, 300);
 
     // Textarea should reappear
-    await expect(page.locator('textarea')).toBeVisible({ timeout: 2000 });
+    await expect(page.locator('textarea')).toBeVisible();
   });
 });

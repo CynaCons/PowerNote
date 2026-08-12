@@ -55,7 +55,7 @@ test.describe('03 - Text Place (REQ-TEXT-001, REQ-TEXT-002)', () => {
 
     // A textarea should appear for inline editing
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
   });
 
   test('placed text node is selected in the store', async ({ page }) => {

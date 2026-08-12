@@ -21,7 +21,7 @@ test.describe('21 - Text Intentional Width (REQ-TEXT-007, REQ-TEXT-020)', () => 
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
     await textarea.fill('Hi');
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.waitForTimeout(200);
@@ -37,7 +37,7 @@ test.describe('21 - Text Intentional Width (REQ-TEXT-007, REQ-TEXT-020)', () => 
     await clickCanvas(page, 400, 300);
 
     const textarea = page.locator('textarea');
-    await expect(textarea).toBeVisible({ timeout: 2000 });
+    await expect(textarea).toBeVisible();
     await textarea.fill(
       'This is a longer piece of text that should wrap within the page-wide block rather than growing the box to content',
     );

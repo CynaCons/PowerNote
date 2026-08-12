@@ -27,7 +27,7 @@ test.describe('12 - Hierarchy Rename Section (REQ-HIER-007)', () => {
 
     // Rename input should appear
     const renameInput = page.locator('[data-testid="section-rename-input"]');
-    await expect(renameInput).toBeVisible({ timeout: 2000 });
+    await expect(renameInput).toBeVisible();
   });
 
   test('typing a new name and pressing Enter renames the section', async ({ page }) => {
@@ -40,7 +40,7 @@ test.describe('12 - Hierarchy Rename Section (REQ-HIER-007)', () => {
     await sectionTitle.dblclick();
 
     const renameInput = page.locator('[data-testid="section-rename-input"]');
-    await expect(renameInput).toBeVisible({ timeout: 2000 });
+    await expect(renameInput).toBeVisible();
 
     // Clear and type new name
     await renameInput.fill('My Custom Section');
@@ -62,7 +62,7 @@ test.describe('12 - Hierarchy Rename Section (REQ-HIER-007)', () => {
     await sectionTitle.dblclick();
 
     const renameInput = page.locator('[data-testid="section-rename-input"]');
-    await expect(renameInput).toBeVisible({ timeout: 2000 });
+    await expect(renameInput).toBeVisible();
 
     // Clear and type new name
     await renameInput.fill('Renamed Section');
@@ -87,7 +87,7 @@ test.describe('12 - Hierarchy Rename Section (REQ-HIER-007)', () => {
     await sectionTitle.dblclick();
 
     const renameInput = page.locator('[data-testid="section-rename-input"]');
-    await expect(renameInput).toBeVisible({ timeout: 2000 });
+    await expect(renameInput).toBeVisible();
 
     await renameInput.fill('Updated Name');
     await renameInput.press('Enter');

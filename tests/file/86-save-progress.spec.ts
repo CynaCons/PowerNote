@@ -29,7 +29,7 @@ test.describe('86 - Save-in-progress animation (REQ-FILE-021)', () => {
     const downloadPromise = page.waitForEvent('download');
     await saveBtn.click();
 
-    await expect(page.locator('[data-testid="save-spinner"]')).toBeVisible({ timeout: 2000 });
+    await expect(page.locator('[data-testid="save-spinner"]')).toBeVisible();
     await expect(saveBtn).toBeDisabled();
     await expect(saveBtn).toHaveAttribute('aria-busy', 'true');
 
