@@ -728,6 +728,26 @@ const TOOLS = [
     },
   },
   {
+    name: 'create_diagram',
+    description:
+      'DEPRECATED - use create_diagram_plantuml, create_diagram_mermaid or ' +
+      'create_diagram_svg instead, which name the language they take and each ' +
+      'document their own subset. This name still works and sniffs the format from ' +
+      'the source, but it will be removed. Behaviour is otherwise identical.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        source: { type: 'string', description: 'Diagram source. The format is sniffed.' },
+        title: { type: 'string', description: 'Title shown on the diagram frame.' },
+        pageId: { type: 'string', description: 'Page to draw on. Defaults to the open page.' },
+        scrollId: { type: 'string', description: 'Scroll to draw into. Defaults to the leftmost.' },
+        column: { type: 'integer', minimum: 0, description: 'Legacy fallback - prefer scrollId.' },
+      },
+      required: ['source'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'list_scrolls',
     description:
       'List the scrolls (named vertical columns) on a page, with how many blocks ' +
@@ -1032,6 +1052,9 @@ const TOOL_ROUTES = {
   create_diagram_plantuml: { cmd: 'create_diagram', params: { format: 'plantuml' } },
   create_diagram_mermaid: { cmd: 'create_diagram', params: { format: 'mermaid' } },
   create_diagram_svg: { cmd: 'create_diagram', params: { format: 'svg' } },
+  // Deprecated alias, kept so anything written against the pre-v0.37 name still
+  // works. No `format`, so the grammar is sniffed exactly as it used to be.
+  create_diagram: { cmd: 'create_diagram', params: {} },
 };
 
 const server = new Server(

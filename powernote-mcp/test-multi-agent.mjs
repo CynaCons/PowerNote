@@ -162,7 +162,13 @@ async function main() {
   // --- diagram tools are named for the language they take ----------------
   check('plantuml diagram tool is offered', tools.includes('create_diagram_plantuml'));
   check('mermaid diagram tool is offered', tools.includes('create_diagram_mermaid'));
-  check('the format-less diagram tool is gone', !tools.includes('create_diagram'));
+  check('svg diagram tool is offered', tools.includes('create_diagram_svg'));
+  // Kept on purpose: renaming a shipped tool would break anything written
+  // against the old name, and an alias costs one route entry.
+  check('the old name survives as a deprecated alias', tools.includes('create_diagram'));
+
+  const legacy = await beta.call('create_diagram', { source: 'flowchart LR\nA-->B' });
+  check('the deprecated alias still draws', !legacy.isError, legacy.text);
 
   const drawn = await beta.call('create_diagram_mermaid', { source: 'flowchart LR\nA-->B' });
   check('mermaid tool reaches the notebook', !drawn.isError, drawn.text);

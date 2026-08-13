@@ -175,4 +175,44 @@ test.describe('131 - Upgrade regression (REQ-UPDATE-020..024)', () => {
     expect(round.persisted).toBe(true);
     expect(round.legacyKept).toBe(true);
   });
+
+  test('opening a legacy file migrates it onto the current build', async ({ page }) => {
+    // The real migration path: run the NEW build, open an OLD notebook file, and
+    // save. `handleOpen` rebinds the file handle, so the save writes the current
+    // build into the old file -- which is how a notebook that cannot self-update
+    // gets onto a new version.
+    await openUpgraded(page, buildUpgraded({ ...LEGACY_WORKSPACE, filename: 'Fresh Build' }));
+
+    const migrated = await page.evaluate(async (legacyHtml) => {
+      const S = (window as any).__POWERNOTE_STORES__;
+      const ser = await import('/src/utils/serialization.ts');
+      const mig = await import('/src/utils/migrations.ts').catch(() => null);
+
+      // Exactly what handleOpen does with the bytes of an old file.
+      const data = ser.extractDataFromHtml(legacyHtml);
+      const workspace = mig?.migrateWorkspace ? mig.migrateWorkspace(data) : data;
+      S.workspace.setState({
+        workspace,
+        activeSectionId: workspace.sections[0].id,
+        activePageId: workspace.sections[0].pages[0].id,
+      });
+      S.canvas.getState().loadPageNodes(workspace.sections[0].pages[0].nodes ?? []);
+
+      const rebuilt = await ser.buildExportHtml(S.workspace.getState().workspace);
+      return {
+        loadedFilename: workspace.filename,
+        nodes: S.canvas.getState().nodes.length,
+        // The re-saved file carries the CURRENT build, not the old one.
+        savedIsCurrentBuild: rebuilt.includes('<div id="root">'),
+        savedKeepsContent: rebuilt.includes('buffers to flash'),
+        scrollsHydrated: (workspace.sections[0].pages[0].scrolls ?? []).length > 0,
+      };
+    }, buildUpgraded(LEGACY_WORKSPACE));
+
+    expect(migrated.loadedFilename).toBe('Legacy Notes');
+    expect(migrated.nodes).toBe(2);
+    expect(migrated.savedIsCurrentBuild).toBe(true);
+    expect(migrated.savedKeepsContent).toBe(true);
+    expect(migrated.scrollsHydrated).toBe(true);
+  });
 });

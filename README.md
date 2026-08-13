@@ -36,6 +36,21 @@ No install. No account. No server. Just open and write.
 - **Offline-first** — works without internet, no cloud dependency
 - **Agent-ready** — an MCP server lets an AI agent read and write the open notebook, including drawing diagrams. See [`powernote-mcp/`](powernote-mcp/README.md)
 
+## Migrating an old notebook
+
+A notebook carries its own copy of the app, so a file built before the in-app
+updater was fixed (anything up to v0.36.0) cannot update itself. Move it across
+once, by hand:
+
+1. Download `PowerNote.html` from the [latest release](https://github.com/CynaCons/PowerNote/releases/latest) and open it.
+2. Click the **open** icon in the top bar and pick your old notebook.
+3. Press **Ctrl+S**.
+
+Step 2 loads your old notebook's data into the new build and binds to that file,
+so step 3 writes the new build back over it — sections, pages, nodes and
+drawings intact, and fields added since your old version filled in with
+defaults. From then on in-app updates work.
+
 ## How It Works
 
 Each PowerNote file is a standalone HTML application. When you save, your notes are serialized as JSON and embedded inside the HTML file alongside the editor code. Reopen the file to continue editing. Share the file to share your notes — the recipient gets a fully editable copy.

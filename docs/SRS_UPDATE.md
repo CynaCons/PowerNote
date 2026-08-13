@@ -38,3 +38,5 @@ route that works. It is kept first and pinned to the tag.
 **Limit of the fix.** The updater lives inside each notebook file, so a build
 that shipped with the broken order cannot repair itself. Users on those versions
 must download the new build once by hand; from then on updating works.
+
+| REQ-UPDATE-025 | Opening an older notebook file from a newer build shall migrate its workspace and rebind the file handle, so saving writes the newer build back over it | Must | T131 |
