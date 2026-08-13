@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Columns2, FileText, Pencil, X } from 'lucide-react';
+import { ScrollText, FileText, Pencil, X, Plus } from 'lucide-react';
 import type { Page } from '../../types/data';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import './HierarchyPanel.css';
@@ -165,10 +165,29 @@ function ScrollList({
   onOpenScroll: (sectionId: string, pageId: string, scrollId: string, column: number) => void;
 }) {
   const activeScrollId = useWorkspaceStore((s) => s.activeScrollId);
+  const createScroll = useWorkspaceStore((s) => s.createScroll);
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState('');
   const named = [...(page.scrolls ?? [])]
     .filter((s) => s.title)
     .sort((a, b) => a.column - b.column);
-  if (named.length === 0) return null;
+
+  // Nothing to show for a collapsed page with no named scrolls. The add row is
+  // offered on the OPEN page only: under every page in the tree it would be
+  // noise, and it would be ambiguous which page a click was adding to.
+  if (!isActive && named.length === 0) return null;
+
+  // An unnamed scroll draws no header, so a blank name would create something
+  // invisible. Cancel instead, the same as Escape.
+  const commit = () => {
+    const title = draft.trim();
+    if (title) {
+      const record = createScroll(page.id, title);
+      if (record) onOpenScroll(sectionId, page.id, record.id, record.column);
+    }
+    setDraft('');
+    setAdding(false);
+  };
 
   return (
     <div className="hierarchy-scrolls" data-testid={`page-scrolls-${page.id}`}>
@@ -185,11 +204,40 @@ function ScrollList({
             title={scroll.title}
             onClick={() => onOpenScroll(sectionId, page.id, scroll.id, scroll.column)}
           >
-            <Columns2 size={12} />
+            <ScrollText size={12} />
             <span className="hierarchy-scroll__title">{scroll.title}</span>
           </button>
         );
       })}
+
+      {!isActive ? null : adding ? (
+        <input
+          className="hierarchy-scroll__new"
+          data-testid={`new-scroll-input-${page.id}`}
+          placeholder="Scroll name"
+          aria-label="New scroll name"
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit();
+            else if (e.key === 'Escape') {
+              setDraft('');
+              setAdding(false);
+            }
+          }}
+        />
+      ) : (
+        <button
+          className="hierarchy-scroll-add"
+          data-testid={`new-scroll-${page.id}`}
+          onClick={() => setAdding(true)}
+        >
+          <Plus size={12} />
+          <span className="hierarchy-scroll__title">New scroll</span>
+        </button>
+      )}
     </div>
   );
 }

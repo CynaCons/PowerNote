@@ -153,3 +153,55 @@ export function calculateSnap(
 
   return { x: snapX, y: snapY, lines };
 }
+
+/**
+ * How close a node must come to a scroll's edge before the magnet takes it.
+ * One constant so the pull strength is a single edit.
+ */
+export const SCROLL_SNAP_THRESHOLD = 14;
+
+/**
+ * Magnetic snap to the edges of the scroll band a node is being dragged in.
+ *
+ * Deliberately NOT gated behind Shift, unlike `calculateSnap`: lining content up
+ * with the column it belongs to is the common case, not the exception. It stays
+ * a magnet rather than a constraint — pull further than the threshold and the
+ * node goes exactly where you put it, so a considered off-band placement is
+ * still one gesture.
+ *
+ * Snaps the left edge to the band's left, or the right edge to the band's right,
+ * whichever is nearer. Vertical position is never touched: blocks stack down a
+ * band freely and snapping y would fight that.
+ */
+export function calculateScrollSnap(
+  dragged: { x: number; y: number; width: number },
+  columnLeftOf: (column: number) => number,
+  columnWidth: number,
+  columnCount: number,
+  threshold = SCROLL_SNAP_THRESHOLD,
+): { x: number; line: SnapLine | null } {
+  if (threshold <= 0 || columnCount <= 0) return { x: dragged.x, line: null };
+
+  const width = Math.abs(dragged.width);
+  let best: { x: number; at: number } | null = null;
+
+  for (let column = 0; column < columnCount; column += 1) {
+    const left = columnLeftOf(column);
+    const right = left + columnWidth;
+
+    const leftGap = Math.abs(dragged.x - left);
+    if (leftGap <= threshold && (!best || leftGap < Math.abs(best.x - dragged.x))) {
+      best = { x: left, at: left };
+    }
+    const rightGap = Math.abs(dragged.x + width - right);
+    if (rightGap <= threshold && (!best || rightGap < Math.abs(best.x - dragged.x))) {
+      best = { x: right - width, at: right };
+    }
+  }
+
+  if (!best) return { x: dragged.x, line: null };
+  return {
+    x: best.x,
+    line: { type: 'vertical', position: best.at, start: dragged.y - 400, end: dragged.y + 400 },
+  };
+}

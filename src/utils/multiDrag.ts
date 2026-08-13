@@ -22,7 +22,21 @@ export function multiDragStart(draggedId: string, x: number, y: number): void {
   const draw = useDrawStore.getState();
 
   const inSelection = canvas.selectedNodeIds.includes(draggedId);
-  const nodeIds = inSelection ? [...canvas.selectedNodeIds] : [draggedId];
+
+  // Konva begins dragging on mousedown, before any click has run — so a press
+  // and drag in one motion arrives with the node still unselected. Falling back
+  // to [draggedId] there tore groups apart: the frame of a diagram moved while
+  // its contents stayed put. Group membership, not selection, decides what
+  // travels together, which also matches what click-then-drag already did.
+  let nodeIds: string[];
+  if (inSelection) {
+    nodeIds = [...canvas.selectedNodeIds];
+  } else {
+    const dragged = canvas.nodes.find((n) => n.id === draggedId);
+    nodeIds = dragged?.groupId
+      ? canvas.nodes.filter((n) => n.groupId === dragged.groupId).map((n) => n.id)
+      : [draggedId];
+  }
   const strokeIds =
     inSelection && nodeIds.length + draw.selectedStrokeIds.length > 1
       ? [...draw.selectedStrokeIds]

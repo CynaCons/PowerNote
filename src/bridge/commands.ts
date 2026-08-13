@@ -22,11 +22,15 @@ import { DEFAULT_WORKSPACE_SETTINGS } from '../utils/defaults';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useCanvasStore } from '../stores/useCanvasStore';
 import { useDrawStore } from '../stores/useDrawStore';
-import { createBlockNode, blockHeight, columnOf, orderedTextNodes } from './blocks';
+import { createBlockNode, blockHeight, columnOf, orderedTextNodes, nextBlockY } from './blocks';
+import { columnX } from './blocks';
+import { rebuildDiagram, FRAME_MIN_W, FRAME_MIN_H } from '../diagram/canvasOps';
+import { generateId } from '../utils/ids';
 import { A4_WIDTH } from '../utils/pageLayout';
 import { scrollById } from '../utils/scrolls';
 import type {
   AppendBlockResult,
+  CreateDiagramResult,
   BackgroundResult,
   BridgeCommandName,
   BridgeErrorCode,
@@ -870,12 +874,79 @@ async function runUpdate(params: Record<string, unknown>): Promise<RunUpdateResu
 
 type Handler = (params: Record<string, unknown>) => unknown | Promise<unknown>;
 
+
+/**
+ * Draws a PlantUML diagram onto the page as a native diagram node.
+ *
+ * The agent supplies semantics only — entities and relationships — and the app
+ * computes every coordinate from real text metrics. What lands is ordinary
+ * shape and text nodes inside a frame, so the user can drag any part of it
+ * afterwards exactly like something they drew by hand.
+ *
+ * Diagnostics come back with the write rather than needing a second call, so a
+ * clean diagram costs one round trip. A source that parses to nothing is a
+ * PRECONDITION error, not a silently empty frame.
+ */
+async function createDiagram(params: Record<string, unknown>): Promise<CreateDiagramResult> {
+  flush();
+  const source = requireString(params, 'source');
+  const title = optionalString(params, 'title') ?? 'Diagram';
+  const { section, page } = resolvePage(optionalString(params, 'pageId'));
+  const column = resolveColumn(params, page);
+
+  navigateToPage(section.id, page.id);
+
+  // Placed below whatever is already in that column, like an appended block.
+  const nodes = useCanvasStore.getState().nodes;
+  const frameId = generateId();
+  const frame: CanvasNode = {
+    id: frameId,
+    type: 'diagram',
+    x: columnX(column),
+    y: nextBlockY(nodes, column),
+    width: FRAME_MIN_W,
+    height: FRAME_MIN_H,
+    layer: 2,
+    groupId: frameId,
+    data: { source, title },
+  };
+
+  const built = rebuildDiagram(frame, source);
+  if (built.contents.length === 0) {
+    throw new BridgeCommandError(
+      'PRECONDITION',
+      `Nothing in that source could be drawn. ${built.diagnostics.map((d) => d.message).join(' ')}`.trim(),
+    );
+  }
+
+  useCanvasStore.getState().addNode(frame);
+  for (const content of built.contents) useCanvasStore.getState().addNode(content);
+  useCanvasStore.getState().updateNode(frameId, {
+    width: built.frame.width,
+    height: built.frame.height,
+  });
+  flush();
+
+  return {
+    sectionId: section.id,
+    pageId: page.id,
+    diagramId: frameId,
+    title,
+    column,
+    elementCount: built.contents.length,
+    width: built.frame.width,
+    height: built.frame.height,
+    diagnostics: built.diagnostics,
+  };
+}
+
 const HANDLERS: Record<BridgeCommandName, Handler> = {
   list_pages: listPages,
   read_page: readPage,
   create_section: createSection,
   create_page: createPage,
   append_block: appendBlock,
+  create_diagram: createDiagram,
   update_block: updateBlock,
   rename_page: renamePage,
   move_page: movePage,

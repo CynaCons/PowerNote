@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Group, Line, Text } from 'react-konva';
+import { Group, Line, Rect, Text } from 'react-konva';
 import { Html } from 'react-konva-utils';
 import type { BackgroundMode, ScrollRecord } from '../../types/data';
-import { A4_WIDTH, SCROLL_HEADER_HEIGHT, columnLeft } from '../../utils/pageLayout';
+import { A4_WIDTH, SCROLL_HEADER_HEIGHT, columnLeft, scrollTitleY } from '../../utils/pageLayout';
 import { renameScroll } from '../../utils/scrollOps';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
+import { useCanvasStore } from '../../stores/useCanvasStore';
 
 interface ScrollHeadersProps {
   mode: BackgroundMode;
@@ -13,6 +14,7 @@ interface ScrollHeadersProps {
 }
 
 const TITLE_INSET = 16;
+
 
 /**
  * Scroll titles drawn at the top of each column band — the user-facing half of
@@ -32,6 +34,9 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const activeScrollId = useWorkspaceStore((s) => s.activeScrollId);
   const setActiveScroll = useWorkspaceStore((s) => s.setActiveScroll);
+  // Pinning is a function of where the viewport is, so the header has to follow
+  // it rather than sit at a fixed canvas y.
+  const viewport = useCanvasStore((s) => s.viewport);
 
   // Stop editing if the scroll disappears (page switch, delete) — the overlay
   // would otherwise hang over an empty band.
@@ -63,6 +68,8 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
       {scrolls.map((scroll) => {
         const x = columnLeft(scroll.column);
         const isEditing = editingId === scroll.id;
+
+        const { y: pinnedY, holding: isHolding } = scrollTitleY(viewport);
 
         if (isEditing) {
           return (
@@ -104,9 +111,22 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
             {/* No id() on these nodes: useTextPlacement treats an unidentified
                 target as background, so a single click still places text or
                 clears selection straight through the header. */}
+            {/* Backing so a held title reads over the content passing beneath.
+                Only while holding — at rest the canvas already provides it. */}
+            {isHolding && (
+              <Rect
+                x={x}
+                y={pinnedY - 10}
+                width={A4_WIDTH}
+                height={SCROLL_HEADER_HEIGHT - 6}
+                fill="#ffffff"
+                opacity={0.92}
+                listening={false}
+              />
+            )}
             <Text
               x={x + TITLE_INSET}
-              y={12}
+              y={pinnedY}
               width={A4_WIDTH - TITLE_INSET * 2}
               text={scroll.title}
               fontSize={15}
@@ -116,7 +136,12 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
               wrap="none"
             />
             <Line
-              points={[x, SCROLL_HEADER_HEIGHT, x + A4_WIDTH, SCROLL_HEADER_HEIGHT]}
+              points={[
+                x,
+                pinnedY + SCROLL_HEADER_HEIGHT - 12,
+                x + A4_WIDTH,
+                pinnedY + SCROLL_HEADER_HEIGHT - 12,
+              ]}
               stroke={isActive ? '#bfdbfe' : '#e2e2e2'}
               strokeWidth={1}
               listening={false}

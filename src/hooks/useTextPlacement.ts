@@ -4,6 +4,7 @@ import { useCanvasStore, undoBatchStart } from '../stores/useCanvasStore';
 import { useToolStore } from '../stores/useToolStore';
 import { generateId } from '../utils/ids';
 import { DEFAULT_TEXT_WIDTH } from '../utils/pageLayout';
+import { rebuildDiagram, STARTER_DIAGRAM, FRAME_MIN_W, FRAME_MIN_H } from '../diagram/canvasOps';
 import type { CanvasNode as CanvasNodeType } from '../types/data';
 
 // Track the most recently placed node so it auto-enters edit mode
@@ -117,6 +118,43 @@ export function useTextPlacement(
         useToolStore.getState().setTool('select');
         addNode(newNode);
         selectNode(newNode.id, false);
+      } else if (currentTool === 'diagram') {
+        const pointer = stage.getPointerPosition();
+        if (!pointer) return;
+        const scale = stage.scaleX();
+        const stageX = (pointer.x - stage.x()) / scale;
+        const stageY = (pointer.y - stage.y()) / scale;
+
+        // The frame is its own group, so its generated contents (which carry the
+        // same groupId) drag along with it through the existing group machinery.
+        const frameId = generateId();
+        const frame: CanvasNodeType = {
+          id: frameId,
+          type: 'diagram',
+          x: stageX,
+          y: stageY,
+          width: FRAME_MIN_W,
+          height: FRAME_MIN_H,
+          layer: 2,
+          groupId: frameId,
+          data: { source: STARTER_DIAGRAM, title: 'Composite structure' },
+        };
+
+        undoBatchStart(useCanvasStore.getState().nodes);
+        useToolStore.getState().setTool('select');
+        addNode(frame);
+
+        // Draw it immediately, so placing the tool yields a real diagram rather
+        // than an empty box the user has to go and fill in.
+        const built = rebuildDiagram(frame, STARTER_DIAGRAM);
+        if (built.contents.length > 0) {
+          for (const content of built.contents) useCanvasStore.getState().addNode(content);
+          useCanvasStore.getState().updateNode(frameId, {
+            width: built.frame.width,
+            height: built.frame.height,
+          });
+        }
+        selectNode(frameId, false);
       } else {
         clearSelection();
       }

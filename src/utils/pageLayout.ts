@@ -59,3 +59,27 @@ export const MAX_TEXT_WIDTH = 5000;
 
 /** Minimum text block height after content measure */
 export const MIN_TEXT_HEIGHT = 24;
+
+/** Canvas y a scroll title rests at when the page is scrolled to the top. */
+export const SCROLL_TITLE_RESTING_Y = 12;
+/** Gap kept between a held title and the top of the viewport. */
+export const SCROLL_TITLE_PIN_INSET = 10;
+
+/**
+ * Where a scroll title should draw, given where the viewport is (v0.35).
+ *
+ * At rest it sits at the top of the band. Once the viewport scrolls past that,
+ * the title holds just below the top edge instead, so you never lose track of
+ * which column you are reading — a frozen header row, in canvas coordinates.
+ *
+ * Pure so the behaviour is testable without a stage: the component only feeds
+ * it the viewport.
+ */
+export function scrollTitleY(viewport: { y: number; scale: number }): {
+  y: number;
+  holding: boolean;
+} {
+  const viewportTop = -viewport.y / (viewport.scale || 1);
+  const y = Math.max(SCROLL_TITLE_RESTING_Y, viewportTop + SCROLL_TITLE_PIN_INSET);
+  return { y, holding: y > SCROLL_TITLE_RESTING_Y + 0.5 };
+}

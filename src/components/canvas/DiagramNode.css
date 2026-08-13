@@ -1,0 +1,116 @@
+.diagram-node__src {
+  font: 400 10px/1 ui-monospace, Consolas, monospace;
+  letter-spacing: 0.08em;
+  color: #5c6467;
+  background: #fff;
+  border: 1px solid #c3cbc9;
+  border-radius: 4px;
+  padding: 3px 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.diagram-node__src:hover { color: #14181a; border-color: #14181a; }
+
+.diagram-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(20, 24, 26, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.diagram-modal {
+  width: min(620px, 90%);
+  max-height: 80%;
+  background: #fff;
+  border: 1px solid #c3cbc9;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.diagram-modal header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid #dce1e0;
+  font: 400 11px/1 ui-monospace, Consolas, monospace;
+  letter-spacing: 0.14em;
+  color: #8a9295;
+}
+.diagram-modal header button {
+  border: 0;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  color: #5c6467;
+  cursor: pointer;
+}
+
+.diagram-modal textarea {
+  border: 0;
+  resize: vertical;
+  min-height: 240px;
+  padding: 14px;
+  font: 400 12px/1.6 ui-monospace, Consolas, monospace;
+  color: #14181a;
+}
+.diagram-modal textarea:focus { outline: 2px solid #14181a; outline-offset: -2px; }
+
+.diagram-diags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 150px;
+  overflow-y: auto;
+  border-top: 1px solid #dce1e0;
+}
+.diagram-diags li {
+  display: flex;
+  gap: 10px;
+  padding: 7px 14px;
+  border-bottom: 1px solid #f0f2f1;
+  font: 400 12px/1.5 Inter, system-ui, sans-serif;
+  color: #5c6467;
+}
+.diagram-diags li span {
+  flex: none;
+  width: 54px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: #8a9295;
+}
+.diagram-diags li.error span { color: #b4552d; }
+
+.diagram-modal footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-top: 1px solid #dce1e0;
+}
+.diagram-count {
+  font: 400 12px/1.4 Inter, system-ui, sans-serif;
+  color: #5c6467;
+}
+.diagram-modal footer div { display: flex; gap: 8px; }
+.diagram-modal footer button {
+  font: 500 12px/1 Inter, system-ui, sans-serif;
+  border: 1px solid #c3cbc9;
+  background: #fff;
+  color: #14181a;
+  border-radius: 6px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+.diagram-modal footer button:hover { border-color: #14181a; }
+.diagram-modal footer button.primary {
+  background: #14181a;
+  border-color: #14181a;
+  color: #fff;
+}

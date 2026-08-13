@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Group, Rect, Ellipse, Line, Arrow, Circle } from 'react-konva';
+import { Group, Rect, Ellipse, Line, Arrow, Circle, Arc } from 'react-konva';
 import type Konva from 'konva';
 import type { CanvasNode, ShapeNodeData } from '../../types/data';
 import { useCanvasStore } from '../../stores/useCanvasStore';
@@ -9,7 +9,9 @@ import { useDrawStore } from '../../stores/useDrawStore';
 import { isNodeInteractive } from '../../utils/toolConfig';
 import { generateId } from '../../utils/ids';
 import { multiDragStart, multiDragMove, multiDragEnd } from '../../utils/multiDrag';
-import { calculateSnap, type SnapLine } from './SnapGuides';
+import { calculateSnap, calculateScrollSnap, type SnapLine } from './SnapGuides';
+import { columnLeft, A4_WIDTH } from '../../utils/pageLayout';
+import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 
 interface ShapeNodeProps {
   node: CanvasNode;
@@ -42,7 +44,21 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
   const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
     multiDragMove(node.id, e.target.x(), e.target.y(), e.target.getStage());
     if (!e.evt.shiftKey) {
-      onSnapChange([]);
+      // Ungated magnet to the scroll band's edges. Shift-snapping to other
+      // nodes is the deliberate act; lining up with your column is not.
+      const page = useWorkspaceStore.getState().getActivePage();
+      const columns = page?.scrolls?.length ?? 0;
+      const snap = calculateScrollSnap(
+        { x: e.target.x(), y: e.target.y(), width: node.width },
+        columnLeft,
+        A4_WIDTH,
+        columns,
+      );
+      onSnapChange(snap.line ? [snap.line] : []);
+      if (snap.line) {
+        e.target.x(snap.x);
+        multiDragMove(node.id, snap.x, e.target.y(), e.target.getStage());
+      }
       return;
     }
     const allNodes = useCanvasStore.getState().nodes;
@@ -155,7 +171,26 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
           stroke={stroke}
           strokeWidth={strokeWidth}
           dash={dash}
-          cornerRadius={0}
+          cornerRadius={data.cornerRadius ?? 0}
+          rotation={data.rotation ?? 0}
+          listening={false}
+        />
+      )}
+
+      {/* Stroked half-circle — a UML required-interface socket. innerRadius ===
+          outerRadius degenerates the ring sector to a plain arc line, and
+          `rotation` turns the opening to face its ball. */}
+      {data.shapeType === 'arc' && (
+        <Arc
+          x={w / 2}
+          y={h / 2}
+          innerRadius={Math.abs(w) / 2}
+          outerRadius={Math.abs(w) / 2}
+          angle={180}
+          rotation={data.rotation ?? 0}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          dash={dash}
           listening={false}
         />
       )}

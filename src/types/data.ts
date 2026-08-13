@@ -1,6 +1,6 @@
 // ── Node types ──────────────────────────────────────────────
 
-export type NodeType = 'text' | 'image' | 'shape' | 'gantt';
+export type NodeType = 'text' | 'image' | 'shape' | 'gantt' | 'diagram';
 
 export interface TextNodeData {
   text: string;
@@ -27,7 +27,11 @@ export interface ImageNodeData {
   rotation?: number; // Degrees (0, 90, 180, 270)
 }
 
-export type ShapeType = 'rect' | 'circle' | 'triangle' | 'arrow' | 'line';
+/**
+ * `arc` is a stroked half-circle (v0.34+). It exists because a UML required
+ * interface is a socket, and no combination of the other five can produce one.
+ */
+export type ShapeType = 'rect' | 'circle' | 'triangle' | 'arrow' | 'line' | 'arc';
 
 export interface ShapeNodeData {
   shapeType: ShapeType;
@@ -35,6 +39,10 @@ export interface ShapeNodeData {
   stroke: string;         // hex color
   strokeWidth: number;    // 1-10
   strokeDash: number[];   // [] solid, [8,4] dashed, [2,2] dotted
+  /** Rounded rect corners (v0.34+). UML states and node boxes are rounded. */
+  cornerRadius?: number;
+  /** Degrees (v0.34+). Orients an arc's opening and directional triangles. */
+  rotation?: number;
 }
 
 // Gantt node — embeds a PowerPlanner chart document.
@@ -49,7 +57,27 @@ export interface GanttNodeData {
   theme?: 'dark' | 'light' | 'print' | 'auto';
 }
 
-export type NodeData = TextNodeData | ImageNodeData | ShapeNodeData | GanttNodeData;
+/**
+ * A diagram frame (v0.34+) — a first-class canvas object, like an image.
+ *
+ * The node owns the PlantUML source; the marks it generates are ordinary shape
+ * and text nodes carrying `groupId === <this node's id>`. So the frame is what
+ * you select, move and delete, and its contents stay individually editable
+ * underneath. Membership is derived from groupId, never stored.
+ */
+export interface DiagramNodeData {
+  /** PlantUML text this diagram was built from. */
+  source: string;
+  /** Title shown on the frame band. */
+  title: string;
+}
+
+export type NodeData =
+  | TextNodeData
+  | ImageNodeData
+  | ShapeNodeData
+  | GanttNodeData
+  | DiagramNodeData;
 
 export interface CanvasNode {
   id: string;
@@ -153,7 +181,7 @@ export interface WorkspaceData {
 
 // ── Tool types ──────────────────────────────────────────────
 
-export type ToolType = 'select' | 'text' | 'draw' | 'lasso' | 'shape' | 'image' | 'gantt';
+export type ToolType = 'select' | 'text' | 'draw' | 'lasso' | 'shape' | 'image' | 'gantt' | 'diagram';
 
 export interface ShapeOptions {
   shapeType: ShapeType;

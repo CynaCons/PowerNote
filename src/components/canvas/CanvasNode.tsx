@@ -4,6 +4,7 @@ import { TextNode } from './TextNode';
 import { ImageNode } from './ImageNode';
 import { ShapeNode } from './ShapeNode';
 import { GanttNode } from './GanttNode';
+import { DiagramNode } from './DiagramNode';
 
 interface CanvasNodeProps {
   node: CanvasNodeType;
@@ -50,6 +51,16 @@ export function CanvasNode({ node, isSelected, onSelect, stageScale, autoEdit, o
     case 'gantt':
       return (
         <GanttNode
+          node={node}
+          isSelected={isSelected}
+          onSelect={onSelect}
+          stageScale={stageScale}
+          onSnapChange={onSnapChange}
+        />
+      );
+    case 'diagram':
+      return (
+        <DiagramNode
           node={node}
           isSelected={isSelected}
           onSelect={onSelect}

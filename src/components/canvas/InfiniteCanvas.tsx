@@ -14,6 +14,7 @@ import { ScrollHeaders } from './ScrollHeaders';
 import { DrawingLayer } from './DrawingLayer';
 import { TrashButton } from './TrashButton';
 import { GroupIsolationBar } from './GroupIsolationBar';
+import { DiagramSourceDialog } from './DiagramSourceDialog';
 import { useShapeCreation } from '../../hooks/useShapeCreation';
 import { useTextPlacement, consumeAutoEditNodeId } from '../../hooks/useTextPlacement';
 import { useCanvasKeyboard } from '../../hooks/useCanvasKeyboard';
@@ -303,7 +304,6 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
         >
           <Layer>
             <PageGuides mode={backgroundMode} nodes={nodes} />
-            <ScrollHeaders mode={backgroundMode} scrolls={activeScrolls} pageId={activePageId} />
           </Layer>
           <Layer>
             {/* Shape preview ghost while dragging — uses same coordinate system as ShapeNode */}
@@ -348,6 +348,12 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
             })}
             <SnapGuides lines={snapLines} />
           </Layer>
+          {/* Scroll titles sit ABOVE the nodes (v0.35): once a title pins to the
+              top of the viewport, content scrolls underneath it, so drawing it
+              in the guide layer would let blocks pass over the header. */}
+          <Layer>
+            <ScrollHeaders mode={backgroundMode} scrolls={activeScrolls} pageId={activePageId} />
+          </Layer>
           {/* Drawings render above nodes (REQ-DRAW-009) so pen strokes
               annotate over images/text/shapes. listening={false} keeps
               node clicks/drags working through the stroke layer. */}
@@ -377,6 +383,8 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
         <TrashButton />
       )}
       <GroupIsolationBar />
+      {/* PlantUML behind a diagram. DOM, outside the Stage on purpose. */}
+      <DiagramSourceDialog />
       {/* Right-click context menu */}
       {contextMenu && (
         <ContextMenu

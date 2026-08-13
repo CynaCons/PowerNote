@@ -25,6 +25,7 @@ export type BridgeCommandName =
   | 'create_section'
   | 'create_page'
   | 'append_block'
+  | 'create_diagram'
   | 'update_block'
   | 'rename_page'
   | 'move_page'
@@ -212,6 +213,22 @@ export interface AppendBlockResult {
   column: number;
   /** Scroll the block landed in, when the page has a record for that band. */
   scrollId?: string;
+}
+
+/** What `create_diagram` drew. Diagnostics travel back with the write, so a
+ *  clean diagram costs one round trip and a flawed one still reports why. */
+export interface CreateDiagramResult {
+  sectionId: string;
+  pageId: string;
+  /** Id of the diagram node. Its contents carry this as their groupId. */
+  diagramId: string;
+  title: string;
+  column: number;
+  /** Native shape and text nodes drawn inside the frame. */
+  elementCount: number;
+  width: number;
+  height: number;
+  diagnostics: { line: number; severity: 'error' | 'ignored'; message: string }[];
 }
 
 export interface UpdateBlockResult {

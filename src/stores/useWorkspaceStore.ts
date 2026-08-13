@@ -353,6 +353,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       }));
     },
 
+
     deleteScroll: (pageId, scrollId, withBlocks) => {
       set((state) => {
         const page = findPage(state.workspace, pageId);

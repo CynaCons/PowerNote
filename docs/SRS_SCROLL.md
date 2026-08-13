@@ -66,3 +66,30 @@ is that sequential writes from different workstreams land in different columns.
 
 See also `docs/SRS_AGENT.md` for the bridge transport and the single-connection
 constraint that bounds what "parallel" means here.
+
+## Affordances (v0.35)
+
+Scrolls had identity from v0.31 but almost nothing you could do with them: only
+an agent could create one, and the title left the screen the moment you read
+past it.
+
+| ID | Description | Priority | Test Ref |
+|----|-------------|----------|----------|
+| REQ-SCROLL-020 | The sidebar shall offer a "New scroll" action under a page's scroll list | Must | T122 |
+| REQ-SCROLL-021 | Committing a non-empty name shall create a scroll in the next free column and make it active | Must | T122 |
+| REQ-SCROLL-022 | An empty name, or Escape, shall cancel without creating — an unnamed scroll draws no header and would be invisible | Must | T122 |
+| REQ-SCROLL-023 | A scroll title shall hold at the top of the viewport once the viewport scrolls past its resting position, for every named scroll at once | Must | T123 |
+| REQ-SCROLL-024 | A held title shall be visually distinguished from a resting one, and shall draw above page content rather than beneath it | Must | T123 |
+| REQ-SCROLL-025 | Dragging a node shall snap its left edge to a scroll band's left, or its right edge to the band's right, within a threshold | Must | T124 |
+| REQ-SCROLL-026 | The snap shall release when dragged beyond the threshold, so a deliberate off-band placement holds | Must | T124 |
+| REQ-SCROLL-027 | The scroll snap shall not require a modifier key, unlike node-to-node snapping | Must | T124 |
+| REQ-SCROLL-028 | Sidebar scroll entries shall use a scroll glyph rather than a column-split glyph | Should | T122 |
+
+Vertical position is never snapped: blocks stack freely down a band, and
+snapping y would fight that.
+
+## Traceability (v0.35)
+
+- T122 — `tests/scroll/122-scroll-create-pin-snap.spec.ts` (creation, icon)
+- T123 — same file (pinned titles)
+- T124 — same file (magnetic snap)

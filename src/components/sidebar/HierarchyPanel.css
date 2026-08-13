@@ -415,3 +415,38 @@
   outline: none;
   background: white;
 }
+
+/* v0.35: create a scroll from the sidebar. Reuses .hierarchy-scroll metrics so
+   the add row sits in the same rhythm as the scrolls it appends to. */
+.hierarchy-scroll-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 8px 4px 22px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-tertiary, #8a9295);
+}
+.hierarchy-scroll-add:hover {
+  color: var(--text-primary, #14181a);
+}
+.hierarchy-scroll__new {
+  display: block;
+  width: calc(100% - 30px);
+  margin: 2px 0 4px 22px;
+  padding: 3px 6px;
+  border: 1px solid #2563eb;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: inherit;
+  color: inherit;
+  background: var(--surface, #fff);
+}
+.hierarchy-scroll__new:focus {
+  outline: none;
+}

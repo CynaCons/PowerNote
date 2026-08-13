@@ -270,6 +270,63 @@ const TOOLS = [
     },
   },
   {
+    name: 'create_diagram',
+    description:
+      'Draw a UML diagram on the page from PlantUML source. TWO grammars are supported, ' +
+      'and the right one is detected automatically. ' +
+      '(1) COMPONENT / COMPOSITE STRUCTURE: components, nested components, ports ' +
+      '(port / portin / portout), provided and required interfaces, and assembly and ' +
+      'delegation connectors. A composite-structure part puts its role in the label, as ' +
+      'component "role : Type [multiplicity]" as alias. Nesting uses braces. ' +
+      '(2) ACTIVITY / SWIMLANE FLOWCHARTS: |Lane| switches the swimlane, start and stop ' +
+      'are the pseudostates, :action; is a step, and if (cond) then (label) / else ' +
+      '(label) / endif adds a decision with guards on the arrows. Steps run top to bottom ' +
+      'in source order and the lane fixes the column. ' +
+      'What lands on the canvas is ordinary PowerNote shapes and text inside a diagram ' +
+      'frame, so the user can drag any part of it afterwards - this is NOT an image. ' +
+      'Supply semantics only: name the steps or entities and what connects to what. Every ' +
+      'coordinate is computed here from real text metrics, and there is no way to position ' +
+      'anything yourself. Do NOT include skinparam, !include, !theme or any styling - ' +
+      'PowerNote supplies the style and those lines come back as skipped diagnostics. ' +
+      'fork, split, while and repeat are refused rather than drawn wrong, and activity ' +
+      'branches currently render in source order rather than as parallel paths that rejoin. ' +
+      'The response carries the diagnostics, so one call is enough to know whether it came out right.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        source: {
+          type: 'string',
+          description:
+            'PlantUML text; @startuml/@enduml optional, one statement per line. ' +
+            'Component example: component "gateway" as gw { portin telemetry ... }. ' +
+            'Swimlane example: |Sensor| then start then :sample burst; then |Gateway| ' +
+            'then :buffer to flash; then stop.',
+        },
+        title: {
+          type: 'string',
+          description: 'Title shown on the diagram frame. Defaults to "Diagram".',
+        },
+        pageId: {
+          type: 'string',
+          description: 'Page to draw on. Defaults to the page currently open.',
+        },
+        scrollId: {
+          type: 'string',
+          description:
+            'Scroll (named column) to draw into - call list_scrolls first. The diagram ' +
+            'lands below whatever is already in that column, like append_block. Defaults to the leftmost.',
+        },
+        column: {
+          type: 'integer',
+          minimum: 0,
+          description: 'Raw A4 page-guide index. Legacy fallback - prefer scrollId. Ignored when scrollId is given.',
+        },
+      },
+      required: ['source'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'list_scrolls',
     description:
       'List the scrolls (named vertical columns) on a page, with how many blocks ' +

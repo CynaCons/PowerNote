@@ -14,10 +14,12 @@ import {
   MIN_TEXT_WIDTH,
   MAX_TEXT_WIDTH,
   MIN_TEXT_HEIGHT,
+  columnLeft,
+  A4_WIDTH,
 } from '../../utils/pageLayout';
 import { multiDragStart, multiDragMove, multiDragEnd } from '../../utils/multiDrag';
 import { TextEditor } from './TextEditor';
-import { calculateSnap, type SnapLine } from './SnapGuides';
+import { calculateSnap, calculateScrollSnap, type SnapLine } from './SnapGuides';
 import { markdownToHtml, markdownBoxStyle } from '../../utils/renderMarkdown';
 
 // Handle powernote:// internal links
@@ -138,9 +140,21 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
 
   const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
     multiDragMove(node.id, e.target.x(), e.target.y(), e.target.getStage());
-    // Only snap when Shift is held
+    // Shift snaps to other nodes; without it, the ungated magnet lines the block
+    // up with the scroll band it is being dragged in.
     if (!e.evt.shiftKey) {
-      onSnapChange([]);
+      const page = useWorkspaceStore.getState().getActivePage();
+      const snap = calculateScrollSnap(
+        { x: e.target.x(), y: e.target.y(), width: node.width },
+        columnLeft,
+        A4_WIDTH,
+        page?.scrolls?.length ?? 0,
+      );
+      onSnapChange(snap.line ? [snap.line] : []);
+      if (snap.line) {
+        e.target.x(snap.x);
+        multiDragMove(node.id, snap.x, e.target.y(), e.target.getStage());
+      }
       return;
     }
 
