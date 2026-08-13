@@ -1102,6 +1102,8 @@
 - [x] MCP `create_diagram` description rewritten to document BOTH grammars, the lane syntax, that coordinates cannot be supplied, and what is refused — so an agent can use it without guessing
 - [x] T125 — 6 tests: grammar routing (and that component sources are not misrouted), lane partition, decision guards, refusal of fork/while/repeat, an agent drawing a swimlane over the bridge, and styling directives skipped in activity sources
 - [ ] Known limitation, documented in the MCP description and the SRS rather than hidden: `if/else` branches render in source order, not as parallel paths that rejoin. True branching needs a merge point and sub-columns within a lane — that is where a graph layout would finally earn its place
+### v0.36.0 — Multiple agents, one notebook
+**Goal:** Several agents may connect at once but must not operate at once, and a blocked agent must be told who is holding the notebook. One MCP server process is spawned per agent session, so they race for the port: the winner becomes the HUB and owns the single app connection, the losers become PEERS and forward their tool calls to it. That keeps exactly one socket to the notebook — so the app needs no changes at all — and gives one obvious place for the lock. The hub hands out a lease held for the duration of a command and a short idle grace after it, released on idle, on agent disconnect, or when the notebook goes away.
 ## Future (Backlog)
 > Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 

@@ -103,3 +103,33 @@ Added after the feature was demoed live and before it shipped.
 - REQ-TEXT family — markdown rendering and clickable checkboxes in text nodes
 - REQ-HIERARCHY family — section/page structure and navigation
 - REQ-FILE family — auto-save and notebook persistence
+
+## Multiple agents (v0.36)
+
+Several agents may connect at once; they may not operate at once.
+
+One MCP server process is spawned per agent session, so they race for the bridge
+port. The winner is the **hub** and owns the single connection to the notebook;
+the losers are **peers** and forward their tool calls to the hub. Exactly one
+socket ever reaches the app, which is why the app side is unchanged.
+
+| ID | Description | Priority | Test Ref |
+|----|-------------|----------|----------|
+| REQ-AGENT-040 | A server that cannot bind the bridge port shall join the existing server as a peer rather than failing | Must | test:bridge |
+| REQ-AGENT-041 | A peer's tool calls shall be executed by the hub against the one connected notebook | Must | test:bridge |
+| REQ-AGENT-042 | A mutating tool shall acquire a lease before running; a second agent's mutating tool shall be refused with `LOCKED` | Must | test:bridge |
+| REQ-AGENT-043 | The `LOCKED` message shall name the holder, how long it has held, roughly when it frees up, and the caller's queue position | Must | test:bridge |
+| REQ-AGENT-044 | The lease shall be held for the whole duration of a command, so a slow command cannot lose it mid-flight | Must | test:bridge |
+| REQ-AGENT-045 | Read-only tools shall never be blocked — an agent that cannot read cannot discover why it is blocked | Must | test:bridge |
+| REQ-AGENT-046 | The lease shall be released on idle, on holder disconnect, and on notebook disconnect, so no crash can wedge the notebook | Must | test:bridge |
+| REQ-AGENT-047 | A holder past the maximum hold shall yield at its next command, but only when another agent is waiting | Should | — |
+| REQ-AGENT-048 | `bridge_status` shall report the notebook, every connected agent, the holder, and whether the caller is the holder | Must | test:bridge |
+| REQ-AGENT-049 | Every tool result shall carry the calling agent's identity | Must | test:bridge |
+| REQ-AGENT-050 | If the hub exits, a surviving peer shall take the port and continue serving | Must | test:bridge |
+
+**Expiry is evaluated on use, not on a timer.** A timer firing while nothing is
+happening tells us nothing, and one firing mid-command would be wrong.
+
+**Coverage.** `npm run test:bridge` spawns two real server processes and a stub
+notebook. The Playwright suite drives the app side of the bridge and never
+starts the server, so this topology has no coverage there.

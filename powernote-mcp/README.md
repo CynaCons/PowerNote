@@ -62,6 +62,7 @@ socket on their machine.
 | `set_background` | Change the guide style (`pages`/`scroll`/`grid`/`none`) and/or colour. Stored in the notebook. |
 | `rename_notebook` | Rename the notebook in the app (not the file on disk). |
 | `save_notebook` | Write the notebook back to the file it was opened from. |
+| `bridge_status` | Who else is working in this notebook, and who holds it. Never blocked. |
 | `check_update` | Is a newer PowerNote release available? |
 | `run_update` | Install it. Overwrites the file and reloads the app. |
 
@@ -130,6 +131,36 @@ the lane fixes the column.
   came out right. A source that draws nothing is a `PRECONDITION` error, not an
   empty frame.
 
+### Several agents at once
+
+More than one agent may connect. They may not **operate** at once.
+
+One server process is spawned per agent session, so they race for the port. The
+winner becomes the **hub** and owns the single connection to the notebook; the
+losers become **peers** and forward their calls to it. That keeps exactly one
+socket to the app and one place where the lock lives. If the hub process exits,
+the survivors re-race and one is promoted — agents see a brief unavailable
+window, not a broken bridge.
+
+The hub hands out a **lease**:
+
+- A writing tool takes the lease, holds it for the whole command — including
+  slow ones like `save_notebook` and `run_update` — and keeps it for a short
+  idle grace afterwards (`POWERNOTE_LOCK_IDLE_MS`, default 10 s).
+- A second agent writing meanwhile gets a `LOCKED` error naming the holder, how
+  long it has been working, roughly when it frees up, and your queue position.
+- **Reads are never blocked.** An agent that cannot look also cannot find out
+  why it is blocked.
+- The lease is released when it goes idle, when the holding agent disconnects,
+  or when the notebook does. A crashed agent cannot wedge the notebook.
+- A holder still working after `POWERNOTE_LOCK_MAX_HOLD_MS` (default 2 min)
+  yields at its next command **if** anyone is waiting.
+
+Call `bridge_status` when you get `LOCKED`. A "free" answer can go stale
+immediately, so treat the error as the real signal and the status as the
+explanation. Every tool result carries `_agent`, so you always know which agent
+you are.
+
 ### Blocks, not rows
 
 A block is one text node holding one markdown chunk. Prefer one block per
@@ -195,6 +226,9 @@ not a guarantee.
 | `POWERNOTE_BRIDGE_PORT` | `41777` | WebSocket port (loopback only). |
 | `POWERNOTE_BRIDGE_TIMEOUT_MS` | `10000` | How long to wait for the app to answer. |
 | `POWERNOTE_BRIDGE_SLOW_TIMEOUT_MS` | `120000` | Budget for the network-bound tools (`check_update`, `run_update`, `save_notebook`). |
+| `POWERNOTE_AGENT_NAME` | `agent-<id>` | Label other agents see in `LOCKED` errors and `bridge_status`. |
+| `POWERNOTE_LOCK_IDLE_MS` | `10000` | Idle grace before another agent may take the notebook. |
+| `POWERNOTE_LOCK_MAX_HOLD_MS` | `120000` | After this a holder yields, if anyone is waiting. |
 
 If the port is taken the server says so on stderr rather than dying silently.
 

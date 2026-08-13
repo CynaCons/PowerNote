@@ -8,11 +8,24 @@
  * which applies them to its live stores; its normal auto-save then persists
  * them to the notebook file.
  *
+ * MULTIPLE AGENTS (v0.36). One MCP server process is spawned per agent session,
+ * so several of them race for the same port. The winner becomes the HUB and owns
+ * the single app connection; the losers become PEERS and forward their tool
+ * calls to the hub over the same loopback port. This keeps exactly one socket to
+ * the notebook, which means the app needs no changes and there is one obvious
+ * place for the lock.
+ *
+ * Agents may connect freely but may not operate concurrently: the hub hands out
+ * a lease, held for the duration of a command and for a short idle grace after
+ * it. A blocked agent is told who holds the lock and when to retry. Read-only
+ * tools bypass the lease, because looking while someone writes is harmless and
+ * refusing it would make a blocked agent unable to find out anything.
+ *
  * IMPORTANT: stdout is the MCP transport. All logging goes to stderr.
  */
 
 import { randomUUID } from 'node:crypto';
-import { WebSocketServer } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -27,6 +40,29 @@ const REQUEST_TIMEOUT_MS = Number(process.env.POWERNOTE_BRIDGE_TIMEOUT_MS || 10_
 
 const log = (...args) => console.error('[powernote-notes]', ...args);
 
+/** This process's agent identity. Stable for its lifetime. */
+const AGENT_ID = randomUUID().slice(0, 8);
+const AGENT_LABEL = process.env.POWERNOTE_AGENT_NAME || `agent-${AGENT_ID}`;
+
+/**
+ * Tools that only look. They bypass the lease: a blocked agent must still be
+ * able to read, and above all to call `bridge_status` to find out why it is
+ * blocked.
+ */
+const READ_ONLY = new Set([
+  'list_pages',
+  'read_page',
+  'list_scrolls',
+  'get_background',
+  'check_update',
+  'bridge_status',
+]);
+
+/** Idle grace between one agent's commands before another may take over. */
+const LOCK_IDLE_MS = Number(process.env.POWERNOTE_LOCK_IDLE_MS || 10_000);
+/** A holder that keeps working still yields after this, if anyone is waiting. */
+const LOCK_MAX_HOLD_MS = Number(process.env.POWERNOTE_LOCK_MAX_HOLD_MS || 120_000);
+
 // ── App connection ──────────────────────────────────────────
 
 /** The currently connected PowerNote tab, if any. Latest connection wins. */
@@ -36,20 +72,100 @@ let appInfo = null;
 /** id → { resolve, reject, timer } for in-flight requests. */
 const pending = new Map();
 
-const wss = new WebSocketServer({ host: HOST, port: PORT });
+/** 'hub' once we own the port, 'peer' once we are talking to whoever does. */
+let mode = 'starting';
+/** Peer mode: our socket to the hub. */
+let hub = null;
+/** Hub mode: peer socket -> { agentId, label }. */
+const peers = new Map();
+/** Set when startup failed for a reason the user has to fix. */
+let startupError = null;
+/** Hub mode: the listening server, so shutdown can close it. */
+let wss = null;
 
-wss.on('listening', () => log(`WebSocket listening on ws://${HOST}:${PORT}`));
+/**
+ * The lease. `inFlight` is what stops it expiring underneath a slow command:
+ * run_update downloads a couple of megabytes without issuing anything, and an
+ * idle-only timer would hand the notebook to someone else mid-download.
+ */
+let lock = { holder: null, label: null, inFlight: 0, idleUntil: 0, since: 0 };
+/** agentIds waiting, oldest first. Decides when a long holder must yield. */
+const waiting = [];
 
-wss.on('error', (err) => {
-  if (err && err.code === 'EADDRINUSE') {
-    log(
-      `Port ${PORT} is already in use — another powernote-notes server is probably ` +
-      `running. Stop it, or set POWERNOTE_BRIDGE_PORT to a free port.`,
+function releaseLock(why) {
+  if (!lock.holder) return;
+  log('Lock released by ' + lock.label + ' (' + why + ').');
+  lock = { holder: null, label: null, inFlight: 0, idleUntil: 0, since: 0 };
+}
+
+/**
+ * Expiry is evaluated on use rather than on a timer: a timer that fires while
+ * nothing is happening tells us nothing, and one that fires mid-command would
+ * be wrong anyway.
+ */
+function currentHolder(now) {
+  now = now || Date.now();
+  if (lock.holder && lock.inFlight === 0 && now > lock.idleUntil) releaseLock('idle');
+  return lock.holder;
+}
+
+function lockStatus(now) {
+  now = now || Date.now();
+  const holder = currentHolder(now);
+  return {
+    held: !!holder,
+    holderId: holder,
+    holder: holder ? lock.label : null,
+    retryAfterMs: holder ? Math.max(0, lock.idleUntil - now) : 0,
+    heldForMs: holder ? now - lock.since : 0,
+    waiting: waiting.length,
+  };
+}
+
+class Locked extends Error {}
+
+/**
+ * Grants the lease, or explains who has it. A holder past LOCK_MAX_HOLD_MS
+ * yields at its next command boundary, but only when someone is actually
+ * waiting -- otherwise a long solo task would interrupt itself for nothing.
+ */
+function acquireLock(agentId, label) {
+  const now = Date.now();
+  const holder = currentHolder(now);
+
+  if (holder && holder !== agentId) {
+    if (waiting.indexOf(agentId) < 0) waiting.push(agentId);
+    const st = lockStatus(now);
+    throw new Locked(
+      'Another agent is operating this notebook. "' + st.holder + '" holds it and has ' +
+      'been working for ' + Math.round(st.heldForMs / 1000) + 's; it frees up after about ' +
+      Math.ceil(st.retryAfterMs / 1000) + 's of inactivity. Do other work and retry, or call ' +
+      'bridge_status to check. You are queued at position ' + (waiting.indexOf(agentId) + 1) + '.',
     );
-  } else {
-    log('WebSocket server error:', err?.message || err);
   }
-});
+
+  if (holder === agentId && now - lock.since > LOCK_MAX_HOLD_MS && waiting.length > 0) {
+    const n = waiting.length;
+    releaseLock('max hold reached with agents waiting');
+    throw new Locked(
+      'You have held this notebook for over ' + Math.round(LOCK_MAX_HOLD_MS / 1000) + 's and ' +
+      n + ' agent(s) are waiting, so the lock was handed on. Retry to queue for it again.',
+    );
+  }
+
+  const idx = waiting.indexOf(agentId);
+  if (idx >= 0) waiting.splice(idx, 1);
+
+  if (!holder) {
+    lock = { holder: agentId, label: label, inFlight: 0, idleUntil: now + LOCK_IDLE_MS, since: now };
+    log('Lock acquired by ' + label + '.');
+  }
+  lock.inFlight += 1;
+  return function release() {
+    lock.inFlight = Math.max(0, lock.inFlight - 1);
+    lock.idleUntil = Date.now() + LOCK_IDLE_MS;
+  };
+}
 
 /** Fail every in-flight request now, rather than letting each one time out. */
 function rejectPending(message) {
@@ -60,18 +176,98 @@ function rejectPending(message) {
   }
 }
 
-wss.on('connection', (socket) => {
+// -- Hub mode: own the port, own the app, own the lock -------
+
+function startHub() {
+  return new Promise((resolve, reject) => {
+    const candidate = new WebSocketServer({ host: HOST, port: PORT });
+    candidate.on('listening', () => {
+      wss = candidate;
+      log('Hub: listening on ws://' + HOST + ':' + PORT + ' as "' + AGENT_LABEL + '".');
+      resolve(candidate);
+    });
+    candidate.on('error', (err) => reject(err));
+    candidate.on('connection', (socket) => onHubConnection(socket));
+  });
+}
+
+function onHubConnection(socket) {
+  let kind = null;
+
+  socket.on('message', (raw) => {
+    let msg;
+    try {
+      msg = JSON.parse(raw.toString());
+    } catch (e) {
+      return;
+    }
+
+    // A peer announces itself before anything else; the app sends 'hello'.
+    if (msg.type === 'peer-hello') {
+      kind = 'peer';
+      peers.set(socket, { agentId: msg.agentId, label: msg.label });
+      log('Peer agent "' + msg.label + '" connected. ' + peers.size + ' peer(s).');
+      socket.send(JSON.stringify({ v: PROTOCOL_VERSION, type: 'peer-welcome', hub: AGENT_LABEL }));
+      return;
+    }
+
+    if (msg.type === 'hello') {
+      kind = 'app';
+      adoptApp(socket, msg);
+      return;
+    }
+
+    if (kind === 'peer' && msg.type === 'peer-request') {
+      handlePeerRequest(socket, msg);
+      return;
+    }
+
+    // Otherwise it is the app answering one of our requests.
+    const entry = pending.get(msg.id);
+    if (!entry) return;
+    clearTimeout(entry.timer);
+    pending.delete(msg.id);
+    entry.resolve(msg);
+  });
+
+  socket.on('close', () => {
+    if (kind === 'peer') {
+      const info = peers.get(socket);
+      peers.delete(socket);
+      if (info) {
+        // A peer that goes away must not keep the notebook locked.
+        if (lock.holder === info.agentId) releaseLock('peer disconnected');
+        const w = waiting.indexOf(info.agentId);
+        if (w >= 0) waiting.splice(w, 1);
+      }
+      log('Peer agent disconnected. ' + peers.size + ' peer(s).');
+      return;
+    }
+    if (app === socket) {
+      app = null;
+      appInfo = null;
+      // The notebook going away invalidates any lease over it.
+      releaseLock('notebook disconnected');
+      log('Notebook disconnected.');
+    }
+  });
+
+  socket.on('error', (err) => log('Socket error:', (err && err.message) || err));
+}
+
+function adoptApp(socket, msg) {
   const previous = app;
   // Newest connection wins: a stale or zombie socket must never lock out a
   // notebook the user is actually looking at.
   app = socket;
-  appInfo = null;
+  appInfo = { appVersion: msg.appVersion, notebook: msg.notebook };
+  log('Hello from PowerNote v' + msg.appVersion + ' -- notebook "' + msg.notebook + '"');
 
   if (previous && previous !== socket && previous.readyState === previous.OPEN) {
     log('A second notebook connected; displacing the previous one.');
     // Tell the old client to stand down BEFORE closing it. Without this it
     // reconnects on backoff, displaces this new client in turn, and the two
-    // trade the slot forever — commands then land in whichever notebook
+    // trade the slot forever -- commands then land in whichever notebook
     // happens to hold it, which is how writes ended up in the wrong file.
     try {
       previous.send(
@@ -82,47 +278,124 @@ wss.on('connection', (socket) => {
         }),
       );
     } catch (err) {
-      log('Could not notify displaced notebook:', err?.message || err);
+      log('Could not notify displaced notebook:', (err && err.message) || err);
     }
     previous.close();
+    releaseLock('notebook displaced');
     rejectPending(
       'The notebook this request was sent to was displaced by another connection. Retry.',
     );
   }
+}
 
-  log('Notebook connected.');
+async function handlePeerRequest(socket, msg) {
+  const reply = (body) =>
+    socket.send(
+      JSON.stringify(Object.assign(
+        { v: PROTOCOL_VERSION, type: 'peer-response', reqId: msg.reqId },
+        body,
+      )),
+    );
+  try {
+    const result = await runToolAsAgent(msg.cmd, msg.params, msg.agentId, msg.label);
+    reply({ ok: true, result: result });
+  } catch (err) {
+    reply({
+      ok: false,
+      error: { code: err instanceof Locked ? 'LOCKED' : 'ERROR', message: err.message },
+    });
+  }
+}
 
+// -- Peer mode: forward everything to the hub ----------------
+
+function connectToHub() {
+  const socket = new WebSocket('ws://' + HOST + ':' + PORT);
+  socket.on('open', () => {
+    hub = socket;
+    socket.send(
+      JSON.stringify({
+        v: PROTOCOL_VERSION,
+        type: 'peer-hello',
+        agentId: AGENT_ID,
+        label: AGENT_LABEL,
+      }),
+    );
+    log('Peer: joined the hub on ws://' + HOST + ':' + PORT + ' as "' + AGENT_LABEL + '".');
+  });
   socket.on('message', (raw) => {
     let msg;
     try {
       msg = JSON.parse(raw.toString());
-    } catch {
+    } catch (e) {
       return;
     }
-
-    if (msg.type === 'hello') {
-      appInfo = { appVersion: msg.appVersion, notebook: msg.notebook };
-      log(`Hello from PowerNote v${msg.appVersion} — notebook "${msg.notebook}"`);
-      return;
-    }
-
-    const entry = pending.get(msg.id);
+    if (msg.type !== 'peer-response') return;
+    const entry = pending.get(msg.reqId);
     if (!entry) return;
     clearTimeout(entry.timer);
-    pending.delete(msg.id);
+    pending.delete(msg.reqId);
     entry.resolve(msg);
   });
-
   socket.on('close', () => {
-    if (app === socket) {
-      app = null;
-      appInfo = null;
-      log('Notebook disconnected.');
-    }
+    hub = null;
+    rejectPending('The agent hub went away. Retrying.');
+    // The hub process exited, so the port is free again. Whoever gets there
+    // first becomes the new hub; everyone else re-joins it. The jitter stops
+    // every survivor retrying in lockstep.
+    log('Hub connection lost -- re-racing for the port.');
+    setTimeout(() => { void start(); }, 250 + Math.floor(Math.random() * 500));
   });
+  socket.on('error', () => {
+    // The close handler drives the retry; the error carries nothing useful.
+  });
+}
 
-  socket.on('error', (err) => log('Socket error:', err?.message || err));
-});
+/** Peer side of a tool call: ask the hub to run it on our behalf. */
+function askHub(cmd, params) {
+  return new Promise((resolve, reject) => {
+    if (!hub || hub.readyState !== hub.OPEN) {
+      reject(new BridgeUnavailable('Not connected to the agent hub yet. Retry in a moment.'));
+      return;
+    }
+    const reqId = randomUUID();
+    const budget = timeoutFor(cmd);
+    const timer = setTimeout(() => {
+      pending.delete(reqId);
+      reject(new Error('The agent hub did not answer "' + cmd + '" within ' + budget + 'ms'));
+    }, budget);
+    pending.set(reqId, { resolve: resolve, reject: reject, timer: timer });
+    hub.send(
+      JSON.stringify({
+        v: PROTOCOL_VERSION,
+        type: 'peer-request',
+        reqId: reqId,
+        agentId: AGENT_ID,
+        label: AGENT_LABEL,
+        cmd: cmd,
+        params: params,
+      }),
+    );
+  });
+}
+
+async function start() {
+  try {
+    await startHub();
+    mode = 'hub';
+    startupError = null;
+  } catch (err) {
+    if (err && err.code === 'EADDRINUSE') {
+      mode = 'peer';
+      connectToHub();
+      return;
+    }
+    startupError =
+      'Could not start the agent bridge on ' + HOST + ':' + PORT + ': ' +
+      ((err && err.message) || err) + '. Set POWERNOTE_BRIDGE_PORT to a free port.';
+    log(startupError);
+  }
+}
 
 class BridgeUnavailable extends Error {}
 
@@ -325,6 +598,19 @@ const TOOLS = [
       required: ['source'],
       additionalProperties: false,
     },
+  },
+  {
+    name: 'bridge_status',
+    description:
+      'Who else is working in this notebook. Several agents may be connected at ' +
+      'once but only one may operate at a time, so call this when a tool comes ' +
+      'back LOCKED, or before starting a long piece of work. Reports the ' +
+      'connected notebook, every connected agent, which one holds the notebook, ' +
+      'how long until it frees up, and whether that is you. This tool is never ' +
+      'blocked. Note that a free result can go stale immediately -- another agent ' +
+      'may take the lock before your next call -- so treat the LOCKED error as the ' +
+      'real signal and this as a way to understand it.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
     name: 'list_scrolls',
@@ -626,6 +912,66 @@ const server = new Server(
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
 
+/** Everyone connected right now, from the hub's point of view. */
+function connectedAgents() {
+  const list = [{ agentId: AGENT_ID, label: AGENT_LABEL, role: 'hub' }];
+  for (const info of peers.values()) {
+    list.push({ agentId: info.agentId, label: info.label, role: 'peer' });
+  }
+  return list;
+}
+
+/**
+ * Runs one tool on behalf of an agent, holding the lease for its duration.
+ *
+ * Only the hub ever gets here: peers forward to it, so there is exactly one
+ * arbiter no matter how many agent processes are running.
+ */
+async function runToolAsAgent(name, params, agentId, label) {
+  if (name === 'bridge_status') {
+    const st = lockStatus();
+    return {
+      notebook: appInfo ? appInfo.notebook : null,
+      notebookConnected: !!app,
+      you: { agentId: agentId, label: label, isHolder: st.holderId === agentId },
+      agents: connectedAgents(),
+      lock: {
+        held: st.held,
+        heldBy: st.holder,
+        heldByYou: st.holderId === agentId,
+        heldForMs: st.heldForMs,
+        freesUpInMs: st.retryAfterMs,
+        agentsWaiting: st.waiting,
+      },
+    };
+  }
+
+  // Reads never queue: an agent that cannot look also cannot find out why.
+  if (READ_ONLY.has(name)) {
+    const response = await callApp(name, params);
+    return unwrap(response);
+  }
+
+  const release = acquireLock(agentId, label);
+  try {
+    const response = await callApp(name, params);
+    return unwrap(response);
+  } finally {
+    release();
+  }
+}
+
+class CommandFailed extends Error {}
+
+function unwrap(response) {
+  if (response.ok === false) {
+    throw new CommandFailed(
+      (response.error && response.error.code) + ': ' + (response.error && response.error.message),
+    );
+  }
+  return response.result;
+}
+
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   if (!TOOLS.some((t) => t.name === name)) {
@@ -635,21 +981,41 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
+  if (startupError) {
+    return { isError: true, content: [{ type: 'text', text: startupError }] };
+  }
+
   try {
-    const response = await callApp(name, args ?? {});
-    if (response.ok === false) {
-      return {
-        isError: true,
-        content: [
-          { type: 'text', text: `${response.error?.code}: ${response.error?.message}` },
-        ],
-      };
+    // Hub runs it directly; a peer asks the hub, so the lease is decided in one
+    // place regardless of which process the agent happens to be talking to.
+    let result;
+    if (mode === 'peer') {
+      const response = await askHub(name, args ?? {});
+      if (response.ok === false) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: (response.error && response.error.code) + ': ' + (response.error && response.error.message),
+            },
+          ],
+        };
+      }
+      result = response.result;
+    } else {
+      result = await runToolAsAgent(name, args ?? {}, AGENT_ID, AGENT_LABEL);
     }
-    const payload = { ...response.result };
+
+    const payload = { ...result };
     if (appInfo) payload._notebook = appInfo.notebook;
+    // Stamp identity on every result: an agent that never learns who it is
+    // cannot make sense of a LOCKED message naming someone else.
+    payload._agent = { id: AGENT_ID, label: AGENT_LABEL, role: mode };
     return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
   } catch (err) {
-    return { isError: true, content: [{ type: 'text', text: err.message }] };
+    const code = err instanceof Locked ? 'LOCKED: ' : '';
+    return { isError: true, content: [{ type: 'text', text: code + err.message }] };
   }
 });
 
@@ -658,13 +1024,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  log('MCP server ready on stdio.');
+  // Race for the port: winner hosts the notebook connection and the lock,
+  // losers become peers of whoever won.
+  await start();
+  log('MCP server ready on stdio (' + mode + ').');
 }
 
 function shutdown() {
   for (const { timer } of pending.values()) clearTimeout(timer);
   pending.clear();
-  wss.close();
+  if (wss) wss.close();
+  if (hub) hub.close();
   process.exit(0);
 }
 
