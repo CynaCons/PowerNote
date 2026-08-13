@@ -1,7 +1,7 @@
 # SRS: Diagrams
 
 **Project:** PowerNote
-**Version:** 0.34.3
+**Version:** 0.35.1
 **Date:** 2026-08-13
 
 ## Purpose
@@ -10,7 +10,23 @@ Let an agent draw diagrams on the canvas using the same elements a user draws by
 
 The division of labour is the point. The agent supplies semantics: what exists and what connects to what. The app supplies geometry: how wide a box must be to hold its label, where the boxes go, how the edges route. An agent that guesses coordinates produces overlapping boxes and overflowing labels; an agent that names entities does not.
 
-Because the output is ordinary canvas objects, the user can drag, restyle and delete any part of a generated diagram the moment it appears. A part the user moves is pinned, and later re-layouts place the rest around it rather than overwriting the change.
+Because the output is ordinary canvas objects, the user can drag, restyle and delete any part of a generated diagram the moment it appears.
+
+## Implementation status
+
+This document specifies more than has shipped. Requirements are written ahead of
+implementation on purpose, but the difference matters when reading it:
+
+| Area | State as of v0.35.1 |
+|------|---------------------|
+| Diagram node, PlantUML parsing, layout, materialize | Shipped — REQ-DIAG-001, 006, 010..014, 017, 040..046, 050..067, 070..076 |
+| Activity and swimlane grammar | Shipped — REQ-DIAG-070..076 |
+| Agent authoring over the bridge | Shipped — `create_diagram` |
+| Frame reflow and document flow (REQ-DIAG-002..005) | **Not built.** Diagrams sit on the canvas; blocks below a frame do not move when it resizes |
+| Pin loop (REQ-DIAG-020..023) | **Not built, and descoped 2026-08-13.** Redrawing replaces every content node, so a manual nudge is lost on the next redraw |
+| Geometric warnings (REQ-DIAG-016) | **Partial.** Parse diagnostics ship; overlap, crossing and density checks do not |
+| Sequence and state layouts (REQ-DIAG-031..035) | Not built |
+| Positional membership (REQ-DIAG-007..008) | Not built. Membership is by `groupId`, but dragging a mark out does not rewrite the source |
 
 ## Definitions
 

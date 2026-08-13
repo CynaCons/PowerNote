@@ -1,8 +1,8 @@
 # SRS: Scrolls
 
 **Project:** PowerNote  
-**Version:** 0.31.0  
-**Date:** 2026-08-11
+**Version:** 0.35.0  
+**Date:** 2026-08-13
 
 ## Purpose
 

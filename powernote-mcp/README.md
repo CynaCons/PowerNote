@@ -48,6 +48,7 @@ socket on their machine.
 | `create_page` | New titled page, opened. Also writes an `# Title` block unless `withHeading: false`. |
 | `append_block` | Append a markdown block to the bottom of a page. The main way to write. |
 | `update_block` | Replace an existing block's markdown, by id. |
+| `create_diagram` | Draw a UML diagram from PlantUML source, as native canvas shapes. See [Diagrams](#diagrams). |
 | `rename_page` | Retitle a page, and its `# Title` block if that still matches. |
 | `move_page` | Move a page into another section. |
 | `list_scrolls` | The named scrolls (columns) on a page, with block counts. Call before writing to a shared page. |
@@ -63,6 +64,71 @@ socket on their machine.
 | `save_notebook` | Write the notebook back to the file it was opened from. |
 | `check_update` | Is a newer PowerNote release available? |
 | `run_update` | Install it. Overwrites the file and reloads the app. |
+
+### Diagrams
+
+`create_diagram` takes PlantUML and draws it onto the page. What lands is
+ordinary PowerNote shapes and text inside a diagram frame — **not an image** —
+so the user can drag any part of it afterwards. We take PlantUML's syntax and
+throw its renderer away; that is what makes the result editable.
+
+Two grammars are supported, and the right one is detected from the source:
+
+**Component and composite structure**
+
+```
+component "gateway" as gw {
+  portin telemetry
+  portout storage
+  component "broker : MqttBroker [1]" as broker
+  component "buffer : StoreForward [1..*]" as buffer
+  broker --> buffer : Queue
+  telemetry --> broker
+  buffer --> storage
+}
+```
+
+Nested components, ports (`port` / `portin` / `portout`), provided and required
+interfaces, assembly and delegation connectors. A composite-structure part puts
+its role in the label: `"role : Type [multiplicity]"`. Connector kind is derived
+from UML's rule, not declared — an end on a port that is not on a part is a
+delegation, otherwise an assembly.
+
+**Activity with swimlanes**
+
+```
+|Sensor|
+start
+:sample burst;
+|Gateway|
+:buffer to flash;
+if (uplink up?) then (yes)
+|Cloud|
+:ingest batch;
+else (no)
+:hold in store-forward;
+endif
+stop
+```
+
+`|Lane|` switches the swimlane, `start` and `stop` are the pseudostates,
+`:action;` is a step, and `if (cond) then (label) / else (label) / endif` adds a
+decision with guards on the arrows. Steps run top to bottom in source order and
+the lane fixes the column.
+
+**Rules worth knowing**
+
+- Supply semantics only. Every coordinate is computed from real text metrics,
+  and there is no syntax for positioning anything yourself.
+- `skinparam`, `!include` and `!theme` are **reported back as skipped**, not
+  silently dropped — PowerNote supplies the style.
+- `fork`, `split`, `while` and `repeat` are refused with a diagnostic rather
+  than drawn wrong.
+- Activity `if/else` branches currently render in source order rather than as
+  parallel paths that rejoin.
+- The response carries the diagnostics, so one call is enough to know whether it
+  came out right. A source that draws nothing is a `PRECONDITION` error, not an
+  empty frame.
 
 ### Blocks, not rows
 

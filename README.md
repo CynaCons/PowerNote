@@ -20,8 +20,10 @@ No install. No account. No server. Just open and write.
 - **Math / LaTeX** — inline `$E=mc^2$` and display `$$...$$` via KaTeX
 - **Images** — paste from clipboard, drag-drop, multi-file import, crop, 90° rotate, notes
 - **Freehand drawing** — pen with color/size options, stroke and zone erasers
-- **Shapes** — rectangles, circles, triangles, arrows (two-vertex handles), lines with fill/stroke/dash styling
+- **Shapes** — rectangles, circles, triangles, arrows (two-vertex handles), lines and arcs with fill/stroke/dash/corner-radius styling
+- **Diagrams** — write PlantUML, get native shapes you can drag. UML component and composite structure (ports, ball-and-socket assemblies, delegation, parts) and activity charts with swimlanes. Not an image: every box, arrow and label is an ordinary canvas object
 - **Hierarchy** — sections and pages like OneNote, drag to reorder
+- **Scrolls** — named vertical columns on a page, with titles that pin to the top as you scroll and a magnetic snap to their edges
 - **Search & Replace** — Ctrl+F for current page, Ctrl+Shift+F across notebook, replace mode
 - **Lasso select** — drag-rectangle to select multiple nodes, move as a group
 - **Undo/Redo** — per-page history (Ctrl+Z / Ctrl+Shift+Z)
@@ -32,6 +34,7 @@ No install. No account. No server. Just open and write.
 - **Auto-update** — detects new releases on GitHub, in-app update
 - **Self-contained** — every file is both the editor and the data
 - **Offline-first** — works without internet, no cloud dependency
+- **Agent-ready** — an MCP server lets an AI agent read and write the open notebook, including drawing diagrams. See [`powernote-mcp/`](powernote-mcp/README.md)
 
 ## How It Works
 

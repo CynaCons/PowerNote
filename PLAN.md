@@ -377,7 +377,15 @@
 | v0.27.0 | **shipped** — Shape & drawing groups (flat + isolation) |
 | v0.28.0 | **shipped** — Agent bridge: MCP writes notes into the live app |
 | v0.28.1 | **tagged** — Floating zoom control bar |
-| v0.29.0 | **current** — Agent bridge: notebook management + update control |
+| v0.29.0 | **shipped** — Agent bridge: notebook management + update control |
+| v0.30.0 | **shipped** — Scroll guide style + agent-controlled canvas look |
+| v0.31.0 | **shipped** — Named scrolls: identity for parallel columns |
+| v0.32.0 | **shipped** — Resizable hierarchy panel |
+| v0.33.0 | **shipped** — Document outline, active scroll, agent deletes |
+| v0.33.1 | **shipped** — Test suite timeout hardening |
+| v0.34.x | **partially shipped** — Diagrams as native canvas objects. Frames, PlantUML component/composite parsing, `create_diagram` over MCP. Reflow, the pin loop and the sequence/state layouts are NOT built; see `docs/SRS_DIAGRAM.md` for what shipped |
+| v0.35.0 | **shipped** — Scrolls: ScrollText icon, user-created scrolls, pinned titles, magnetic edge snap |
+| v0.35.1 | **current, tagged** — Swimlane activity diagrams (second PlantUML grammar) |
 
 ---
 
