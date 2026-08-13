@@ -23,6 +23,14 @@ jobs:
 
       - run: npm run build:template
 
+      # A release that cannot be upgraded to is worse than no release, so the
+      # regression suite gates the tag. 131 loads the artifact built above.
+      - run: npx playwright install --with-deps chromium
+
+      - run: npx playwright test
+
+      - run: npm run test:bridge
+
       - name: Copy release artifact
         run: cp dist-template/index.html PowerNote.html
 

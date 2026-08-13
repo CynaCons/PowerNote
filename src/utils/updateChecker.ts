@@ -10,6 +10,8 @@ export interface UpdateInfo {
   latestVersion?: string;
   downloadUrl?: string;
   releaseUrl?: string;
+  /** Release tag, e.g. "v0.36.0". The download is pinned to it — see fetchAssetHtml. */
+  tag?: string;
 }
 
 /** Result of performUpdate — callers use mode for UI copy. */
@@ -23,7 +25,7 @@ export type PerformUpdateResult =
  * Injectable deps for tests. Production uses the defaults below.
  */
 export interface PerformUpdateDeps {
-  fetchTemplate?: (downloadUrl: string) => Promise<string | null>;
+  fetchTemplate?: (downloadUrl: string, tag?: string) => Promise<string | null>;
   getHandle?: () => Promise<FileSystemFileHandle | null>;
   writeHandle?: (handle: FileSystemFileHandle, html: string) => Promise<boolean>;
   verifyWritePermission?: (handle: FileSystemFileHandle) => Promise<boolean>;
@@ -111,6 +113,7 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
       latestVersion: latest,
       downloadUrl: asset?.browser_download_url,
       releaseUrl: data.html_url,
+      tag: data.tag_name,
     };
   } catch (err) {
     console.error('[PowerNote Update] Check failed:', err);
@@ -145,65 +148,80 @@ export function isLiveUpdateEnabled(): boolean {
  * GitHub's download URLs have CORS issues from file:// origins,
  * so we try several approaches in order.
  */
-export async function fetchAssetHtml(downloadUrl: string): Promise<string | null> {
-  // Strategy 1: Direct fetch of browser_download_url
-  console.log('[PowerNote Update] Strategy 1: direct fetch');
-  try {
-    const resp = await fetch(downloadUrl);
-    if (resp.ok) {
-      const text = await resp.text();
-      if (text.includes('<div id="root">')) {
-        console.log(`[PowerNote Update] Strategy 1 succeeded (${text.length} bytes)`);
-        return text;
+/**
+ * Downloads the new build.
+ *
+ * Order matters, and it is not the obvious one. GitHub does NOT send CORS
+ * headers on release-asset downloads: `browser_download_url` 302s to
+ * objects.githubusercontent.com, and so does the API's octet-stream asset
+ * endpoint, and neither response carries `Access-Control-Allow-Origin`. From a
+ * page — which is all PowerNote ever is — both fail with a bare "TypeError:
+ * Failed to fetch". They are kept only as fallbacks in case that ever changes.
+ *
+ * raw.githubusercontent.com does send `Access-Control-Allow-Origin: *`, and the
+ * built single-file app is committed at `dist-template/index.html`, so fetching
+ * it AT THE RELEASE TAG is the path that actually works. Pinning to the tag
+ * rather than `main` matters: main can be ahead of the newest release, and an
+ * update must install the version it just told the user about.
+ */
+export async function fetchAssetHtml(
+  downloadUrl: string,
+  tag?: string,
+): Promise<string | null> {
+  const looksRight = (text: string) => text.includes('<div id="root">');
+
+  // Strategy 1: the committed build at the release tag. The only CORS-clean route.
+  if (tag) {
+    const rawUrl = `https://raw.githubusercontent.com/${GITHUB_REPO}/${tag}/dist-template/index.html`;
+    console.log(`[PowerNote Update] Strategy 1: ${rawUrl}`);
+    try {
+      const resp = await fetch(rawUrl);
+      if (resp.ok) {
+        const text = await resp.text();
+        if (looksRight(text)) {
+          console.log(`[PowerNote Update] Strategy 1 succeeded (${text.length} bytes)`);
+          return text;
+        }
+        console.warn('[PowerNote Update] Strategy 1: response is not a PowerNote build');
+      } else {
+        console.warn(`[PowerNote Update] Strategy 1 returned ${resp.status}`);
       }
+    } catch (err) {
+      console.log('[PowerNote Update] Strategy 1 failed:', err);
     }
-  } catch (err) {
-    console.log('[PowerNote Update] Strategy 1 failed:', err);
   }
 
-  // Strategy 2: Use GitHub API asset endpoint with octet-stream
-  try {
-    const match = downloadUrl.match(/repos\/([^/]+\/[^/]+)\/releases\/download/);
-    const assetMatch = downloadUrl.match(/\/([^/]+)$/);
-    if (match && assetMatch) {
-      const repo = match[1];
-      console.log('[PowerNote Update] Strategy 2: GitHub API asset endpoint');
-      const releaseResp = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
-        headers: { Accept: 'application/vnd.github.v3+json' },
-      });
-      if (releaseResp.ok) {
-        const releaseData = await releaseResp.json();
-        const asset = releaseData.assets?.find((a: any) => a.name === ASSET_NAME);
-        if (asset?.id) {
-          const assetResp = await fetch(
-            `https://api.github.com/repos/${repo}/releases/assets/${asset.id}`,
-            { headers: { Accept: 'application/octet-stream' } }
-          );
-          if (assetResp.ok) {
-            const text = await assetResp.text();
-            if (text.includes('<div id="root">')) {
-              console.log(`[PowerNote Update] Strategy 2 succeeded (${text.length} bytes)`);
-              return text;
-            }
-            console.log('[PowerNote Update] Strategy 2: response is not valid HTML');
-          }
+  // Strategy 2: the release asset. Expected to fail on CORS; kept as a fallback.
+  if (downloadUrl) {
+    console.log('[PowerNote Update] Strategy 2: direct asset fetch');
+    try {
+      const resp = await fetch(downloadUrl);
+      if (resp.ok) {
+        const text = await resp.text();
+        if (looksRight(text)) {
+          console.log(`[PowerNote Update] Strategy 2 succeeded (${text.length} bytes)`);
+          return text;
         }
       }
+    } catch (err) {
+      console.log('[PowerNote Update] Strategy 2 failed (expected — GitHub sends no CORS header on assets):', err);
     }
-  } catch (err) {
-    console.log('[PowerNote Update] Strategy 2 failed:', err);
   }
 
-  // Strategy 3: raw.githubusercontent.com dist-template
-  console.log('[PowerNote Update] Strategy 3: raw.githubusercontent.com');
+  // Strategy 3: main. Last resort only — it can be ahead of the newest release,
+  // so it may install something that was never released.
+  console.log('[PowerNote Update] Strategy 3: raw.githubusercontent.com @ main');
   try {
     const resp = await fetch(
-      `https://raw.githubusercontent.com/${GITHUB_REPO}/main/dist-template/index.html`
+      `https://raw.githubusercontent.com/${GITHUB_REPO}/main/dist-template/index.html`,
     );
     if (resp.ok) {
       const text = await resp.text();
-      if (text.includes('<div id="root">')) {
-        console.log(`[PowerNote Update] Strategy 3 succeeded (${text.length} bytes)`);
+      if (looksRight(text)) {
+        console.warn(
+          '[PowerNote Update] Strategy 3 succeeded, but this is main rather than the ' +
+          'release — the installed build may be ahead of the version reported.',
+        );
         return text;
       }
     }
@@ -239,6 +257,7 @@ export async function performUpdate(
   currentVersion: string,
   newVersion: string,
   deps: PerformUpdateDeps = {},
+  tag?: string,
 ): Promise<PerformUpdateResult> {
   console.log(`[PowerNote Update] Starting update ${currentVersion} → ${newVersion}...`);
 
@@ -261,7 +280,7 @@ export async function performUpdate(
     const safeName = workspace.filename.replace(/[^a-zA-Z0-9_\- ]/g, '_');
 
     console.log('[PowerNote Update] Downloading new version...');
-    const newHtml = await fetchTemplate(downloadUrl);
+    const newHtml = await fetchTemplate(downloadUrl, tag ?? `v${newVersion}`);
     if (!newHtml) {
       console.error('[PowerNote Update] Could not download new version');
       return { ok: false };
