@@ -40,3 +40,7 @@ that shipped with the broken order cannot repair itself. Users on those versions
 must download the new build once by hand; from then on updating works.
 
 | REQ-UPDATE-025 | Opening an older notebook file from a newer build shall migrate its workspace and rebind the file handle, so saving writes the newer build back over it | Must | T131 |
+| REQ-UPDATE-026 | The update check shall be cached, so opening notebooks repeatedly does not exhaust GitHub's unauthenticated API quota (60/hour per IP) | Must | — |
+| REQ-UPDATE-027 | The update check shall be skipped under automation, detected via `navigator.webdriver`, so a test run cannot spend a user's quota | Must | — |
+| REQ-UPDATE-028 | A 403 from the API shall fall back to a host without an API quota rather than reporting failure | Must | — |
+| REQ-UPDATE-029 | An explicit check requested by the user or an agent shall bypass the cache | Must | — |

@@ -50,7 +50,7 @@ export function SettingsPanel({ backgroundMode, onChangeBackgroundMode, bgColor,
 
   const handleCheckUpdate = async () => {
     setUpdateStatus('checking');
-    const result = await checkForUpdate(APP_VERSION);
+    const result = await checkForUpdate(APP_VERSION, { force: true });
     if (result?.available && result.latestVersion) {
       setUpdateStatus('available');
       setUpdateInfo({ version: result.latestVersion, url: result.downloadUrl, releaseUrl: result.releaseUrl });

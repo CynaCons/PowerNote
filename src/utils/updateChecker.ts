@@ -5,6 +5,70 @@ import { getCurrentHandle } from './fileHandleStore';
 const GITHUB_REPO = 'CynaCons/PowerNote';
 const ASSET_NAME = 'PowerNote.html';
 
+/**
+ * How long a check is trusted before asking GitHub again.
+ *
+ * api.github.com allows 60 unauthenticated requests an hour PER IP, and the
+ * check fires on every page load. Without a cache, opening a handful of
+ * notebooks — or running a test suite that loads the app hundreds of times —
+ * exhausts the quota for everything else on that IP, and the user sees 403.
+ */
+const CHECK_CACHE_KEY = 'powernote-update-check';
+const CHECK_CACHE_MS = 6 * 60 * 60 * 1000;
+
+function readCachedCheck(currentVersion: string): UpdateInfo | null {
+  try {
+    const raw = localStorage.getItem(CHECK_CACHE_KEY);
+    if (!raw) return null;
+    const entry = JSON.parse(raw);
+    if (entry.forVersion !== currentVersion) return null;
+    if (Date.now() - entry.at > CHECK_CACHE_MS) return null;
+    return entry.info as UpdateInfo;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedCheck(currentVersion: string, info: UpdateInfo): void {
+  try {
+    localStorage.setItem(
+      CHECK_CACHE_KEY,
+      JSON.stringify({ at: Date.now(), forVersion: currentVersion, info }),
+    );
+  } catch {
+    // A full or blocked localStorage costs us the cache, not the check.
+  }
+}
+
+/**
+ * Automation loads the app over and over, and each load would spend one of the
+ * hour's 60 requests. `navigator.webdriver` is set by every driver, so this
+ * needs no cooperation from the tests themselves.
+ */
+function isAutomated(): boolean {
+  return typeof navigator !== 'undefined' && navigator.webdriver === true;
+}
+
+/**
+ * The version on main, read from a host that is not API-rate-limited.
+ *
+ * Used when the API says 403. The release flow bumps the version and tags in
+ * one go, so main's version is the newest release's version.
+ */
+async function latestVersionFromRaw(): Promise<string | null> {
+  try {
+    const resp = await fetch(
+      `https://raw.githubusercontent.com/${GITHUB_REPO}/main/package.json`,
+      { cache: 'no-cache' },
+    );
+    if (!resp.ok) return null;
+    const pkg = await resp.json();
+    return typeof pkg.version === 'string' ? pkg.version : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface UpdateInfo {
   available: boolean;
   latestVersion?: string;
@@ -65,7 +129,20 @@ export function compareVersions(a: string, b: string): number {
  * Check GitHub for a newer release of PowerNote.
  * Returns null if the check fails (offline, CORS blocked, etc.)
  */
-export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo | null> {
+export async function checkForUpdate(
+  currentVersion: string,
+  options: { force?: boolean } = {},
+): Promise<UpdateInfo | null> {
+  if (isAutomated() && !options.force) return null;
+
+  if (!options.force) {
+    const cached = readCachedCheck(currentVersion);
+    if (cached) {
+      console.log('[PowerNote Update] Using cached check (refreshes every 6h)');
+      return cached;
+    }
+  }
+
   console.log(`[PowerNote Update] Checking for updates... current version: ${currentVersion}`);
   try {
     const url = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
@@ -76,7 +153,19 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
     console.log(`[PowerNote Update] Response status: ${resp.status}`);
     if (!resp.ok) {
       if (resp.status === 403) {
-        console.warn('[PowerNote Update] GitHub API rate limited (403). Try again in a few minutes.');
+        console.warn(
+          '[PowerNote Update] GitHub API rate limited (403) — falling back to raw.githubusercontent.com, ' +
+          'which has no API quota.',
+        );
+        const raw = await latestVersionFromRaw();
+        if (raw) {
+          const info: UpdateInfo =
+            compareVersions(raw, currentVersion) > 0
+              ? { available: true, latestVersion: raw, tag: `v${raw}` }
+              : { available: false, latestVersion: raw };
+          writeCachedCheck(currentVersion, info);
+          return info;
+        }
       } else {
         console.warn(`[PowerNote Update] GitHub API returned ${resp.status}`);
       }
@@ -100,7 +189,9 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
       console.log(
         `[PowerNote Update] Already up to date (running ${currentVersion}, latest release ${latest})`,
       );
-      return { available: false, latestVersion: latest };
+      const upToDate: UpdateInfo = { available: false, latestVersion: latest };
+      writeCachedCheck(currentVersion, upToDate);
+      return upToDate;
     }
 
     const asset = data.assets?.find((a: any) => a.name === ASSET_NAME);
@@ -108,13 +199,15 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
     console.log(`[PowerNote Update] browser_download_url: ${asset?.browser_download_url ?? 'NONE'}`);
     console.log(`[PowerNote Update] Release URL: ${data.html_url}`);
 
-    return {
+    const info: UpdateInfo = {
       available: true,
       latestVersion: latest,
       downloadUrl: asset?.browser_download_url,
       releaseUrl: data.html_url,
       tag: data.tag_name,
     };
+    writeCachedCheck(currentVersion, info);
+    return info;
   } catch (err) {
     console.error('[PowerNote Update] Check failed:', err);
     return null;

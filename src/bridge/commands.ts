@@ -772,7 +772,7 @@ async function saveNotebookCmd(): Promise<SaveNotebookResult> {
 // ── App updates ─────────────────────────────────────────────
 
 async function checkUpdate(): Promise<CheckUpdateResult> {
-  const info = await checkForUpdate(APP_VERSION);
+  const info = await checkForUpdate(APP_VERSION, { force: true });
 
   // checkForUpdate returns null for offline / CORS / rate-limit. That is not
   // the same as "up to date", and conflating them would have the agent report
@@ -821,7 +821,7 @@ async function runUpdate(params: Record<string, unknown>): Promise<RunUpdateResu
     );
   }
 
-  const info = await checkForUpdate(APP_VERSION);
+  const info = await checkForUpdate(APP_VERSION, { force: true });
   if (info === null) {
     throw new BridgeCommandError(
       'PRECONDITION',
