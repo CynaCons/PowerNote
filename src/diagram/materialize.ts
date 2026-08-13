@@ -270,8 +270,9 @@ export function materializeDiagram(
       continue;
     }
 
-    // Delegation and dependency both terminate in an arrowhead.
-    line(e, rel.from, rel.to, true, rel.dashed);
+    // Delegation and dependency both terminate in an arrowhead; an undirected
+    // link (Mermaid's `---`) is the one case that must not grow one.
+    line(e, rel.from, rel.to, rel.arrowhead !== false, rel.dashed);
     if (rel.label) {
       label(
         e,

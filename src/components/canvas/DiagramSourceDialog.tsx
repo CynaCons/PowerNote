@@ -7,12 +7,16 @@ import type { DiagramNodeData } from '../../types/data';
 import './DiagramNode.css';
 
 /**
- * The PlantUML behind a diagram, shown over the canvas.
+ * The source behind a diagram, shown over the canvas.
  *
  * Plain DOM, rendered as a sibling of the Konva Stage rather than inside a node,
  * because a react-konva subtree is reconciled by Konva's renderer and HTML
  * children there throw. Redrawing replaces the frame's contents in place and
  * refits the frame; a source that parses to nothing leaves the drawing alone.
+ *
+ * No format is passed to the redraw: the grammar follows whatever the user has
+ * typed, so pasting Mermaid over PlantUML works rather than fighting the
+ * language the frame was first created from.
  */
 export function DiagramSourceDialog() {
   const editingId = useDiagramStore((s) => s.editingId);
@@ -63,12 +67,12 @@ export function DiagramSourceDialog() {
       <div
         className="diagram-modal"
         role="dialog"
-        aria-label="PlantUML source"
+        aria-label="Diagram source"
         data-testid="diagram-dialog"
         onClick={(e) => e.stopPropagation()}
       >
         <header>
-          <span>plantuml source</span>
+          <span>diagram source</span>
           <button type="button" onClick={closeSource} aria-label="Close">
             ×
           </button>

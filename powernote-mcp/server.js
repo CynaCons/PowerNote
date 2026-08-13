@@ -543,10 +543,11 @@ const TOOLS = [
     },
   },
   {
-    name: 'create_diagram',
+    name: 'create_diagram_plantuml',
     description:
-      'Draw a UML diagram on the page from PlantUML source. TWO grammars are supported, ' +
-      'and the right one is detected automatically. ' +
+      'Draw a UML diagram on the page from PLANTUML source. (For Mermaid source, use ' +
+      'create_diagram_mermaid instead - this tool refuses it rather than half-drawing it.) ' +
+      'Two PlantUML dialects are supported, and the right one is detected automatically. ' +
       '(1) COMPONENT / COMPOSITE STRUCTURE: components, nested components, ports ' +
       '(port / portin / portout), provided and required interfaces, and assembly and ' +
       'delegation connectors. A composite-structure part puts its role in the label, as ' +
@@ -600,6 +601,63 @@ const TOOLS = [
     },
   },
   {
+    name: 'create_diagram_mermaid',
+    description:
+      'Draw a diagram on the page from MERMAID source. (For PlantUML source, use ' +
+      'create_diagram_plantuml instead.) A DOCUMENTED SUBSET is read, and anything ' +
+      'outside it comes back as a diagnostic instead of being drawn wrong. ' +
+      '(1) FLOWCHART: "flowchart TD" / "flowchart LR" / "graph LR" as the first line, then ' +
+      'nodes A[Label], A(Label) and A{Label}, and edges A --> B, A -->|guard| B and ' +
+      'A --- B. Chains such as A --> B --> C work. ' +
+      '(2) SEQUENCE: "sequenceDiagram" as the first line, then participant X (optionally ' +
+      '"participant X as Label") and messages A->>B: text and A-->>B: reply. ' +
+      'TWO THINGS TO EXPECT. Node SHAPE is carried as a stereotype above the name, not as ' +
+      'geometry: a {decision} renders as a box labelled "decision" rather than as a diamond, ' +
+      'because the shared layout has one box shape. LAYOUT is left to right whatever direction ' +
+      'the header names, and a sequence renders as participants side by side with numbered ' +
+      'messages between them, not as lifelines running down the page. ' +
+      'NOT SUPPORTED, and refused with a diagnostic: subgraphs, dotted (-.->), thick (==>) ' +
+      'and circle/cross (--o, --x) links, compound node shapes such as A[[Sub]] or ' +
+      'A((Circle)), loop/alt/opt/par/note blocks, and the class, state, ER and Gantt families. ' +
+      'What lands on the canvas is ordinary PowerNote shapes and text inside a diagram frame, ' +
+      'so the user can drag any part of it afterwards - this is NOT an image. Supply semantics ' +
+      'only; every coordinate is computed here from real text metrics. The response carries ' +
+      'the diagnostics, so one call is enough to know whether it came out right.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        source: {
+          type: 'string',
+          description:
+            'Mermaid text. The FIRST line must be flowchart/graph with a direction, or ' +
+            'sequenceDiagram. Example: "flowchart LR" then A[Read sensor] --> B{Uplink up?} ' +
+            'then B -->|yes| C[Send batch].',
+        },
+        title: {
+          type: 'string',
+          description: 'Title shown on the diagram frame. Defaults to "Diagram".',
+        },
+        pageId: {
+          type: 'string',
+          description: 'Page to draw on. Defaults to the page currently open.',
+        },
+        scrollId: {
+          type: 'string',
+          description:
+            'Scroll (named column) to draw into - call list_scrolls first. The diagram ' +
+            'lands below whatever is already in that column, like append_block. Defaults to the leftmost.',
+        },
+        column: {
+          type: 'integer',
+          minimum: 0,
+          description: 'Raw A4 page-guide index. Legacy fallback - prefer scrollId. Ignored when scrollId is given.',
+        },
+      },
+      required: ['source'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'bridge_status',
     description:
       'Who else is working in this notebook. Several agents may be connected at ' +
@@ -611,6 +669,63 @@ const TOOLS = [
       'may take the lock before your next call -- so treat the LOCKED error as the ' +
       'real signal and this as a way to understand it.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'create_diagram_svg',
+    description:
+      'Draw an SVG onto the page as native PowerNote shapes. Every element becomes an ' +
+      'ordinary rectangle, circle, line or text run that the user can select and drag ' +
+      'afterwards -- it is transpiled, NOT embedded as an image. ' +
+      'THIS TOOL IS THE OPPOSITE OF THE OTHER TWO: create_diagram_plantuml and ' +
+      'create_diagram_mermaid want semantics and compute every coordinate for you, ' +
+      'whereas here YOU have already done the layout and the coordinates are the ' +
+      'payload. Use this when you want exact placement, and one of the others when you ' +
+      'want a diagram laid out well without doing the geometry yourself. ' +
+      'Supported: svg (viewBox and width/height set a uniform scale), g with translate ' +
+      'and uniform scale, rect (incl. rx), circle, ellipse, line, polyline, polygon, ' +
+      'and text with tspan and text-anchor. Paint via fill, stroke, stroke-width, ' +
+      'stroke-dasharray and font-*, read from attributes or a style attribute and ' +
+      'inherited down the tree. ' +
+      'REFUSED, each with a diagnostic naming it: path (a bezier has no native node, ' +
+      'and flattening it to line segments is a lie that survives every later edit), ' +
+      'gradients, patterns, filters, masks, clipPath, use, symbol, image, ' +
+      'foreignObject, textPath, style, script, animation and nested svg. rotate() ' +
+      'transforms are refused too, because the native rotation turns about an ' +
+      'element\'s own corner rather than the user-space origin, so honouring it would ' +
+      'move your drawing. Keep to the supported subset and nothing is silently lost. ' +
+      'The response carries the diagnostics, so one call tells you what was dropped.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        source: {
+          type: 'string',
+          description:
+            'SVG markup. A root <svg> with a viewBox is best -- it fixes the scale and ' +
+            'the corner lands where the diagram is placed.',
+        },
+        title: {
+          type: 'string',
+          description: 'Title shown on the diagram frame. Defaults to "Diagram".',
+        },
+        pageId: {
+          type: 'string',
+          description: 'Page to draw on. Defaults to the page currently open.',
+        },
+        scrollId: {
+          type: 'string',
+          description:
+            'Scroll (named column) to draw into - call list_scrolls first. Lands below ' +
+            'whatever is already in that column. Defaults to the leftmost.',
+        },
+        column: {
+          type: 'integer',
+          minimum: 0,
+          description: 'Raw A4 page-guide index. Legacy fallback - prefer scrollId.',
+        },
+      },
+      required: ['source'],
+      additionalProperties: false,
+    },
   },
   {
     name: 'list_scrolls',
@@ -905,6 +1020,20 @@ const TOOLS = [
   },
 ];
 
+/**
+ * Tools that are one app command carrying a fixed argument.
+ *
+ * The TOOL is named for the language, because choosing between languages is the
+ * decision a model actually has to make and a name it can read beats a `format`
+ * enum it has to remember. The COMMAND is one, because once a source is parsed
+ * into a spec the language is nothing but which parser ran.
+ */
+const TOOL_ROUTES = {
+  create_diagram_plantuml: { cmd: 'create_diagram', params: { format: 'plantuml' } },
+  create_diagram_mermaid: { cmd: 'create_diagram', params: { format: 'mermaid' } },
+  create_diagram_svg: { cmd: 'create_diagram', params: { format: 'svg' } },
+};
+
 const server = new Server(
   { name: 'powernote-notes', version: '0.33.0' },
   { capabilities: { tools: {} } },
@@ -946,15 +1075,19 @@ async function runToolAsAgent(name, params, agentId, label) {
     };
   }
 
+  const route = TOOL_ROUTES[name];
+  const cmd = route ? route.cmd : name;
+  const args = route ? { ...params, ...route.params } : params;
+
   // Reads never queue: an agent that cannot look also cannot find out why.
   if (READ_ONLY.has(name)) {
-    const response = await callApp(name, params);
+    const response = await callApp(cmd, args);
     return unwrap(response);
   }
 
   const release = acquireLock(agentId, label);
   try {
-    const response = await callApp(name, params);
+    const response = await callApp(cmd, args);
     return unwrap(response);
   } finally {
     release();

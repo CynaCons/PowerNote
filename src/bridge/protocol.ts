@@ -215,6 +215,14 @@ export interface AppendBlockResult {
   scrollId?: string;
 }
 
+/**
+ * Language a diagram source is written in.
+ *
+ * Duplicated from `src/diagram` rather than imported: this module is the wire
+ * contract, and the MCP server reads it without pulling in the renderer.
+ */
+export type DiagramSourceFormat = 'plantuml' | 'mermaid' | 'svg';
+
 /** What `create_diagram` drew. Diagnostics travel back with the write, so a
  *  clean diagram costs one round trip and a flawed one still reports why. */
 export interface CreateDiagramResult {
@@ -223,6 +231,8 @@ export interface CreateDiagramResult {
   /** Id of the diagram node. Its contents carry this as their groupId. */
   diagramId: string;
   title: string;
+  /** Grammar that read the source, so the agent can see which tool ran. */
+  format: DiagramSourceFormat;
   column: number;
   /** Native shape and text nodes drawn inside the frame. */
   elementCount: number;

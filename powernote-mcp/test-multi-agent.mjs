@@ -104,6 +104,9 @@ function startAgent(label, extraEnv = {}) {
 function fakeNotebook() {
   const ws = new WebSocket(`ws://127.0.0.1:${PORT}`);
   const seen = [];
+  // Whole frames as well as names: a tool that rewrites its command or injects a
+  // parameter is only observable from this side.
+  const frames = [];
   ws.on('open', () => {
     ws.send(
       JSON.stringify({ v: 1, type: 'hello', app: 'powernote', appVersion: '0.36.0', notebook: 'Test.html' }),
@@ -113,13 +116,14 @@ function fakeNotebook() {
     const msg = JSON.parse(raw.toString());
     if (!msg.cmd) return;
     seen.push(msg.cmd);
+    frames.push(msg);
     // A slow command, so the test can observe a lease being held across one.
     const delay = msg.cmd === 'save_notebook' ? 900 : 10;
     setTimeout(() => {
       ws.send(JSON.stringify({ v: 1, id: msg.id, ok: true, result: { ran: msg.cmd } }));
     }, delay);
   });
-  return { ws, seen, close: () => ws.close() };
+  return { ws, seen, frames, close: () => ws.close() };
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -154,6 +158,20 @@ async function main() {
   const bWrite = await beta.call('append_block', { markdown: 'from beta' });
   check('peer write reaches the notebook', !bWrite.isError, bWrite.text);
   check('notebook actually ran it', notebook.seen.includes('append_block'));
+
+  // --- diagram tools are named for the language they take ----------------
+  check('plantuml diagram tool is offered', tools.includes('create_diagram_plantuml'));
+  check('mermaid diagram tool is offered', tools.includes('create_diagram_mermaid'));
+  check('the format-less diagram tool is gone', !tools.includes('create_diagram'));
+
+  const drawn = await beta.call('create_diagram_mermaid', { source: 'flowchart LR\nA-->B' });
+  check('mermaid tool reaches the notebook', !drawn.isError, drawn.text);
+  const frame = notebook.frames.filter((f) => f.cmd === 'create_diagram').pop();
+  check(
+    'mermaid tool routes to create_diagram naming its format',
+    !!frame && frame.params.format === 'mermaid',
+    JSON.stringify(frame),
+  );
 
   // --- exclusion --------------------------------------------------------
   // beta holds the lease from the write above; alpha must be refused.

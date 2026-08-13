@@ -186,7 +186,11 @@ export function layoutDiagram(
 
     const fromEntity = index.get(rel.fromId);
     const toEntity = index.get(rel.toId);
-    const kind = deriveConnectorKind(fromEntity, toEntity, index, !!rel.label);
+    // A flow edge is an arrow whatever it is labelled; only UML connectors get
+    // their kind derived from where their ends land.
+    const kind = rel.flow
+      ? 'dependency'
+      : deriveConnectorKind(fromEntity, toEntity, index, !!rel.label);
 
     const from = boundaryPoint(fromBox, centre(toBox), isPort(fromEntity));
     const to = boundaryPoint(toBox, centre(fromBox), isPort(toEntity));

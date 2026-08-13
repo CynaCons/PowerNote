@@ -25,6 +25,7 @@ import { useDrawStore } from '../stores/useDrawStore';
 import { createBlockNode, blockHeight, columnOf, orderedTextNodes, nextBlockY } from './blocks';
 import { columnX } from './blocks';
 import { rebuildDiagram, FRAME_MIN_W, FRAME_MIN_H } from '../diagram/canvasOps';
+import { looksLikeMermaid } from '../diagram/mermaid';
 import { generateId } from '../utils/ids';
 import { A4_WIDTH } from '../utils/pageLayout';
 import { scrollById } from '../utils/scrolls';
@@ -39,6 +40,7 @@ import type {
   CreateScrollResult,
   CreateSectionResult,
   DeleteResult,
+  DiagramSourceFormat,
   ListPagesResult,
   ListScrollsResult,
   MovePageResult,
@@ -875,13 +877,19 @@ async function runUpdate(params: Record<string, unknown>): Promise<RunUpdateResu
 type Handler = (params: Record<string, unknown>) => unknown | Promise<unknown>;
 
 
+const DIAGRAM_FORMATS: DiagramSourceFormat[] = ['plantuml', 'mermaid', 'svg'];
+
 /**
- * Draws a PlantUML diagram onto the page as a native diagram node.
+ * Draws a diagram onto the page as a native diagram node.
  *
  * The agent supplies semantics only — entities and relationships — and the app
  * computes every coordinate from real text metrics. What lands is ordinary
  * shape and text nodes inside a frame, so the user can drag any part of it
  * afterwards exactly like something they drew by hand.
+ *
+ * `format` names the language. It is optional so the pre-Mermaid callers keep
+ * working by sniffing, but an agent that states it gets told when its source is
+ * in the other language instead of watching it half-render.
  *
  * Diagnostics come back with the write rather than needing a second call, so a
  * clean diagram costs one round trip. A source that parses to nothing is a
@@ -891,6 +899,14 @@ async function createDiagram(params: Record<string, unknown>): Promise<CreateDia
   flush();
   const source = requireString(params, 'source');
   const title = optionalString(params, 'title') ?? 'Diagram';
+  const declared = optionalString(params, 'format');
+  if (declared !== undefined && !DIAGRAM_FORMATS.includes(declared as DiagramSourceFormat)) {
+    throw new BridgeCommandError(
+      'BAD_PARAMS',
+      `"${declared}" is not a diagram format. Valid values: ${DIAGRAM_FORMATS.join(', ')}.`,
+    );
+  }
+  const format = declared as DiagramSourceFormat | undefined;
   const { section, page } = resolvePage(optionalString(params, 'pageId'));
   const column = resolveColumn(params, page);
 
@@ -911,7 +927,7 @@ async function createDiagram(params: Record<string, unknown>): Promise<CreateDia
     data: { source, title },
   };
 
-  const built = rebuildDiagram(frame, source);
+  const built = rebuildDiagram(frame, source, format);
   if (built.contents.length === 0) {
     throw new BridgeCommandError(
       'PRECONDITION',
@@ -932,6 +948,7 @@ async function createDiagram(params: Record<string, unknown>): Promise<CreateDia
     pageId: page.id,
     diagramId: frameId,
     title,
+    format: format ?? (looksLikeMermaid(source) ? 'mermaid' : 'plantuml'),
     column,
     elementCount: built.contents.length,
     width: built.frame.width,

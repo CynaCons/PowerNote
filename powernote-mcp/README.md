@@ -48,7 +48,8 @@ socket on their machine.
 | `create_page` | New titled page, opened. Also writes an `# Title` block unless `withHeading: false`. |
 | `append_block` | Append a markdown block to the bottom of a page. The main way to write. |
 | `update_block` | Replace an existing block's markdown, by id. |
-| `create_diagram` | Draw a UML diagram from PlantUML source, as native canvas shapes. See [Diagrams](#diagrams). |
+| `create_diagram_plantuml` | Draw a UML diagram from PlantUML source, as native canvas shapes. See [Diagrams](#diagrams). |
+| `create_diagram_mermaid` | Draw a flowchart or sequence from Mermaid source, as native canvas shapes. See [Diagrams](#diagrams). |
 | `rename_page` | Retitle a page, and its `# Title` block if that still matches. |
 | `move_page` | Move a page into another section. |
 | `list_scrolls` | The named scrolls (columns) on a page, with block counts. Call before writing to a shared page. |
@@ -68,12 +69,19 @@ socket on their machine.
 
 ### Diagrams
 
-`create_diagram` takes PlantUML and draws it onto the page. What lands is
-ordinary PowerNote shapes and text inside a diagram frame — **not an image** —
-so the user can drag any part of it afterwards. We take PlantUML's syntax and
-throw its renderer away; that is what makes the result editable.
+Two tools, named for the language each takes: `create_diagram_plantuml` and
+`create_diagram_mermaid`. What lands is ordinary PowerNote shapes and text
+inside a diagram frame — **not an image** — so the user can drag any part of it
+afterwards. We take the syntax and throw the renderer away; that is what makes
+the result editable.
 
-Two grammars are supported, and the right one is detected from the source:
+Only the parser differs between the two. Both produce the same spec, and layout
+and rendering are shared, so a Mermaid flowchart looks like it belongs in the
+same notebook as a PlantUML component diagram.
+
+#### `create_diagram_plantuml`
+
+Two PlantUML dialects, and the right one is detected from the source:
 
 **Component and composite structure**
 
@@ -117,12 +125,60 @@ stop
 decision with guards on the arrows. Steps run top to bottom in source order and
 the lane fixes the column.
 
+#### `create_diagram_mermaid`
+
+A **documented subset**, because a parser that guesses at the rest would draw a
+diagram nobody wrote. Anything outside it comes back as a diagnostic.
+
+**Flowchart**
+
+```
+flowchart LR
+  A[Read sensor] --> B{Uplink up?}
+  B -->|yes| C[Send batch]
+  B -->|no| D[Store and forward]
+  D --- C
+```
+
+Nodes `A`, `A[Label]`, `A(Label)`, `A{Label}`. Edges `-->`, `---` and their
+`|label|` forms, including chains such as `A --> B --> C`. A bare id is a node,
+as it is in Mermaid.
+
+**Sequence**
+
+```
+sequenceDiagram
+  participant S as Sensor
+  participant G as Gateway
+  S->>G: telemetry burst
+  G-->>S: ack
+```
+
+`participant X`, `participant X as Label`, `actor X`, and the `->>` and `-->>`
+messages. A `-->>` reply renders dashed.
+
+**Two things to expect.** Node SHAPE travels as a stereotype above the name, not
+as geometry: `{decision}` renders as a box labelled «decision» rather than as a
+diamond, because the shared layout has one box shape and showing the wrong shape
+is worse than naming the right one. LAYOUT is left to right whatever direction
+the header names, and a sequence renders as participants side by side with
+numbered messages rather than lifelines running down the page.
+
+**Not supported, and refused with a diagnostic:** subgraphs, dotted (`-.->`),
+thick (`==>`) and circle/cross (`--o`, `--x`) links, compound node shapes such
+as `A[[Sub]]` and `A((Circle))`, `loop`/`alt`/`opt`/`par`/`note` blocks, and the
+class, state, ER and Gantt families.
+
 **Rules worth knowing**
 
 - Supply semantics only. Every coordinate is computed from real text metrics,
   and there is no syntax for positioning anything yourself.
-- `skinparam`, `!include` and `!theme` are **reported back as skipped**, not
-  silently dropped — PowerNote supplies the style.
+- Send each language to its own tool. A source in the other language is refused
+  rather than half-drawn — PlantUML would happily render `A[Read sensor]` as an
+  entity literally named `A[Read sensor]`.
+- `skinparam`, `!include`, `!theme`, `style`, `classDef` and `%%{init}%%` are
+  **reported back as skipped**, not silently dropped — PowerNote supplies the
+  style.
 - `fork`, `split`, `while` and `repeat` are refused with a diagnostic rather
   than drawn wrong.
 - Activity `if/else` branches currently render in source order rather than as

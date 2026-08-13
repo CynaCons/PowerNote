@@ -51,6 +51,14 @@ export interface DiagramRelationship {
   dashed: boolean;
   /** Source line, so a diagnostic can point back at what the author wrote. */
   sourceLine: number;
+  /**
+   * Set by flow grammars. A label on a flowchart arrow is a guard, not the name
+   * of an interface, so the UML derivation that turns a labelled component link
+   * into a ball-and-socket assembly must not run on one.
+   */
+  flow?: boolean;
+  /** False for an undirected link (Mermaid `---`). Absent means an arrowhead. */
+  arrowhead?: boolean;
 }
 
 export interface DiagramSpec {

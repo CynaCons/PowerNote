@@ -8,6 +8,7 @@
 
 import type { CanvasNode, DiagramNodeData } from '../types/data';
 import { buildDiagram } from './index';
+import type { DiagramFormat } from './index';
 import type { Diagnostic } from './types';
 
 /** Space between the frame edge and its contents. */
@@ -40,11 +41,20 @@ export interface RebuildResult {
  * Pure: it reads the frame's position and returns what should replace its
  * contents. The caller decides whether to commit, which is what lets a source
  * that parses to nothing leave the existing drawing alone.
+ *
+ * `format` is for a caller that was told the language. A redraw from the source
+ * editor leaves it off so the grammar follows whatever the user typed, rather
+ * than what the frame was first created from.
  */
-export function rebuildDiagram(frame: CanvasNode, source: string): RebuildResult {
+export function rebuildDiagram(
+  frame: CanvasNode,
+  source: string,
+  format?: DiagramFormat,
+): RebuildResult {
   const built = buildDiagram(source, {
     groupId: frame.id,
     origin: { x: frame.x + FRAME_PAD, y: frame.y + FRAME_TITLE_H + FRAME_PAD },
+    format,
   });
 
   if (built.nodes.length === 0 || !built.bounds) {
