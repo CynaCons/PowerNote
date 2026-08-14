@@ -326,14 +326,34 @@ export async function fetchAssetHtml(
   return null;
 }
 
+/**
+ * Saves a blob to disk.
+ *
+ * Two details here are load-bearing and were both wrong, which is why updating
+ * produced a backup and no new notebook:
+ *
+ * - The object URL must NOT be revoked synchronously after `click()`. These
+ *   files are ~2.4MB, and revoking before the browser has read the blob
+ *   cancels the download outright.
+ * - The anchor must be in the document. A detached one works in some browsers
+ *   and is silently ignored in others.
+ */
 function triggerDownload(content: string, filename: string) {
   const blob = new Blob([content], { type: 'text/html;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  a.rel = 'noopener';
+  a.style.display = 'none';
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  // Long enough for the browser to have taken the bytes; short enough not to
+  // leak if the page stays open.
+  setTimeout(() => {
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, 60_000);
 }
 
 /**
@@ -407,11 +427,15 @@ export async function performUpdate(
     }
 
     // ── Download fallback ────────────────────────────────────
-    console.log('[PowerNote Update] Download fallback path...');
-    const backupHtml = await buildBackup(workspace);
-    download(backupHtml, `${safeName} (v${currentVersion}_update-backup).html`);
+    //
+    // No backup here, deliberately. Nothing has been overwritten on this path —
+    // the notebook on disk is untouched, so it IS the backup. Downloading one
+    // anyway was worse than redundant: browsers block a second programmatic
+    // download from the same gesture, so the backup went through and the actual
+    // new notebook was silently dropped, which read as "update does nothing".
+    console.log('[PowerNote Update] Download fallback: your existing file is untouched.');
     download(finalHtml, `${safeName} (v${newVersion}).html`);
-    console.log('[PowerNote Update] Update complete — open the downloaded file to use the new version');
+    console.log('[PowerNote Update] Downloaded the new version — open it to continue.');
     return { ok: true, mode: 'download' };
   } catch (err) {
     console.error('[PowerNote Update] Update failed:', err);

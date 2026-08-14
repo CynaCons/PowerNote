@@ -78,7 +78,7 @@ test.describe('88 - Live-swap write + reload (REQ-UPDATE-002)', () => {
     expect(result.writes).toHaveLength(1);
     expect(result.writeHasPayload).toBe(true);
     expect(result.writeLooksUpdated).toBe(true);
-    // Safety backup only — not the updated notebook download
+    // Live-swap overwrites the file, so the backup is the point here.
     expect(result.downloads).toHaveLength(1);
     expect(result.downloads[0]).toContain('update-backup');
     expect(result.downloads.some((d) => d.includes('v0.25.0') && !d.includes('backup'))).toBe(false);
@@ -121,6 +121,8 @@ test.describe('88 - Live-swap write + reload (REQ-UPDATE-002)', () => {
 
     expect(result.outcome).toEqual({ ok: true, mode: 'download' });
     expect(result.reloadCount).toBe(0);
-    expect(result.downloads.length).toBe(2);
+    // Live-swap disabled means the fallback path, which downloads the new
+    // notebook only -- nothing was overwritten, so there is nothing to back up.
+    expect(result.downloads.length).toBe(1);
   });
 });

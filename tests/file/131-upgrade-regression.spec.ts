@@ -215,4 +215,69 @@ test.describe('131 - Upgrade regression (REQ-UPDATE-020..024)', () => {
     expect(migrated.savedKeepsContent).toBe(true);
     expect(migrated.scrollsHydrated).toBe(true);
   });
+
+  test('with no file handle, the update downloads the new notebook and nothing else', async ({ page }) => {
+    // The reported failure: a notebook opened by double-click has no file
+    // handle, so live-swap is impossible and the update falls back to a
+    // download. It used to emit the backup first and the new notebook second --
+    // and browsers block a second programmatic download from one gesture, so
+    // the backup arrived and the update silently did not.
+    await openUpgraded(page, buildUpgraded(LEGACY_WORKSPACE));
+
+    const result = await page.evaluate(async () => {
+      const m = await import('/src/utils/updateChecker.ts');
+      const ws = {
+        version: '1', filename: 'My Notes', editorVersion: '0.33.0',
+        sections: [{ id: 's1', title: 'S', pages: [{ id: 'p1', title: 'P', nodes: [
+          { id: 'n1', type: 'text', x: 10, y: 10, width: 794, height: 40, layer: 3,
+            data: { text: 'my real notes', fontSize: 16, fontFamily: 'Inter', fontStyle: 'normal', fill: '#111' } },
+        ] }] }],
+      };
+      const downloads: any[] = [];
+      const res = await m.performUpdate('', ws as any, '0.33.0', '9.9.9', {
+        getHandle: async () => null,
+        fetchTemplate: async () => '<html><head></head><body><div id="root"></div></body></html>',
+        download: (content: string, name: string) =>
+          downloads.push({ name, isBuild: content.includes('<div id="root">'), hasData: content.includes('my real notes') }),
+        reload: () => {},
+        buildBackupHtml: async () => 'BACKUP',
+      });
+      return { ok: res.ok, mode: (res as any).mode, downloads };
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.mode).toBe('download');
+    // Exactly one file, and it is the new notebook -- not a backup. Nothing was
+    // overwritten on this path, so the file on disk is already the backup.
+    expect(result.downloads).toHaveLength(1);
+    expect(result.downloads[0].name).toContain('9.9.9');
+    expect(result.downloads[0].isBuild).toBe(true);
+    expect(result.downloads[0].hasData).toBe(true);
+  });
+
+  test('the live-swap path still backs up before overwriting', async ({ page }) => {
+    await openUpgraded(page, buildUpgraded(LEGACY_WORKSPACE));
+
+    const result = await page.evaluate(async () => {
+      const m = await import('/src/utils/updateChecker.ts');
+      const downloads: string[] = [];
+      let written = '';
+      const res = await m.performUpdate('', { version: '1', filename: 'N', sections: [] } as any, '0.33.0', '9.9.9', {
+        getHandle: async () => ({} as any),
+        verifyWritePermission: async () => true,
+        writeHandle: async (_h: any, html: string) => { written = html; return true; },
+        fetchTemplate: async () => '<html><head></head><body><div id="root"></div></body></html>',
+        download: (_c: string, name: string) => downloads.push(name),
+        reload: () => {},
+        buildBackupHtml: async () => 'BACKUP',
+      });
+      return { ok: res.ok, mode: (res as any).mode, downloads, wroteBuild: written.includes('<div id="root">') };
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.mode).toBe('live-swap');
+    // Here the file IS overwritten, so a backup is the point.
+    expect(result.downloads.some((n: string) => n.includes('backup'))).toBe(true);
+    expect(result.wroteBuild).toBe(true);
+  });
 });

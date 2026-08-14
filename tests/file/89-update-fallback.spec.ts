@@ -1,14 +1,18 @@
 /**
  * Test 89: Update download fallback (REQ-UPDATE-003)
  *
- * When no FSA handle is available, performUpdate downloads a backup and
+ * When no FSA handle is available, performUpdate downloads ONLY the updated
+ * notebook. Nothing is overwritten on this path, so the file on disk is already
+ * the backup -- and emitting a second download got it blocked by the browser,
+ * which is what made updating look like it did nothing.
+ * Previously it also downloaded a backup and
  * an updated notebook (no reload).
  */
 import { test, expect } from '@playwright/test';
 import { waitForCanvasReady, disableFSA } from '../helpers';
 
 test.describe('89 - Update download fallback (REQ-UPDATE-003)', () => {
-  test('downloads backup + updated file when no handle', async ({ page }) => {
+  test('downloads only the updated file when no handle', async ({ page }) => {
     await disableFSA(page);
     await page.goto('/');
     await waitForCanvasReady(page);
@@ -66,10 +70,11 @@ test.describe('89 - Update download fallback (REQ-UPDATE-003)', () => {
     expect(result.outcome).toEqual({ ok: true, mode: 'download' });
     expect(result.reloadCount).toBe(0);
     expect(result.writeCalls).toBe(0);
-    expect(result.downloads).toHaveLength(2);
-    expect(result.downloads[0].name).toContain('update-backup');
-    expect(result.downloads[1].name).toContain('v0.25.0');
-    expect(result.downloads[1].name).not.toContain('backup');
+    // One file only: browsers block a second programmatic download from the
+    // same gesture, and the untouched file on disk is the backup.
+    expect(result.downloads).toHaveLength(1);
+    expect(result.downloads[0].name).toContain('v0.25.0');
+    expect(result.downloads[0].name).not.toContain('backup');
   });
 
   test('falls back when write permission denied', async ({ page }) => {
@@ -109,6 +114,6 @@ test.describe('89 - Update download fallback (REQ-UPDATE-003)', () => {
 
     expect(result.outcome).toEqual({ ok: true, mode: 'download' });
     expect(result.reloadCount).toBe(0);
-    expect(result.downloads).toHaveLength(2);
+    expect(result.downloads).toHaveLength(1);
   });
 });
