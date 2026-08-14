@@ -280,4 +280,34 @@ test.describe('131 - Upgrade regression (REQ-UPDATE-020..024)', () => {
     expect(result.downloads.some((n: string) => n.includes('backup'))).toBe(true);
     expect(result.wroteBuild).toBe(true);
   });
+
+  test('write permission is requested before the download, not after', async ({ page }) => {
+    // The bug this pins: requestPermission() needs transient user activation
+    // from the click that started the update, and the ~2.4MB download outlives
+    // it. Asking afterwards gets denied without a prompt, and the updater
+    // silently downgrades to "download a copy" instead of updating the notebook
+    // you already have open.
+    await openUpgraded(page, buildUpgraded(LEGACY_WORKSPACE));
+
+    const result = await page.evaluate(async () => {
+      const m = await import('/src/utils/updateChecker.ts');
+      const order: string[] = [];
+      let written = '';
+      const res = await m.performUpdate('', { version: '1', filename: 'N', sections: [] } as any, '0.33.0', '9.9.9', {
+        getHandle: async () => ({}) as any,
+        verifyWritePermission: async () => { order.push('permission'); return true; },
+        fetchTemplate: async () => { order.push('download'); return '<html><head></head><body><div id="root"></div></body></html>'; },
+        writeHandle: async (_h: any, html: string) => { order.push('write'); written = html; return true; },
+        download: () => {},
+        reload: () => order.push('reload'),
+        buildBackupHtml: async () => 'BACKUP',
+      });
+      return { mode: (res as any).mode, order, wroteBuild: written.includes('<div id="root">') };
+    });
+
+    expect(result.mode).toBe('live-swap');
+    expect(result.order.indexOf('permission')).toBeLessThan(result.order.indexOf('download'));
+    expect(result.order).toEqual(['permission', 'download', 'write', 'reload']);
+    expect(result.wroteBuild).toBe(true);
+  });
 });

@@ -392,6 +392,27 @@ export async function performUpdate(
   try {
     const safeName = workspace.filename.replace(/[^a-zA-Z0-9_\- ]/g, '_');
 
+    // Settle the write target BEFORE downloading anything.
+    //
+    // `verifyWrite` can call requestPermission(), which needs transient user
+    // activation from the click that started the update. The build is ~2.4MB and
+    // takes seconds, so asking afterwards means the activation has expired and
+    // the request is denied without a prompt — the update then silently
+    // downgraded to "download a copy", which reads as the updater refusing to
+    // update the notebook you already have open.
+    let target: FileSystemFileHandle | null = null;
+    if (liveEnabled() && isFSASupported()) {
+      const handle = await getHandle();
+      if (!handle) {
+        console.log('[PowerNote Update] No file handle for this notebook — will download instead.');
+      } else if (await verifyWrite(handle)) {
+        target = handle;
+        console.log('[PowerNote Update] Write permission held — updating this file in place.');
+      } else {
+        console.warn('[PowerNote Update] Write permission denied — will download instead.');
+      }
+    }
+
     console.log('[PowerNote Update] Downloading new version...');
     const newHtml = await fetchTemplate(downloadUrl, tag ?? `v${newVersion}`);
     if (!newHtml) {
@@ -403,27 +424,21 @@ export async function performUpdate(
     console.log(`[PowerNote Update] Built updated HTML (${finalHtml.length} bytes)`);
 
     // ── Live-swap path (FSA A/B) ─────────────────────────────
-    if (liveEnabled() && isFSASupported()) {
-      const handle = await getHandle();
-      if (handle) {
-        const canWrite = await verifyWrite(handle);
-        if (canWrite) {
-          if (backupBeforeLive) {
-            console.log('[PowerNote Update] Saving safety backup before live-swap...');
-            const backupHtml = await buildBackup(workspace);
-            download(backupHtml, `${safeName} (v${currentVersion}_update-backup).html`);
-          }
-
-          console.log('[PowerNote Update] Live-swap: writing to current file handle...');
-          const written = await writeHandle(handle, finalHtml);
-          if (written) {
-            console.log('[PowerNote Update] Live-swap write OK — reloading');
-            reload();
-            return { ok: true, mode: 'live-swap' };
-          }
-          console.warn('[PowerNote Update] Live-swap write failed — falling back to download');
-        }
+    if (target) {
+      if (backupBeforeLive) {
+        console.log('[PowerNote Update] Saving safety backup before live-swap...');
+        const backupHtml = await buildBackup(workspace);
+        download(backupHtml, `${safeName} (v${currentVersion}_update-backup).html`);
       }
+
+      console.log('[PowerNote Update] Live-swap: writing to current file handle...');
+      const written = await writeHandle(target, finalHtml);
+      if (written) {
+        console.log('[PowerNote Update] Live-swap write OK — reloading');
+        reload();
+        return { ok: true, mode: 'live-swap' };
+      }
+      console.warn('[PowerNote Update] Live-swap write failed — falling back to download');
     }
 
     // ── Download fallback ────────────────────────────────────
