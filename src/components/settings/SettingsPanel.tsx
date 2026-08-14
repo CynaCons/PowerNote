@@ -64,7 +64,12 @@ export function SettingsPanel({ backgroundMode, onChangeBackgroundMode, bgColor,
   };
 
   const handleUpdate = async () => {
-    if (!updateInfo?.url) {
+    // A missing release asset used to dead-end here, silently opening the
+    // release page instead of updating -- which is exactly what happened when a
+    // failing CI job stopped the asset being attached. The download no longer
+    // needs it: it fetches the committed build at the release tag. Only give up
+    // when there is no version to fetch at all.
+    if (!updateInfo?.version) {
       if (updateInfo?.releaseUrl) window.open(updateInfo.releaseUrl, '_blank');
       return;
     }
@@ -82,7 +87,7 @@ export function SettingsPanel({ backgroundMode, onChangeBackgroundMode, bgColor,
     wsStore.savePageStrokes(useDrawStore.getState().strokes);
     const ws = wsStore.workspace;
 
-    const result = await performUpdate(updateInfo.url, ws, APP_VERSION, updateInfo.version);
+    const result = await performUpdate(updateInfo.url ?? '', ws, APP_VERSION, updateInfo.version);
     if (!result.ok) {
       setUpdateStatus('failed');
       if (updateInfo.releaseUrl) window.open(updateInfo.releaseUrl, '_blank');
