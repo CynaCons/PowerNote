@@ -12,7 +12,7 @@
  * against the previous block's not-yet-corrected height and overlap them.
  */
 
-import type { CanvasNode, TextNodeData } from '../types/data';
+import type { CanvasNode, ScrollRecord, TextNodeData } from '../types/data';
 import { A4_WIDTH, MIN_TEXT_HEIGHT, columnAt, columnLeft } from '../utils/pageLayout';
 import { defaultTextOptions } from '../utils/defaults';
 import { generateId } from '../utils/ids';
@@ -62,8 +62,8 @@ export function blockHeight(
 }
 
 /** Left edge of an A4 page-guide column, matching PageGuides. */
-export function columnX(column: number): number {
-  return columnLeft(column);
+export function columnX(column: number, scrolls?: readonly ScrollRecord[]): number {
+  return columnLeft(column, scrolls);
 }
 
 /**
@@ -71,8 +71,8 @@ export function columnX(column: number): number {
  * page guides and scroll records use, so the bridge and the visible guides
  * always agree on where column boundaries are.
  */
-export function columnOf(node: CanvasNode): number {
-  return columnAt(node.x);
+export function columnOf(node: CanvasNode, scrolls?: readonly ScrollRecord[]): number {
+  return columnAt(node.x, scrolls);
 }
 
 /**
@@ -84,11 +84,11 @@ export function columnOf(node: CanvasNode): number {
  * the first block of column 1 down past all of column 0's content, leaving a
  * large gap at the top of an otherwise empty column.
  */
-export function nextBlockY(nodes: CanvasNode[], column = 0): number {
+export function nextBlockY(nodes: CanvasNode[], column = 0, scrolls?: readonly ScrollRecord[]): number {
   let bottom = BLOCK_TOP_INSET;
   let found = false;
   for (const node of nodes) {
-    if (columnOf(node) !== column) continue;
+    if (columnOf(node, scrolls) !== column) continue;
     found = true;
     bottom = Math.max(bottom, node.y + (node.height || MIN_TEXT_HEIGHT));
   }
@@ -103,13 +103,14 @@ export function createBlockNode(
   markdown: string,
   existing: CanvasNode[],
   column = 0,
+  scrolls?: readonly ScrollRecord[],
 ): CanvasNode {
   const data: TextNodeData = { ...defaultTextOptions, text: markdown };
   return {
     id: generateId(),
     type: 'text',
-    x: columnX(column),
-    y: nextBlockY(existing, column),
+    x: columnX(column, scrolls),
+    y: nextBlockY(existing, column, scrolls),
     width: A4_WIDTH,
     height: blockHeight(markdown, A4_WIDTH, data),
     layer: 3,

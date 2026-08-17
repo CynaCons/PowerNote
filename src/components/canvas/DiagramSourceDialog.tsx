@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDiagramStore } from '../../stores/useDiagramStore';
-import { diagramMembers, diagramSourceOf, rebuildDiagram } from '../../diagram/canvasOps';
+import { applyDiagramScrollFit, diagramMembers, diagramSourceOf, rebuildDiagram } from '../../diagram/canvasOps';
 import { sniffFormat, type Diagnostic } from '../../diagram';
 import { FORMAT_LABEL } from '../../diagram/formatLabels';
 import type { DiagramNodeData } from '../../types/data';
@@ -48,8 +48,11 @@ export function DiagramSourceDialog() {
     const frame = canvas.nodes.find((n) => n.id === editingId);
     if (!frame) return;
 
-    const result = rebuildDiagram(frame, draft);
-    setDiagnostics(result.diagnostics);
+    const result = applyDiagramScrollFit(frame, rebuildDiagram(frame, draft));
+    const notes = result.warning
+      ? [...result.diagnostics, { line: 0, severity: 'ignored' as const, message: result.warning }]
+      : result.diagnostics;
+    setDiagnostics(notes);
     if (result.contents.length === 0) return;
 
     for (const member of diagramMembers(canvas.nodes, editingId)) canvas.deleteNode(member.id);

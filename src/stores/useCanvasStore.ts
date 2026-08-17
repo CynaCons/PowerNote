@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import type { CanvasNode, Viewport } from '../types/data';
+import type { CanvasNode, ScrollRecord, Stroke, Viewport } from '../types/data';
 import { generateId } from '../utils/ids';
 import { expandSelectionForGroup } from '../utils/groups';
+import { clampStageY, pageCeiling } from '../utils/scrollCeiling';
 import { useWorkspaceStore } from './useWorkspaceStore';
 import { useDrawStore } from './useDrawStore';
 import { useGroupStore } from './useGroupStore';
@@ -54,14 +55,54 @@ interface CanvasState {
 
 // Module-level state (persists across renders, not serialized)
 let clipboard: CanvasNode[] = [];
-let undoStack: CanvasNode[][] = [];
-let redoStack: CanvasNode[][] = [];
+
+/** One undo frame. Scrolls/strokes travel with the nodes only when the
+ *  action that pushed the frame also rewrote them (fit-scroll-to-content). */
+interface HistoryFrame {
+  nodes: CanvasNode[];
+  scrolls?: ScrollRecord[];
+  strokes?: Stroke[];
+}
+
+let undoStack: HistoryFrame[] = [];
+let redoStack: HistoryFrame[] = [];
 let batchDepth = 0; // When > 0, only the first pushUndo in the batch saves a snapshot
 let _konvaStageRef: any = null; // Konva.Stage reference for direct manipulation
 
+function copyScrolls(scrolls: ScrollRecord[]): ScrollRecord[] {
+  return scrolls.map((s) => ({ ...s }));
+}
+
+function copyStrokes(strokes: Stroke[]): Stroke[] {
+  return strokes.map((s) => ({
+    ...s,
+    points: [...s.points],
+    ...(s.pressures ? { pressures: [...s.pressures] } : {}),
+  }));
+}
+
+function captureScrolls(): ScrollRecord[] | undefined {
+  const page = useWorkspaceStore.getState().getActivePage();
+  return page?.scrolls ? copyScrolls(page.scrolls) : undefined;
+}
+
+function captureStrokes(): Stroke[] {
+  return copyStrokes(useDrawStore.getState().strokes);
+}
+
+function restoreScrolls(scrolls: ScrollRecord[]): void {
+  const pageId = useWorkspaceStore.getState().activePageId;
+  if (!pageId) return;
+  useWorkspaceStore.getState().replacePageScrolls(pageId, copyScrolls(scrolls));
+}
+
+function restoreStrokes(strokes: Stroke[]): void {
+  useDrawStore.setState({ strokes: copyStrokes(strokes) });
+}
+
 function pushUndo(nodes: CanvasNode[]) {
   if (batchDepth > 0) return; // Inside a batch — skip intermediate snapshots
-  undoStack.push(nodes.map((n) => ({ ...n, data: { ...n.data } })));
+  undoStack.push({ nodes: deepCopyNodes(nodes) });
   if (undoStack.length > MAX_HISTORY) undoStack.shift();
   redoStack = []; // Clear redo on new action
 }
@@ -70,7 +111,28 @@ function pushUndo(nodes: CanvasNode[]) {
 export function undoBatchStart(nodes: CanvasNode[]) {
   if (batchDepth === 0) {
     // Save the snapshot at the start of the batch
-    undoStack.push(nodes.map((n) => ({ ...n, data: { ...n.data } })));
+    undoStack.push({ nodes: deepCopyNodes(nodes) });
+    if (undoStack.length > MAX_HISTORY) undoStack.shift();
+    redoStack = [];
+  }
+  batchDepth++;
+}
+
+/**
+ * Batch that also snapshots scrolls and strokes, so one undo restores a
+ * fit-scroll-to-content (band width + right-hand members + ink).
+ */
+export function undoBatchStartFull(frame: {
+  nodes: CanvasNode[];
+  scrolls: ScrollRecord[];
+  strokes: Stroke[];
+}): void {
+  if (batchDepth === 0) {
+    undoStack.push({
+      nodes: deepCopyNodes(frame.nodes),
+      scrolls: copyScrolls(frame.scrolls),
+      strokes: copyStrokes(frame.strokes),
+    });
     if (undoStack.length > MAX_HISTORY) undoStack.shift();
     redoStack = [];
   }
@@ -183,9 +245,19 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   setViewport: (viewport) => {
-    set((state) => ({
-      viewport: { ...state.viewport, ...viewport },
-    }));
+    set((state) => {
+      const next = { ...state.viewport, ...viewport };
+      // Backstop for every camera path, including zoom-to-fit / zoom presets
+      // that never go through a gesture handler. Mid-gesture stage.position()
+      // still needs its own clamp — this only sees the store write.
+      const ceiling = pageCeiling(
+        state.nodes,
+        useDrawStore.getState().strokes,
+        useWorkspaceStore.getState().getActivePage()?.scrolls,
+      );
+      const y = clampStageY({ y: () => next.y, scaleX: () => next.scale }, ceiling);
+      return { viewport: { ...next, y } };
+    });
     // Sync the Konva Stage if ref is available
     if (_konvaStageRef) {
       const v = get().viewport;
@@ -253,16 +325,11 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
 
-    const newViewport = {
+    get().setViewport({
       x: cw / 2 - centerX * clampedScale,
       y: ch / 2 - centerY * clampedScale,
       scale: clampedScale,
-    };
-
-    set({ viewport: newViewport });
-    stage.scale({ x: clampedScale, y: clampedScale });
-    stage.position({ x: newViewport.x, y: newViewport.y });
-    stage.batchDraw();
+    });
   },
 
   copySelectedNodes: () => {
@@ -295,17 +362,29 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   undo: () => {
     if (undoStack.length === 0) return;
     const current = get().nodes;
-    redoStack.push(deepCopyNodes(current));
     const prev = undoStack.pop()!;
-    set({ nodes: prev, selectedNodeIds: [] });
+    redoStack.push({
+      nodes: deepCopyNodes(current),
+      scrolls: prev.scrolls ? captureScrolls() : undefined,
+      strokes: prev.strokes ? captureStrokes() : undefined,
+    });
+    set({ nodes: prev.nodes, selectedNodeIds: [] });
+    if (prev.scrolls) restoreScrolls(prev.scrolls);
+    if (prev.strokes) restoreStrokes(prev.strokes);
   },
 
   redo: () => {
     if (redoStack.length === 0) return;
     const current = get().nodes;
-    undoStack.push(deepCopyNodes(current));
     const next = redoStack.pop()!;
-    set({ nodes: next, selectedNodeIds: [] });
+    undoStack.push({
+      nodes: deepCopyNodes(current),
+      scrolls: next.scrolls ? captureScrolls() : undefined,
+      strokes: next.strokes ? captureStrokes() : undefined,
+    });
+    set({ nodes: next.nodes, selectedNodeIds: [] });
+    if (next.scrolls) restoreScrolls(next.scrolls);
+    if (next.strokes) restoreStrokes(next.strokes);
   },
 
   canUndo: () => undoStack.length > 0,

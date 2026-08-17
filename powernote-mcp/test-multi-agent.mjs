@@ -163,6 +163,7 @@ async function main() {
   check('plantuml diagram tool is offered', tools.includes('create_diagram_plantuml'));
   check('mermaid diagram tool is offered', tools.includes('create_diagram_mermaid'));
   check('svg diagram tool is offered', tools.includes('create_diagram_svg'));
+  check('drawio diagram tool is offered', tools.includes('create_diagram_drawio'));
   // Kept on purpose: renaming a shipped tool would break anything written
   // against the old name, and an alias costs one route entry.
   check('the old name survives as a deprecated alias', tools.includes('create_diagram'));
@@ -177,6 +178,17 @@ async function main() {
     'mermaid tool routes to create_diagram naming its format',
     !!frame && frame.params.format === 'mermaid',
     JSON.stringify(frame),
+  );
+
+  const dio = await beta.call('create_diagram_drawio', {
+    source: '<mxfile><diagram><mxGraphModel><root><mxCell id="0"/></root></mxGraphModel></diagram></mxfile>',
+  });
+  check('drawio tool reaches the notebook', !dio.isError, dio.text);
+  const dioFrame = notebook.frames.filter((f) => f.cmd === 'create_diagram').pop();
+  check(
+    'drawio tool routes to create_diagram naming its format',
+    !!dioFrame && dioFrame.params.format === 'drawio',
+    JSON.stringify(dioFrame),
   );
 
   // --- exclusion --------------------------------------------------------

@@ -1,9 +1,13 @@
 import { useEffect, useRef } from 'react';
-import { Copy, Trash2, CopyPlus, Layers, Group as GroupIcon, Ungroup } from 'lucide-react';
+import { Copy, Trash2, CopyPlus, Layers, Group as GroupIcon, Ungroup, Download } from 'lucide-react';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
 import { useGroupStore } from '../../stores/useGroupStore';
 import { groupSelection, ungroupSelection } from '../../utils/groupOps';
+import { exportDrawio } from '../../diagram/drawioExport';
+import { downloadFile } from '../../utils/serialization';
+import { showToast } from '../layout/Toast';
+import type { DiagramNodeData } from '../../types/data';
 import './ContextMenu.css';
 
 interface ContextMenuProps {
@@ -75,6 +79,25 @@ export function ContextMenu({ x, y, nodeId, onClose }: ContextMenuProps) {
     useDrawStore.getState().selectedStrokeIds.length;
   const hasGroup = !!node.groupId;
   const isolating = useGroupStore.getState().editingGroupId === node.groupId;
+  const exportGroupId = node.type === 'diagram' ? node.id : node.groupId ?? null;
+
+  const handleExportDrawio = () => {
+    if (!exportGroupId) {
+      onClose();
+      return;
+    }
+    const latest = useCanvasStore.getState().nodes;
+    const { xml, report } = exportDrawio(exportGroupId, latest);
+    const frame = latest.find((n) => n.id === exportGroupId && n.type === 'diagram');
+    const raw =
+      frame && typeof (frame.data as DiagramNodeData)?.title === 'string'
+        ? (frame.data as DiagramNodeData).title.trim() || 'Diagram'
+        : 'Group';
+    const filename = `${raw.replace(/[^a-zA-Z0-9_\- ]/g, '_') || 'Diagram'}.drawio`;
+    downloadFile(xml, filename, 'application/xml;charset=utf-8');
+    if (report.length > 0) showToast(report.join(' '), 'info');
+    onClose();
+  };
 
   return (
     <div
@@ -141,6 +164,16 @@ export function ContextMenu({ x, y, nodeId, onClose }: ContextMenuProps) {
         >
           <Layers size={14} />
           <span>Edit group</span>
+        </button>
+      )}
+      {exportGroupId && (
+        <button
+          className="context-menu__item"
+          data-testid="context-export-drawio"
+          onClick={handleExportDrawio}
+        >
+          <Download size={14} />
+          <span>Export as .drawio</span>
         </button>
       )}
 

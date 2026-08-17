@@ -11,9 +11,11 @@
  */
 
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
-import { useCanvasStore } from '../stores/useCanvasStore';
+import { useCanvasStore, undoBatchStartFull, undoBatchEnd } from '../stores/useCanvasStore';
 import { useDrawStore } from '../stores/useDrawStore';
-import type { ScrollRecord } from '../types/data';
+import type { CanvasNode, ScrollRecord, Stroke } from '../types/data';
+import { columnAt, columnLeft, columnWidth } from './pageLayout';
+import { FIT_SCROLL_PAD } from '../diagram/fitToScroll';
 
 /** Push live canvas/draw state into the workspace. */
 function flush(): void {
@@ -51,4 +53,113 @@ export function reorderScroll(pageId: string, scrollId: string, toIndex: number)
   flush();
   useWorkspaceStore.getState().reorderScroll(pageId, scrollId, toIndex);
   reloadIfActive(pageId);
+}
+
+function nodeBelongsToScroll(
+  node: CanvasNode,
+  scroll: ScrollRecord,
+  scrolls: ScrollRecord[],
+  nodes: CanvasNode[],
+): boolean {
+  if (columnAt(node.x, scrolls) === scroll.column) return true;
+  if (!node.groupId) return false;
+  const frame = nodes.find((n) => n.id === node.groupId);
+  return !!frame && columnAt(frame.x, scrolls) === scroll.column;
+}
+
+function strokeAnchorX(stroke: Stroke): number {
+  return stroke.points[0] ?? 0;
+}
+
+function strokeBelongsToScroll(
+  stroke: Stroke,
+  scroll: ScrollRecord,
+  scrolls: ScrollRecord[],
+  nodes: CanvasNode[],
+): boolean {
+  if (stroke.groupId) {
+    const frame = nodes.find((n) => n.id === stroke.groupId);
+    if (frame && columnAt(frame.x, scrolls) === scroll.column) return true;
+  }
+  return columnAt(strokeAnchorX(stroke), scrolls) === scroll.column;
+}
+
+function isRightOfScroll(
+  columnOfOrigin: number,
+  belongsHere: boolean,
+  scrollColumn: number,
+): boolean {
+  if (belongsHere) return false;
+  return columnOfOrigin > scrollColumn;
+}
+
+/**
+ * Widen this scroll to its widest member + padding and shift every scroll
+ * to its right (and their members) by the delta. Explicit, never automatic.
+ * One undo restores the band width and the shifted members.
+ *
+ * Runs against the active page — the header that offers the action is only
+ * drawn there, and the canvas/draw stores are the live copies.
+ */
+export function fitScrollToContent(pageId: string, scrollId: string): { delta: number; width: number } | null {
+  flush();
+  const ws = useWorkspaceStore.getState();
+  if (ws.activePageId !== pageId) return null;
+  const page = ws.getActivePage();
+  const scrolls = page?.scrolls;
+  const scroll = scrolls?.find((s) => s.id === scrollId);
+  if (!page || !scrolls || !scroll) return null;
+
+  const nodes = useCanvasStore.getState().nodes;
+  const strokes = useDrawStore.getState().strokes;
+
+  const left = columnLeft(scroll.column, scrolls);
+  const currentWidth = columnWidth(scroll.column, scrolls);
+
+  let maxRight = left;
+  for (const node of nodes) {
+    if (!nodeBelongsToScroll(node, scroll, scrolls, nodes)) continue;
+    maxRight = Math.max(maxRight, node.x + Math.abs(node.width || 0));
+  }
+  for (const stroke of strokes) {
+    if (!strokeBelongsToScroll(stroke, scroll, scrolls, nodes)) continue;
+    for (let i = 0; i < stroke.points.length; i += 2) {
+      maxRight = Math.max(maxRight, stroke.points[i]);
+    }
+  }
+
+  const needed = Math.max(currentWidth, maxRight - left + FIT_SCROLL_PAD);
+  const delta = needed - currentWidth;
+  if (delta <= 0.5) return null;
+
+  undoBatchStartFull({ nodes, scrolls, strokes });
+
+  const nextNodes = nodes.map((node) => {
+    if (!isRightOfScroll(columnAt(node.x, scrolls), nodeBelongsToScroll(node, scroll, scrolls, nodes), scroll.column)) {
+      return node;
+    }
+    return { ...node, x: node.x + delta };
+  });
+  const nextStrokes = strokes.map((stroke) => {
+    if (
+      !isRightOfScroll(
+        columnAt(strokeAnchorX(stroke), scrolls),
+        strokeBelongsToScroll(stroke, scroll, scrolls, nodes),
+        scroll.column,
+      )
+    ) {
+      return stroke;
+    }
+    return {
+      ...stroke,
+      points: stroke.points.map((v, i) => (i % 2 === 0 ? v + delta : v)),
+    };
+  });
+  const nextScrolls = scrolls.map((s) => (s.id === scroll.id ? { ...s, width: needed } : s));
+
+  useCanvasStore.setState({ nodes: nextNodes });
+  useDrawStore.setState({ strokes: nextStrokes });
+  ws.replacePageScrolls(pageId, nextScrolls);
+  undoBatchEnd();
+  return { delta, width: needed };
 }

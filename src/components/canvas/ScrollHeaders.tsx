@@ -2,10 +2,28 @@ import { useEffect, useRef, useState } from 'react';
 import { Group, Line, Rect, Text } from 'react-konva';
 import { Html } from 'react-konva-utils';
 import type { BackgroundMode, ScrollRecord } from '../../types/data';
-import { A4_WIDTH, SCROLL_HEADER_HEIGHT, columnLeft, scrollTitleY } from '../../utils/pageLayout';
-import { renameScroll } from '../../utils/scrollOps';
+import {
+  SCROLL_HEADER_HEIGHT,
+  SCROLL_TITLE_FONT_STYLE,
+  SCROLL_TITLE_HAIRLINE,
+  SCROLL_TITLE_HAIRLINE_WIDTH,
+  SCROLL_TITLE_INK,
+  SCROLL_TITLE_PINNED_FILL,
+  SCROLL_TITLE_PINNED_FONT_SIZE,
+  SCROLL_TITLE_PINNED_OPACITY,
+  SCROLL_TITLE_PINNED_STRIP_HEIGHT,
+  SCROLL_TITLE_PIN_INSET,
+  SCROLL_TITLE_RESTING_FONT_SIZE,
+  columnLeft,
+  columnWidth,
+  scrollTitleY,
+} from '../../utils/pageLayout';
+import { pageCeiling } from '../../utils/scrollCeiling';
+import { fitScrollToContent, renameScroll } from '../../utils/scrollOps';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
+import { useDrawStore } from '../../stores/useDrawStore';
+import './ContextMenu.css';
 
 interface ScrollHeadersProps {
   mode: BackgroundMode;
@@ -31,18 +49,40 @@ const TITLE_INSET = 16;
  */
 export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [menu, setMenu] = useState<{ scrollId: string; x: number; y: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const activeScrollId = useWorkspaceStore((s) => s.activeScrollId);
   const setActiveScroll = useWorkspaceStore((s) => s.setActiveScroll);
   // Pinning is a function of where the viewport is, so the header has to follow
   // it rather than sit at a fixed canvas y.
   const viewport = useCanvasStore((s) => s.viewport);
+  const nodes = useCanvasStore((s) => s.nodes);
+  const strokes = useDrawStore((s) => s.strokes);
+  const ceiling = pageCeiling(nodes, strokes, scrolls);
 
   // Stop editing if the scroll disappears (page switch, delete) — the overlay
   // would otherwise hang over an empty band.
   useEffect(() => {
     if (editingId && !scrolls.some((s) => s.id === editingId)) setEditingId(null);
-  }, [editingId, scrolls]);
+    if (menu && !scrolls.some((s) => s.id === menu.scrollId)) setMenu(null);
+  }, [editingId, menu, scrolls]);
+
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e: MouseEvent) => {
+      const t = e.target;
+      if (t instanceof Element && t.closest('[data-testid="scroll-header-menu"]')) return;
+      setMenu(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenu(null);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menu]);
 
   useEffect(() => {
     if (editingId && inputRef.current) {
@@ -66,16 +106,23 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
   return (
     <Group>
       {scrolls.map((scroll) => {
-        const x = columnLeft(scroll.column);
+        const x = columnLeft(scroll.column, scrolls);
+        const bandW = columnWidth(scroll.column, scrolls);
         const isEditing = editingId === scroll.id;
 
-        const { y: pinnedY, holding: isHolding } = scrollTitleY(viewport);
+        const { y: pinnedY, holding: isHolding } = scrollTitleY(viewport, ceiling);
+        const stripY = pinnedY - SCROLL_TITLE_PIN_INSET;
+        const stripH = isHolding ? SCROLL_TITLE_PINNED_STRIP_HEIGHT : SCROLL_HEADER_HEIGHT;
+        const fontSize = isHolding ? SCROLL_TITLE_PINNED_FONT_SIZE : SCROLL_TITLE_RESTING_FONT_SIZE;
+        // Resting text stays at the ceiling y (T150). Pinned text is centred
+        // in the compact strip so the overlay reads as a 22px wayfinding bar.
+        const textY = isHolding ? stripY + (stripH - fontSize) / 2 : pinnedY;
 
         if (isEditing) {
           return (
             <Html
               key={`scroll-edit-${scroll.id}`}
-              groupProps={{ x: x + TITLE_INSET, y: 8 }}
+              groupProps={{ x: x + TITLE_INSET, y: textY }}
               divProps={{ style: { pointerEvents: 'auto' } }}
             >
               <input
@@ -83,7 +130,12 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
                 className="scroll-header__input"
                 defaultValue={scroll.title}
                 data-testid="scroll-rename-input"
-                style={{ width: A4_WIDTH - TITLE_INSET * 2 }}
+                style={{
+                  width: bandW - TITLE_INSET * 2,
+                  fontSize,
+                  fontWeight: 600,
+                  color: SCROLL_TITLE_INK,
+                }}
                 onBlur={() => commit(scroll)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') commit(scroll);
@@ -97,8 +149,6 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
 
         if (!scroll.title) return null;
 
-        const isActive = activeScrollId === scroll.id;
-
         return (
           <Group
             key={`scroll-header-${scroll.id}`}
@@ -108,48 +158,130 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
             // move the viewport — you are already looking at it.
             onClick={() => setActiveScroll(scroll.id)}
             onTap={() => setActiveScroll(scroll.id)}
+            onContextMenu={(e) => {
+              e.cancelBubble = true;
+              e.evt.preventDefault();
+              e.evt.stopPropagation();
+              setActiveScroll(scroll.id);
+              setMenu({ scrollId: scroll.id, x: e.evt.clientX, y: e.evt.clientY });
+            }}
           >
             {/* No id() on these nodes: useTextPlacement treats an unidentified
                 target as background, so a single click still places text or
                 clears selection straight through the header. */}
             {/* Backing so a held title reads over the content passing beneath.
-                Only while holding — at rest the canvas already provides it. */}
+                Only while holding — at rest the canvas already provides it.
+                Konva nodes stay the test/hit contract (T152). Markdown blocks
+                render as Html on top of the Stage, so the visible strip is a
+                matching Html overlay — otherwise body text paints through. */}
             {isHolding && (
               <Rect
+                name="scroll-title-backing"
                 x={x}
-                y={pinnedY - 10}
-                width={A4_WIDTH}
-                height={SCROLL_HEADER_HEIGHT - 6}
-                fill="#ffffff"
-                opacity={0.92}
+                y={stripY}
+                width={bandW}
+                height={stripH}
+                fill={SCROLL_TITLE_PINNED_FILL}
+                opacity={SCROLL_TITLE_PINNED_OPACITY}
                 listening={false}
               />
             )}
+            <Rect
+              name="scroll-title-hit"
+              x={x}
+              y={isHolding ? stripY : pinnedY - SCROLL_TITLE_PIN_INSET}
+              width={bandW}
+              height={stripH}
+              fill="transparent"
+            />
             <Text
+              name="scroll-title-text"
               x={x + TITLE_INSET}
-              y={pinnedY}
-              width={A4_WIDTH - TITLE_INSET * 2}
+              y={textY}
+              width={bandW - TITLE_INSET * 2}
               text={scroll.title}
-              fontSize={15}
+              fontSize={fontSize}
+              fontStyle={SCROLL_TITLE_FONT_STYLE}
               fontFamily="Inter, system-ui, sans-serif"
-              fill={isActive ? '#2563eb' : '#64748b'}
+              fill={SCROLL_TITLE_INK}
               ellipsis
               wrap="none"
+              opacity={isHolding ? 0 : 1}
             />
-            <Line
-              points={[
-                x,
-                pinnedY + SCROLL_HEADER_HEIGHT - 12,
-                x + A4_WIDTH,
-                pinnedY + SCROLL_HEADER_HEIGHT - 12,
-              ]}
-              stroke={isActive ? '#bfdbfe' : '#e2e2e2'}
-              strokeWidth={1}
-              listening={false}
-            />
+            {isHolding && (
+              <Line
+                name="scroll-title-hairline"
+                points={[x, stripY + stripH, x + bandW, stripY + stripH]}
+                stroke={SCROLL_TITLE_HAIRLINE}
+                strokeWidth={SCROLL_TITLE_HAIRLINE_WIDTH}
+                listening={false}
+              />
+            )}
+            {isHolding && (
+              <Html
+                groupProps={{ x, y: stripY }}
+                divProps={{ style: { pointerEvents: 'auto' } }}
+              >
+                <div
+                  data-testid="scroll-title-strip"
+                  onDoubleClick={() => setEditingId(scroll.id)}
+                  onClick={() => setActiveScroll(scroll.id)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setActiveScroll(scroll.id);
+                    setMenu({ scrollId: scroll.id, x: e.clientX, y: e.clientY });
+                  }}
+                  style={{
+                    width: bandW,
+                    height: stripH,
+                    boxSizing: 'border-box',
+                    background: `rgba(255, 255, 255, ${SCROLL_TITLE_PINNED_OPACITY})`,
+                    borderBottom: `${SCROLL_TITLE_HAIRLINE_WIDTH}px solid ${SCROLL_TITLE_HAIRLINE}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: `0 ${TITLE_INSET}px`,
+                    fontSize,
+                    fontWeight: 600,
+                    fontFamily: 'Inter, system-ui, sans-serif',
+                    color: SCROLL_TITLE_INK,
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
+                    textOverflow: 'ellipsis',
+                    lineHeight: 1,
+                  }}
+                >
+                  {scroll.title}
+                </div>
+              </Html>
+            )}
           </Group>
         );
       })}
+      {menu && (
+        <Html
+          groupProps={{ x: 0, y: 0 }}
+          divProps={{ style: { pointerEvents: 'auto' } }}
+        >
+          <div
+            className="context-menu"
+            data-testid="scroll-header-menu"
+            style={{ position: 'fixed', left: menu.x, top: menu.y, zIndex: 100 }}
+          >
+            <button
+              type="button"
+              className="context-menu__item"
+              data-testid="fit-scroll-to-content"
+              onClick={() => {
+                fitScrollToContent(pageId, menu.scrollId);
+                setMenu(null);
+              }}
+            >
+              Fit scroll to content
+            </button>
+          </div>
+        </Html>
+      )}
     </Group>
   );
 }

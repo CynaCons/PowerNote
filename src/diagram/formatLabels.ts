@@ -12,4 +12,5 @@ export const FORMAT_LABEL: Record<DiagramFormat, string> = {
   plantuml: 'PlantUML',
   mermaid: 'Mermaid',
   svg: 'SVG',
+  drawio: 'draw.io',
 };

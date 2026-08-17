@@ -22,6 +22,7 @@ import { useContextMenu } from '../../hooks/useContextMenu';
 import { useCanvasDragDrop } from '../../hooks/useCanvasDragDrop';
 import { useGroupStore } from '../../stores/useGroupStore';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
+import { clampStageY, liveCeiling } from '../../utils/scrollCeiling';
 import type { BackgroundMode, CanvasBgColor, ScrollRecord } from '../../types/data';
 import './InfiniteCanvas.css';
 
@@ -164,7 +165,9 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
 
         stage.scale({ x: newScale, y: newScale });
         stage.position(newPos);
-        setViewport({ x: newPos.x, y: newPos.y, scale: newScale });
+        const zoomY = clampStageY(stage, liveCeiling());
+        if (zoomY !== newPos.y) stage.position({ x: newPos.x, y: zoomY });
+        setViewport({ x: newPos.x, y: zoomY, scale: newScale });
         return;
       }
 
@@ -180,7 +183,9 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
       };
 
       stage.position(newPos);
-      setViewport({ x: newPos.x, y: newPos.y });
+      const y = clampStageY(stage, liveCeiling());
+      if (y !== newPos.y) stage.position({ x: newPos.x, y });
+      setViewport({ x: newPos.x, y });
     },
     [setViewport],
   );
@@ -269,6 +274,11 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
 
       stage.scale({ x: newScale, y: newScale });
       stage.position(newPos);
+      const y = clampStageY(stage, liveCeiling());
+      if (y !== newPos.y) {
+        newPos.y = y;
+        stage.position(newPos);
+      }
 
       setViewport({ x: newPos.x, y: newPos.y, scale: newScale });
 
@@ -295,6 +305,17 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
     [setViewport],
   );
 
+  // Live clamp while the stage is being dragged. A post-hoc snap on
+  // dragend would let the camera sail above the ceiling mid-gesture.
+  const dragBoundFunc = useCallback((pos: { x: number; y: number }) => {
+    const stage = stageRef.current;
+    if (!stage) return pos;
+    return {
+      x: pos.x,
+      y: clampStageY({ y: () => pos.y, scaleX: () => stage.scaleX() }, liveCeiling()),
+    };
+  }, []);
+
   // ── Node selection handler (passed to CanvasNode) ─────────
   const handleNodeSelect = useCallback(
     (id: string, additive: boolean) => {
@@ -317,6 +338,11 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
       className={`infinite-canvas ${cursorClass} ${bgColor === 'paper' ? 'infinite-canvas--paper' : ''}`}
       style={{ backgroundColor: bgColor === 'paper' ? '#f5f0e8' : bgColor }}
       data-testid="canvas-container"
+      // Capture-phase native cancel: Konva's Stage onPointerCancel never
+      // sees the event (it remaps cancel → pointerup on a hit, swallows a
+      // miss). Running before Konva means a later synthetic pointerup finds
+      // activePointer already cleared and does not commit a half-stroke.
+      onPointerCancelCapture={isDrawTool ? (e) => handleDrawPointerCancel(e) : undefined}
     >
       {dimensions.width > 0 && dimensions.height > 0 && (
         <Stage
@@ -324,6 +350,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
           width={dimensions.width}
           height={dimensions.height}
           draggable={!isDrawTool}
+          dragBoundFunc={dragBoundFunc}
           onWheel={handleWheel}
           onDragEnd={handleDragEnd}
           onClick={(e) => { closeContextMenu(); handleStageClick(e); }}
@@ -342,7 +369,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
           onTouchEnd={handleTouchEnd}
         >
           <Layer>
-            <PageGuides mode={backgroundMode} nodes={nodes} />
+            <PageGuides mode={backgroundMode} nodes={nodes} scrolls={activeScrolls} />
           </Layer>
           <Layer>
             {/* Shape preview ghost while dragging — uses same coordinate system as ShapeNode */}

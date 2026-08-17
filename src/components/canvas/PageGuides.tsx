@@ -1,5 +1,5 @@
 import { Rect, Line, Group } from 'react-konva';
-import type { BackgroundMode, CanvasNode } from '../../types/data';
+import type { BackgroundMode, CanvasNode, ScrollRecord } from '../../types/data';
 import {
   A4_WIDTH,
   A4_HEIGHT,
@@ -9,6 +9,7 @@ import {
   SCROLL_SEPARATOR_TICK,
   columnAt,
   columnLeft,
+  columnWidth,
 } from '../../utils/pageLayout';
 
 export type { BackgroundMode };
@@ -24,6 +25,7 @@ const GRID_EXTENT = 5000; // how far grid lines extend
 interface PageGuidesProps {
   mode: BackgroundMode;
   nodes: CanvasNode[];
+  scrolls?: ScrollRecord[];
 }
 
 /**
@@ -62,13 +64,14 @@ function getOccupiedPages(nodes: CanvasNode[]): Set<string> {
   return withAdjacent;
 }
 
-function renderPages(nodes: CanvasNode[]) {
+function renderPages(nodes: CanvasNode[], scrolls?: ScrollRecord[]) {
   const occupied = getOccupiedPages(nodes);
   const elements: JSX.Element[] = [];
 
   for (const key of occupied) {
     const [col, row] = key.split(',').map(Number);
-    const x = MARGIN + col * (A4_WIDTH + PAGE_GAP);
+    const x = columnLeft(col, scrolls);
+    const w = columnWidth(col, scrolls);
     const y = row * (A4_HEIGHT + PAGE_GAP);
 
     elements.push(
@@ -76,7 +79,7 @@ function renderPages(nodes: CanvasNode[]) {
         key={`page-bg-${key}`}
         x={x}
         y={y}
-        width={A4_WIDTH}
+        width={w}
         height={A4_HEIGHT}
         fill="#ffffff"
         shadowColor="rgba(0,0,0,0.08)"
@@ -89,10 +92,10 @@ function renderPages(nodes: CanvasNode[]) {
 
     // Dashed border
     const pts = [
-      { id: 'top', points: [x, y, x + A4_WIDTH, y] },
-      { id: 'bottom', points: [x, y + A4_HEIGHT, x + A4_WIDTH, y + A4_HEIGHT] },
+      { id: 'top', points: [x, y, x + w, y] },
+      { id: 'bottom', points: [x, y + A4_HEIGHT, x + w, y + A4_HEIGHT] },
       { id: 'left', points: [x, y, x, y + A4_HEIGHT] },
-      { id: 'right', points: [x + A4_WIDTH, y, x + A4_WIDTH, y + A4_HEIGHT] },
+      { id: 'right', points: [x + w, y, x + w, y + A4_HEIGHT] },
     ];
 
     for (const { id, points } of pts) {
@@ -119,14 +122,14 @@ function renderPages(nodes: CanvasNode[]) {
  * BETWEEN stacked pages, so a multi-column page keeps its existing layout and
  * each column becomes its own scroll.
  */
-function scrollExtent(nodes: CanvasNode[]) {
+function scrollExtent(nodes: CanvasNode[], scrolls?: ScrollRecord[]) {
   const columns = new Set<number>([0]);
   let minY = 0;
   let maxY = 0;
 
   for (const node of nodes) {
-    const colStart = columnAt(node.x);
-    const colEnd = columnAt(node.x + (node.width || 200));
+    const colStart = columnAt(node.x, scrolls);
+    const colEnd = columnAt(node.x + (node.width || 200), scrolls);
     for (let c = colStart; c <= colEnd; c++) columns.add(c);
     minY = Math.min(minY, node.y);
     maxY = Math.max(maxY, node.y + (node.height || 30));
@@ -139,15 +142,16 @@ function scrollExtent(nodes: CanvasNode[]) {
   };
 }
 
-function renderScroll(nodes: CanvasNode[]) {
-  const { columns, firstRow, lastRow } = scrollExtent(nodes);
+function renderScroll(nodes: CanvasNode[], scrolls?: ScrollRecord[]) {
+  const { columns, firstRow, lastRow } = scrollExtent(nodes, scrolls);
   const elements: JSX.Element[] = [];
 
   const top = firstRow * A4_HEIGHT;
   const height = (lastRow - firstRow + 1) * A4_HEIGHT;
 
   for (const col of columns) {
-    const x = columnLeft(col);
+    const x = columnLeft(col, scrolls);
+    const w = columnWidth(col, scrolls);
 
     elements.push(
       <Rect
@@ -155,7 +159,7 @@ function renderScroll(nodes: CanvasNode[]) {
         name="scroll-sheet"
         x={x}
         y={top}
-        width={A4_WIDTH}
+        width={w}
         height={height}
         fill="#ffffff"
         shadowColor="rgba(0,0,0,0.08)"
@@ -170,7 +174,7 @@ function renderScroll(nodes: CanvasNode[]) {
         key={`scroll-border-${col}`}
         x={x}
         y={top}
-        width={A4_WIDTH}
+        width={w}
         height={height}
         stroke="#d4d4d4"
         strokeWidth={0.5}
@@ -186,7 +190,7 @@ function renderScroll(nodes: CanvasNode[]) {
         <Line
           key={`scroll-sep-${col}-${row}`}
           name="scroll-separator"
-          points={[x, y, x + A4_WIDTH, y]}
+          points={[x, y, x + w, y]}
           stroke="#ededed"
           strokeWidth={1}
           listening={false}
@@ -200,7 +204,7 @@ function renderScroll(nodes: CanvasNode[]) {
         />,
         <Line
           key={`scroll-tick-r-${col}-${row}`}
-          points={[x + A4_WIDTH - SCROLL_SEPARATOR_TICK, y, x + A4_WIDTH, y]}
+          points={[x + w - SCROLL_SEPARATOR_TICK, y, x + w, y]}
           stroke="#cfcfcf"
           strokeWidth={1}
           listening={false}
@@ -250,9 +254,9 @@ function renderGrid() {
   return elements;
 }
 
-export function PageGuides({ mode, nodes }: PageGuidesProps) {
+export function PageGuides({ mode, nodes, scrolls }: PageGuidesProps) {
   if (mode === 'none') return null;
   if (mode === 'grid') return <Group listening={false}>{renderGrid()}</Group>;
-  if (mode === 'scroll') return <Group listening={false}>{renderScroll(nodes)}</Group>;
-  return <Group listening={false}>{renderPages(nodes)}</Group>;
+  if (mode === 'scroll') return <Group listening={false}>{renderScroll(nodes, scrolls)}</Group>;
+  return <Group listening={false}>{renderPages(nodes, scrolls)}</Group>;
 }

@@ -107,7 +107,7 @@ export function groupOutline(
   const groups = new Map<number, OutlineGroup>();
 
   for (const entry of entries) {
-    const column = columnAt(entry.x);
+    const column = columnAt(entry.x, scrolls);
     if (!groups.has(column)) {
       const scroll = scrolls?.find((s) => s.column === column);
       groups.set(column, {

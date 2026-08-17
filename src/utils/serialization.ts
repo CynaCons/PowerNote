@@ -86,8 +86,12 @@ export async function buildExportHtml(workspace: WorkspaceData): Promise<string>
 /**
  * Trigger a file download in the browser
  */
-export function downloadFile(content: string, filename: string) {
-  const blob = new Blob([content], { type: 'text/html;charset=utf-8' });
+export function downloadFile(
+  content: string,
+  filename: string,
+  mime: string = 'text/html;charset=utf-8',
+) {
+  const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;

@@ -79,6 +79,8 @@ interface WorkspaceState {
   /** Removes the record; `withBlocks` also deletes the blocks sitting in its band. */
   deleteScroll: (pageId: string, scrollId: string, withBlocks: boolean) => void;
   reorderScroll: (pageId: string, scrollId: string, toIndex: number) => void;
+  /** Replace the page's scroll records (fit-to-content / undo restore). */
+  replacePageScrolls: (pageId: string, scrolls: ScrollRecord[]) => void;
 
   // Reorder
   reorderSection: (fromIndex: number, toIndex: number) => void;
@@ -424,7 +426,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         if (remaining.length === 0) return state;
 
         const keptNodes = withBlocks
-          ? page.nodes.filter((n) => columnAt(n.x) !== target.column)
+          ? page.nodes.filter((n) => columnAt(n.x, page.scrolls) !== target.column)
           : page.nodes;
 
         // Close the gap the removed band leaves, moving the surviving blocks
@@ -444,6 +446,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
           })),
         };
       });
+    },
+
+    replacePageScrolls: (pageId, scrolls) => {
+      set((state) => ({
+        isDirty: true,
+        workspace: mapPage(state.workspace, pageId, (p) => ({ ...p, scrolls })),
+      }));
     },
 
     reorderScroll: (pageId, scrollId, toIndex) => {

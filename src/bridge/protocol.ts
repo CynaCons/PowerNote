@@ -230,7 +230,7 @@ export interface AppendBlockResult {
  * Duplicated from `src/diagram` rather than imported: this module is the wire
  * contract, and the MCP server reads it without pulling in the renderer.
  */
-export type DiagramSourceFormat = 'plantuml' | 'mermaid' | 'svg';
+export type DiagramSourceFormat = 'plantuml' | 'mermaid' | 'svg' | 'drawio';
 
 /** What `create_diagram` drew. Diagnostics travel back with the write, so a
  *  clean diagram costs one round trip and a flawed one still reports why. */
@@ -248,6 +248,13 @@ export interface CreateDiagramResult {
   width: number;
   height: number;
   diagnostics: { line: number; severity: 'error' | 'ignored'; message: string }[];
+  /**
+   * Geometric placement notes (v0.51). Empty when the diagram was not
+   * scaled. A floor-scale fit names the scroll, the requested width and
+   * the applied scale, riding the v0.34 "warnings in the same response"
+   * contract so the agent does not need a second call.
+   */
+  warnings: string[];
 }
 
 export interface UpdateBlockResult {

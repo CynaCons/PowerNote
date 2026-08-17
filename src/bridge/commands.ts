@@ -24,9 +24,8 @@ import { useCanvasStore } from '../stores/useCanvasStore';
 import { useDrawStore } from '../stores/useDrawStore';
 import { createBlockNode, blockHeight, columnOf, orderedTextNodes, nextBlockY } from './blocks';
 import { columnX } from './blocks';
-import { rebuildDiagram, FRAME_MIN_W, FRAME_MIN_H } from '../diagram/canvasOps';
-import { sniffFormat } from '../diagram';
-import { generateId } from '../utils/ids';
+import { placeDiagramOnCanvas } from '../diagram/canvasOps';
+import { sniffFormat, normalizeDrawioSource } from '../diagram';
 import { A4_WIDTH } from '../utils/pageLayout';
 import { scrollById } from '../utils/scrolls';
 import type {
@@ -284,7 +283,7 @@ async function createPage(params: Record<string, unknown>): Promise<CreatePageRe
   if (withHeading) {
     // Put the title on the canvas too, not just in the sidebar, so the page
     // reads as a titled note.
-    const node = createBlockNode(`# ${title}`, useCanvasStore.getState().nodes, column);
+    const node = createBlockNode(`# ${title}`, useCanvasStore.getState().nodes, column, page.scrolls);
     useCanvasStore.getState().addNode(node);
     headingBlockId = node.id;
   }
@@ -301,7 +300,7 @@ async function appendBlock(params: Record<string, unknown>): Promise<AppendBlock
 
   navigateToPage(section.id, page.id);
 
-  const node = createBlockNode(markdown, useCanvasStore.getState().nodes, column);
+  const node = createBlockNode(markdown, useCanvasStore.getState().nodes, column, page.scrolls);
   useCanvasStore.getState().addNode(node);
   flush();
 
@@ -937,7 +936,7 @@ async function runUpdate(params: Record<string, unknown>): Promise<RunUpdateResu
 type Handler = (params: Record<string, unknown>) => unknown | Promise<unknown>;
 
 
-const DIAGRAM_FORMATS: DiagramSourceFormat[] = ['plantuml', 'mermaid', 'svg'];
+const DIAGRAM_FORMATS: DiagramSourceFormat[] = ['plantuml', 'mermaid', 'svg', 'drawio'];
 
 /**
  * Draws a diagram onto the page as a native diagram node.
@@ -967,6 +966,11 @@ async function createDiagram(params: Record<string, unknown>): Promise<CreateDia
     );
   }
   const format = declared as DiagramSourceFormat | undefined;
+  const sniffed = sniffFormat(source);
+  // Stored source is always readable XML: inflate before build and before
+  // writing data.source, so the redraw dialog never shows a base64 blob.
+  const text =
+    format === 'drawio' || sniffed === 'drawio' ? await normalizeDrawioSource(source) : source;
   const { section, page } = resolvePage(optionalString(params, 'pageId'));
   const column = resolveColumn(params, page);
 
@@ -974,46 +978,33 @@ async function createDiagram(params: Record<string, unknown>): Promise<CreateDia
 
   // Placed below whatever is already in that column, like an appended block.
   const nodes = useCanvasStore.getState().nodes;
-  const frameId = generateId();
-  const frame: CanvasNode = {
-    id: frameId,
-    type: 'diagram',
-    x: columnX(column),
-    y: nextBlockY(nodes, column),
-    width: FRAME_MIN_W,
-    height: FRAME_MIN_H,
-    layer: 2,
-    groupId: frameId,
-    data: { source, title },
-  };
-
-  const built = rebuildDiagram(frame, source, format);
-  if (built.contents.length === 0) {
+  const placed = placeDiagramOnCanvas({
+    x: columnX(column, page.scrolls),
+    y: nextBlockY(nodes, column, page.scrolls),
+    source: text,
+    title,
+    format,
+  });
+  if (!placed.placed) {
     throw new BridgeCommandError(
       'PRECONDITION',
-      `Nothing in that source could be drawn. ${built.diagnostics.map((d) => d.message).join(' ')}`.trim(),
+      `Nothing in that source could be drawn. ${placed.diagnostics.map((d) => d.message).join(' ')}`.trim(),
     );
   }
-
-  useCanvasStore.getState().addNode(frame);
-  for (const content of built.contents) useCanvasStore.getState().addNode(content);
-  useCanvasStore.getState().updateNode(frameId, {
-    width: built.frame.width,
-    height: built.frame.height,
-  });
   flush();
 
   return {
     sectionId: section.id,
     pageId: page.id,
-    diagramId: frameId,
+    diagramId: placed.frameId,
     title,
-    format: format ?? sniffFormat(source),
+    format: format ?? sniffFormat(text),
     column,
-    elementCount: built.contents.length,
-    width: built.frame.width,
-    height: built.frame.height,
-    diagnostics: built.diagnostics,
+    elementCount: placed.elementCount,
+    width: placed.width,
+    height: placed.height,
+    diagnostics: placed.diagnostics,
+    warnings: placed.warning ? [placed.warning] : [],
   };
 }
 

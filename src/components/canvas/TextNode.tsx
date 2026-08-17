@@ -15,7 +15,7 @@ import {
   MAX_TEXT_WIDTH,
   MIN_TEXT_HEIGHT,
   columnLeft,
-  A4_WIDTH,
+  columnWidth,
 } from '../../utils/pageLayout';
 import { multiDragStart, multiDragMove, multiDragEnd } from '../../utils/multiDrag';
 import { TextEditor } from './TextEditor';
@@ -144,11 +144,12 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
     // up with the scroll band it is being dragged in.
     if (!e.evt.shiftKey) {
       const page = useWorkspaceStore.getState().getActivePage();
+      const scrolls = page?.scrolls;
       const snap = calculateScrollSnap(
         { x: e.target.x(), y: e.target.y(), width: node.width },
-        columnLeft,
-        A4_WIDTH,
-        page?.scrolls?.length ?? 0,
+        (c) => columnLeft(c, scrolls),
+        (c) => columnWidth(c, scrolls),
+        scrolls?.length ?? 0,
       );
       onSnapChange(snap.line ? [snap.line] : []);
       if (snap.line) {

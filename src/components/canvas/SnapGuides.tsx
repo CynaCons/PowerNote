@@ -176,18 +176,19 @@ export const SCROLL_SNAP_THRESHOLD = 14;
 export function calculateScrollSnap(
   dragged: { x: number; y: number; width: number },
   columnLeftOf: (column: number) => number,
-  columnWidth: number,
+  columnWidth: number | ((column: number) => number),
   columnCount: number,
   threshold = SCROLL_SNAP_THRESHOLD,
 ): { x: number; line: SnapLine | null } {
   if (threshold <= 0 || columnCount <= 0) return { x: dragged.x, line: null };
 
   const width = Math.abs(dragged.width);
+  const widthOf = typeof columnWidth === 'function' ? columnWidth : () => columnWidth;
   let best: { x: number; at: number } | null = null;
 
   for (let column = 0; column < columnCount; column += 1) {
     const left = columnLeftOf(column);
-    const right = left + columnWidth;
+    const right = left + widthOf(column);
 
     const leftGap = Math.abs(dragged.x - left);
     if (leftGap <= threshold && (!best || leftGap < Math.abs(best.x - dragged.x))) {

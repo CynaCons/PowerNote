@@ -4,7 +4,8 @@ import { useCanvasStore, undoBatchStart } from '../stores/useCanvasStore';
 import { useToolStore } from '../stores/useToolStore';
 import { generateId } from '../utils/ids';
 import { DEFAULT_TEXT_WIDTH } from '../utils/pageLayout';
-import { rebuildDiagram, STARTER_DIAGRAM, FRAME_MIN_W, FRAME_MIN_H } from '../diagram/canvasOps';
+import { clampCanvasY, liveCeiling } from '../utils/scrollCeiling';
+import { applyDiagramScrollFit, rebuildDiagram, STARTER_DIAGRAM, FRAME_MIN_W, FRAME_MIN_H } from '../diagram/canvasOps';
 import type { CanvasNode as CanvasNodeType } from '../types/data';
 
 // Track the most recently placed node so it auto-enters edit mode
@@ -52,7 +53,7 @@ export function useTextPlacement(
 
         const scale = stage.scaleX();
         const stageX = (pointer.x - stage.x()) / scale;
-        const stageY = (pointer.y - stage.y()) / scale;
+        const stageY = clampCanvasY((pointer.y - stage.y()) / scale, liveCeiling());
 
         const newNode: CanvasNodeType = {
           id: generateId(),
@@ -82,7 +83,7 @@ export function useTextPlacement(
         if (!pointer) return;
         const scale = stage.scaleX();
         const stageX = (pointer.x - stage.x()) / scale;
-        const stageY = (pointer.y - stage.y()) / scale;
+        const stageY = clampCanvasY((pointer.y - stage.y()) / scale, liveCeiling());
         // Sample chart so the user sees a populated Gantt immediately.
         const sampleDoc = {
           schemaVersion: 1,
@@ -123,7 +124,7 @@ export function useTextPlacement(
         if (!pointer) return;
         const scale = stage.scaleX();
         const stageX = (pointer.x - stage.x()) / scale;
-        const stageY = (pointer.y - stage.y()) / scale;
+        const stageY = clampCanvasY((pointer.y - stage.y()) / scale, liveCeiling());
 
         // The frame is its own group, so its generated contents (which carry the
         // same groupId) drag along with it through the existing group machinery.
@@ -146,7 +147,7 @@ export function useTextPlacement(
 
         // Draw it immediately, so placing the tool yields a real diagram rather
         // than an empty box the user has to go and fill in.
-        const built = rebuildDiagram(frame, STARTER_DIAGRAM);
+        const built = applyDiagramScrollFit(frame, rebuildDiagram(frame, STARTER_DIAGRAM));
         if (built.contents.length > 0) {
           for (const content of built.contents) useCanvasStore.getState().addNode(content);
           useCanvasStore.getState().updateNode(frameId, {

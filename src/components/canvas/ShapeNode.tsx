@@ -10,7 +10,7 @@ import { isNodeInteractive } from '../../utils/toolConfig';
 import { generateId } from '../../utils/ids';
 import { multiDragStart, multiDragMove, multiDragEnd } from '../../utils/multiDrag';
 import { calculateSnap, calculateScrollSnap, type SnapLine } from './SnapGuides';
-import { columnLeft, A4_WIDTH } from '../../utils/pageLayout';
+import { columnLeft, columnWidth } from '../../utils/pageLayout';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 
 interface ShapeNodeProps {
@@ -47,12 +47,12 @@ export function ShapeNode({ node, isSelected, onSelect, stageScale, onSnapChange
       // Ungated magnet to the scroll band's edges. Shift-snapping to other
       // nodes is the deliberate act; lining up with your column is not.
       const page = useWorkspaceStore.getState().getActivePage();
-      const columns = page?.scrolls?.length ?? 0;
+      const scrolls = page?.scrolls;
       const snap = calculateScrollSnap(
         { x: e.target.x(), y: e.target.y(), width: node.width },
-        columnLeft,
-        A4_WIDTH,
-        columns,
+        (c) => columnLeft(c, scrolls),
+        (c) => columnWidth(c, scrolls),
+        scrolls?.length ?? 0,
       );
       onSnapChange(snap.line ? [snap.line] : []);
       if (snap.line) {

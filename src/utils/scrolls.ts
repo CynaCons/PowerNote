@@ -12,10 +12,10 @@ import { columnAt, columnLeft } from './pageLayout';
 import { generateId } from './ids';
 
 /** Column bands that currently hold at least one node, ascending. */
-export function columnsInUse(nodes: CanvasNode[]): number[] {
+export function columnsInUse(nodes: CanvasNode[], scrolls?: ScrollRecord[]): number[] {
   const columns = new Set<number>();
   for (const node of nodes) {
-    columns.add(columnAt(node.x));
+    columns.add(columnAt(node.x, scrolls));
   }
   return [...columns].sort((a, b) => a - b);
 }
@@ -26,13 +26,13 @@ export function scrollOf(
   scrolls: ScrollRecord[] | undefined,
 ): ScrollRecord | undefined {
   if (!scrolls) return undefined;
-  const column = columnAt(node.x);
+  const column = columnAt(node.x, scrolls);
   return scrolls.find((s) => s.column === column);
 }
 
 /** Nodes belonging to a scroll, by band containment. */
-export function nodesInScroll(nodes: CanvasNode[], scroll: ScrollRecord): CanvasNode[] {
-  return nodes.filter((n) => columnAt(n.x) === scroll.column);
+export function nodesInScroll(nodes: CanvasNode[], scroll: ScrollRecord, scrolls?: ScrollRecord[]): CanvasNode[] {
+  return nodes.filter((n) => columnAt(n.x, scrolls ?? [scroll]) === scroll.column);
 }
 
 export function scrollById(
@@ -84,10 +84,11 @@ export function shiftNodesBetweenColumns(
   nodes: CanvasNode[],
   column: number,
   toColumn: number,
+  scrolls?: ScrollRecord[],
 ): CanvasNode[] {
   if (column === toColumn) return nodes;
-  const delta = columnLeft(toColumn) - columnLeft(column);
-  return nodes.map((n) => (columnAt(n.x) === column ? { ...n, x: n.x + delta } : n));
+  const delta = columnLeft(toColumn, scrolls) - columnLeft(column, scrolls);
+  return nodes.map((n) => (columnAt(n.x, scrolls) === column ? { ...n, x: n.x + delta } : n));
 }
 
 /**
@@ -107,18 +108,19 @@ export function compactColumns(
   // as it stands now. Rewriting x as we go would make later nodes resolve
   // against already-moved neighbours and shift twice.
   const targetOf = new Map(ordered.map((s, index) => [s.column, index]));
+  const next = ordered.map((s, index) => (s.column === index ? s : { ...s, column: index }));
 
   const movedNodes = nodes.map((node) => {
-    const from = columnAt(node.x);
+    const from = columnAt(node.x, ordered);
     const to = targetOf.get(from);
     // Nodes outside every record's band (dragged off to the side) stay put —
     // moving them would be a surprise edit the user never asked for.
     if (to === undefined || to === from) return node;
-    return { ...node, x: node.x + (columnLeft(to) - columnLeft(from)) };
+    return { ...node, x: node.x + (columnLeft(to, next) - columnLeft(from, ordered)) };
   });
 
   return {
-    scrolls: ordered.map((s, index) => (s.column === index ? s : { ...s, column: index })),
+    scrolls: next,
     nodes: movedNodes,
   };
 }

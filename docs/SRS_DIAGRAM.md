@@ -1,8 +1,8 @@
 # SRS: Diagrams
 
 **Project:** PowerNote
-**Version:** 0.35.2
-**Date:** 2026-08-13
+**Version:** 0.51.0
+**Date:** 2026-08-17
 
 ## Purpose
 
@@ -17,12 +17,17 @@ Because the output is ordinary canvas objects, the user can drag, restyle and de
 This document specifies more than has shipped. Requirements are written ahead of
 implementation on purpose, but the difference matters when reading it:
 
-| Area | State as of v0.35.2 |
+| Area | State as of v0.51.0 |
 |------|---------------------|
 | Diagram node, PlantUML parsing, layout, materialize | Shipped — REQ-DIAG-001, 006, 010..014, 017, 040..046, 050..067, 070..076 |
 | Activity and swimlane grammar | Shipped — REQ-DIAG-070..076 |
 | Mermaid flowchart and sequence subset | Shipped — REQ-DIAG-090..099 |
-| Agent authoring over the bridge | Shipped — `create_diagram_plantuml`, `create_diagram_mermaid` |
+| Agent authoring over the bridge | Shipped — `create_diagram_plantuml`, `create_diagram_mermaid`, `create_diagram_svg`, `create_diagram_drawio` |
+| draw.io vertices, sniff, compression | Shipped — REQ-DIAG-110..119 |
+| draw.io edges and `create_diagram_drawio` | Shipped — REQ-DIAG-120..126 |
+| File ingestion (drop/paste of drawio + svg) | Shipped — REQ-DIAG-127..129 |
+| draw.io round-trip export | Shipped — REQ-DIAG-130..135 |
+| Fit diagram to the scroll it lands in | Shipped — REQ-DIAG-136..139 |
 | Frame reflow and document flow (REQ-DIAG-002..005) | **Not built.** Diagrams sit on the canvas; blocks below a frame do not move when it resizes |
 | Pin loop (REQ-DIAG-020..023) | **Not built, and descoped 2026-08-13.** Redrawing replaces every content node, so a manual nudge is lost on the next redraw |
 | Geometric warnings (REQ-DIAG-016) | **Partial.** Parse diagnostics ship; overlap, crossing and density checks do not |
@@ -152,6 +157,93 @@ the contract is inverted, and the tool is named separately to keep that honest.
 | REQ-DIAG-088 | A `rotate()` transform shall be refused, because the native rotation turns about the element's own corner rather than the user-space origin and would move the drawing | Must | T130 |
 | REQ-DIAG-089 | Malformed SVG, empty input, and a missing `DOMParser` shall each produce diagnostics rather than throwing | Must | T130 |
 
+### draw.io transpile (v0.46)
+
+draw.io is the other geometry-is-the-source format, next to SVG. A `.drawio`
+file already has every coordinate; the app maps a documented subset onto native
+nodes and refuses the rest by name — a cloud stencil standing in as a rectangle
+is a lie that survives every later edit.
+
+| ID | Description | Priority | Test Ref |
+|----|-------------|----------|----------|
+| REQ-DIAG-110 | `<mxfile>` and a bare `<mxGraphModel>` shall be classified as draw.io. An `<svg>` source, including one that opens with `<?xml …>`, shall still be classified as SVG — mxGraph files also start with `<?xml`, so the draw.io test shall run first | Must | T146 |
+| REQ-DIAG-111 | A rectangle (including `rounded=1`, which shall set a corner radius), an ellipse (as a circle sized to the cell), a rhombus (as a rectangle rotated 45° whose side is min(width, height)/√2 so the diamond fits the cell), a triangle, a standalone text cell (as a TextNode) and a label on a vertex (as a TextNode centred in the cell) shall map to native nodes | Must | T146 |
+| REQ-DIAG-112 | `fillColor`, `strokeColor`, `strokeWidth`, `dashed=1` and `dashPattern` shall map to fill, stroke, strokeWidth and strokeDash. When those keys are absent the documented defaults shall be used, not left undefined | Must | T146 |
+| REQ-DIAG-113 | A child cell's position shall be the parent cell's position plus the child's own offset. `relative="1"` shall treat the child's x and y as fractions of the parent's width and height | Must | T146 |
+| REQ-DIAG-114 | A swimlane shall become a rectangle plus a title TextNode; its children shall land as flat siblings; every node of the drawing shall share the groupId the caller passed | Must | T146 |
+| REQ-DIAG-115 | A custom stencil (`shape=` outside the documented set), an image cell, `gradientColor`, rotation on an ellipse, and a rich-HTML label shall each be refused with a diagnostic naming the construct. The transpiler shall never throw, and cells that were not refused shall still be emitted | Must | T146 |
+| REQ-DIAG-116 | A multi-page mxfile shall import the first page. An `ignored` diagnostic shall name the title of each page that was not imported | Must | T146 |
+| REQ-DIAG-117 | A straight edge between two vertices with `endArrow` other than `none` shall be emitted as an `arrow` ShapeNode whose (x, y) is the start point and whose width/height is the signed vector to the end. Terminals that reference source/target cells shall connect border-to-border (the centre-to-centre segment clipped at each cell's bounding box). `endArrow=none` shall emit a `line`. The v0.46 deferral diagnostic shall not appear | Must | T146 |
+| REQ-DIAG-118 | A page stored as base64+raw-deflate shall normalize to readable XML that transpiles to the same marks as the uncompressed form. An already-uncompressed source shall be returned unchanged | Must | T146 |
+| REQ-DIAG-119 | `buildDiagram` with format `drawio` shall return native nodes and their bounds, skipping measure and layout, because the source already is geometry | Must | T146 |
+
+### draw.io edges and the agent tool (v0.47)
+
+v0.46 mapped vertices. Edges were the half that would have lied if they had
+been approximated: a straightened curve is not the drawing, and a router-bent
+orthogonal whose bends live in draw.io rather than in the file is not either.
+This slice takes the subset that *is* geometry — straight, or waypointed into
+straight segments — and refuses the rest by name. The agent-facing tool is the
+other half: `create_diagram_drawio` routes onto the one `create_diagram`
+command, and a compressed page is inflated *before* it is stored so the redraw
+dialog never shows a base64 blob.
+
+| ID | Description | Priority | Test Ref |
+|----|-------------|----------|----------|
+| REQ-DIAG-120 | A connected straight edge shall clip at each vertex's bounding box (border-to-border, never centre-to-centre). `endArrow` other than `none` shall emit an `arrow`; `endArrow=none` shall emit a `line`. `dashed`, `strokeColor` and `strokeWidth` shall map on edges as they do on vertices. Floating terminals — explicit `mxPoint`s and no source/target cells — shall be used as given | Must | T147 |
+| REQ-DIAG-121 | An orthogonal edge carrying explicit `mxPoint` waypoints shall decompose into consecutive 2-point `line`/`arrow` segments. Only the final segment shall carry the arrowhead. An edge label — the edge's own `value`, or a child label cell when the edge has none — shall land as a TextNode at the midpoint of the longest segment | Must | T147 |
+| REQ-DIAG-122 | A `startArrow` of `classic` is accepted only when `endArrow` is `none`: the point list shall be reversed so the single available head sits at the source. `startArrow=classic` together with any end head shall be refused (the canvas has no double-headed primitive). Any other start head (`diamond`, and the rest by name) shall be refused | Must | T147 |
+| REQ-DIAG-123 | `curved=1` shall be refused. `rounded=1` on a waypointed edge shall be refused (filleted corners have no canvas equivalent). A router `edgeStyle` without explicit waypoints shall be refused, and the diagnostic shall say to make the waypoints explicit. Each refusal shall name the construct; the transpiler shall never throw; cells that were not refused shall still be emitted. `rounded=1` on a 2-point edge shall be accepted as a no-op | Must | T147 |
+| REQ-DIAG-124 | `create_diagram` with `format: 'drawio'` shall draw a diagram frame whose members are the transpiled native nodes, whose `elementCount` matches the member count, and whose `data.source` is the supplied XML. The agent-facing tool is `create_diagram_drawio`, routed onto that one command | Must | T147 |
+| REQ-DIAG-125 | A compressed (base64+raw-deflate) source passed to `create_diagram` shall succeed, and the stored `data.source` shall be the readable uncompressed XML (opening with `<mxfile` or `<mxGraphModel`), never the base64 payload. Normalization shall run before the source is stored | Must | T147 |
+| REQ-DIAG-126 | A declared `format: 'drawio'` contradicted by a source that sniffs as Mermaid shall be refused with the mismatch error, naming the language the source is actually in — the same contract as the other named tools | Must | T147 |
+
+### File ingestion (v0.48)
+
+Drop and paste are how a *file* lands on the canvas. The agent already had
+`create_diagram`; this slice is the OS path. The gate sits **ahead of** the
+existing `image/*` check in `useCanvasDragDrop`, because that check was eating
+real `.svg` files (`image/svg+xml`) and rasterising them.
+
+| ID | Description | Priority | Test Ref |
+|----|-------------|----------|----------|
+| REQ-DIAG-127 | Dropping a `.drawio` file, or an `.xml` file whose text sniffs as mxGraph, shall create a diagram frame at the drop point (canvas coordinates). Pasting mxGraph XML text shall create a frame at the viewport centre. The stored `data.source` shall be the readable uncompressed XML — `normalizeDrawioSource` runs before the source is stored, same contract as REQ-DIAG-125. The frame title is the filename without its extension (paste uses `Diagram`) | Must | T148 |
+| REQ-DIAG-128 | Dropping a `.svg` file (or a file whose MIME is `image/svg+xml`) shall create a diagram frame of native shape/text members via the existing SVG pipeline (`format: 'svg'`), not an image node. This is a deliberate behaviour change: those files previously matched `image/*` and landed as an opaque raster. Pasted SVG *text* follows the same native-node path; a pasted `image/*` item, including a rasterised SVG, is unchanged | Must | T148 |
+| REQ-DIAG-129 | Non-diagram files (a `.png` among them) shall still follow the existing image drop/paste path. The on-frame format badge shall show the human label from `FORMAT_LABEL` (`draw.io`, not the raw id `drawio`), and that label shall agree with the selection-toolbar source button | Must | T148 |
+
+### draw.io round-trip export (v0.49)
+
+Diagrams leave the way they came. A `.drawio` import that the user has not
+edited is written back byte-for-byte; anything else — an edited import, a
+PlantUML/Mermaid/SVG frame, a plain Ctrl+G group — is reverse-mapped into a
+well-formed mxfile that our own transpiler accepts. Detection of "unedited"
+is by comparing a re-transpile of the stored source to the current members,
+not a dirty flag.
+
+| ID | Description | Priority | Test Ref |
+|----|-------------|----------|----------|
+| REQ-DIAG-130 | A diagram frame whose stored source sniffs as draw.io, and whose current members match a re-transpile of that source (same count, geometry within 0.5 px, same fills and strokes), shall export the stored XML unchanged. The match is a comparison, not a dirty flag — moving a member and moving it back shall restore the verbatim path | Must | T149 |
+| REQ-DIAG-131 | Any other diagram frame or flat group shall export by reverse-mapping its members to a well-formed `<mxfile><diagram><mxGraphModel>` document. Geometry shall be translated so the export origin is (0, 0). Lines and arrows shall become floating edges (explicit endpoint `mxPoint`s; no source/target resolution). Re-transpiling the exported XML shall recover the same node set (count, geometry ±0.5 px, fills) | Must | T149 |
+| REQ-DIAG-132 | Style shall survive the mapped path: `cornerRadius` shall become `rounded=1` plus `arcSize`; a non-empty `strokeDash` shall become `dashed=1` plus `dashPattern`; `rotation` on a rectangle shall be preserved through export then import | Must | T149 |
+| REQ-DIAG-133 | An `arc` (the UML socket) has no portable draw.io built-in (`shape=arc` / `mxgraph.basic.arc` only render when the matching stencil library is loaded). It shall be exported as an `ellipse` with `fillColor=none` and named in the export report. The exporter shall never throw | Must | T149 |
+| REQ-DIAG-134 | The diagram frame's context menu shall offer "Export as .drawio". The same entry shall be offered when the menu target is a member of a plain group, and shall export that group. The file shall download as `<title>.drawio` via the existing anchor/Blob mechanism | Must | T149 |
+| REQ-DIAG-135 | If the export produced a report (anything not exported faithfully), the report shall be surfaced with the existing toast at info severity, joined. A faithful export shall not toast | Must | T149 |
+
+### Fit to the landing scroll (v0.51)
+
+A diagram created into a scroll band must not keep a layout width that spills
+into the neighbouring band — derived membership would then make members
+half-belong to the wrong column. The fit is a placement-time transform: it
+never runs inside the layout engine, is stored on no node field, and is not
+re-applied when the user later moves or resizes the frame.
+
+| ID | Description | Priority | Test Ref |
+|----|-------------|----------|----------|
+| REQ-DIAG-136 | When a diagram is created into or pasted/dropped at a position whose origin falls in a scroll band, and the materialized frame width exceeds that band's width minus padding, the members and frame size shall be scaled about the frame origin (positions, widths, heights, fontSize; strokeWidth unchanged) so the diagram fits. Scale is clamped to `[0.45, 1]` | Must | T151 |
+| REQ-DIAG-137 | If the scale needed to fit is below 0.45, the diagram shall be placed at 0.45× and the write response shall carry a warning naming the scroll, the requested (unfitted) width and the applied scale. Any scale strictly below 1 shall produce a warning naming the scroll and the scale. The warning joins the existing `warnings` array on `create_diagram` (v0.34 same-response contract) and the drop/paste toast | Must | T151 |
+| REQ-DIAG-138 | A diagram whose frame origin does not fall inside any scroll record shall be left unscaled, with no warning | Must | T151 |
+| REQ-DIAG-139 | Redrawing a frame (`rebuildDiagram` via the source dialog) shall apply the same fit against the band the frame currently sits in | Must | T151 |
+
 ### Activity and swimlane diagrams (v0.35.1)
 
 PlantUML's activity syntax is a separate grammar from the component one, so it
@@ -268,6 +360,11 @@ Two additions to `ShapeNodeData` are required before the notation above can be r
 | T118 | REQ-DIAG-053, 057..063 |
 | T119 | REQ-DIAG-065..067 |
 | T130 | REQ-DIAG-080..089 |
+| T146 | REQ-DIAG-110..119 |
+| T147 | REQ-DIAG-120..126 |
+| T148 | REQ-DIAG-127..129 |
+| T149 | REQ-DIAG-130..135 |
+| T151 | REQ-DIAG-136..139 |
 | T125 | REQ-DIAG-070..076 |
 | T126 | REQ-DIAG-090..098 |
 | test:bridge | REQ-DIAG-099 |

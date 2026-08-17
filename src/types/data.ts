@@ -60,13 +60,14 @@ export interface GanttNodeData {
 /**
  * A diagram frame (v0.34+) — a first-class canvas object, like an image.
  *
- * The node owns the PlantUML source; the marks it generates are ordinary shape
- * and text nodes carrying `groupId === <this node's id>`. So the frame is what
- * you select, move and delete, and its contents stay individually editable
- * underneath. Membership is derived from groupId, never stored.
+ * The node owns the source in whichever language built it (PlantUML, Mermaid,
+ * SVG or draw.io); the marks it generates are ordinary shape and text nodes
+ * carrying `groupId === <this node's id>`. So the frame is what you select,
+ * move and delete, and its contents stay individually editable underneath.
+ * Membership is derived from groupId, never stored.
  */
 export interface DiagramNodeData {
-  /** PlantUML text this diagram was built from. */
+  /** Source text this diagram was built from — PlantUML, Mermaid, SVG or draw.io. */
   source: string;
   /** Title shown on the frame band. */
   title: string;
@@ -150,6 +151,11 @@ export interface ScrollRecord {
   title: string;
   /** Band index. 0 is the leftmost scroll. */
   column: number;
+  /**
+   * Band width in canvas px. Absent means A4_WIDTH.
+   * Written only by the explicit "Fit scroll to content" action — never derived.
+   */
+  width?: number;
 }
 
 export interface Page {

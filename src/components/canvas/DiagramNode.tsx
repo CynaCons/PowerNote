@@ -45,6 +45,7 @@ export function DiagramNode({ node, isSelected, onSelect, stageScale, onSnapChan
   // paste a different language over the old one, so a remembered format would
   // go stale the moment it mattered.
   const format = sniffFormat(data.source ?? '');
+  const formatLabel = FORMAT_LABEL[format];
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
@@ -114,20 +115,20 @@ export function DiagramNode({ node, isSelected, onSelect, stageScale, onSnapChan
         {isInteractive && (
           <Html
             divProps={{ style: { pointerEvents: 'auto' } }}
-            groupProps={{ x: node.width - (format.length * 7 + 30), y: 7 }}
+            groupProps={{ x: node.width - (formatLabel.length * 7 + 30), y: 7 }}
           >
             <button
               type="button"
               className="diagram-node__src"
               data-testid={`diagram-source-btn-${node.id}`}
               data-format={format}
-              title={`Show the ${FORMAT_LABEL[format]} this diagram was built from`}
+              title={`Show the ${formatLabel} this diagram was built from`}
               onClick={(e) => {
                 e.stopPropagation();
                 useDiagramStore.getState().openSource(node.id);
               }}
             >
-              {format}
+              {formatLabel}
             </button>
           </Html>
         )}

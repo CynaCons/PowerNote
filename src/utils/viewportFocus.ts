@@ -11,7 +11,8 @@
  */
 
 import { useCanvasStore } from '../stores/useCanvasStore';
-import { A4_WIDTH, columnLeft } from './pageLayout';
+import { useWorkspaceStore } from '../stores/useWorkspaceStore';
+import { A4_WIDTH, columnLeft, columnWidth } from './pageLayout';
 
 /** Where a jumped-to heading lands, measured from the top of the viewport. */
 export const HEADING_INSET = 96;
@@ -27,12 +28,12 @@ function canvasWidth(): number {
 /**
  * Centre a canvas column horizontally and place `y` at `inset` from the top.
  */
-function focus(x: number, y: number, inset: number): void {
+function focus(x: number, y: number, inset: number, width = A4_WIDTH): void {
   const { viewport, setViewport } = useCanvasStore.getState();
   const scale = viewport.scale;
 
   setViewport({
-    x: canvasWidth() / 2 - (x + A4_WIDTH / 2) * scale,
+    x: canvasWidth() / 2 - (x + width / 2) * scale,
     y: inset - y * scale,
     scale,
   });
@@ -40,7 +41,8 @@ function focus(x: number, y: number, inset: number): void {
 
 /** Bring the top of a scroll's column into view. */
 export function focusScrollStart(column: number): void {
-  focus(columnLeft(column), 0, SCROLL_TOP_INSET);
+  const scrolls = useWorkspaceStore.getState().getActivePage()?.scrolls;
+  focus(columnLeft(column, scrolls), 0, SCROLL_TOP_INSET, columnWidth(column, scrolls));
 }
 
 /** Bring a heading into view, near the top of the canvas. */

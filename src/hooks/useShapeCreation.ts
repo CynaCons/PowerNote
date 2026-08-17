@@ -4,6 +4,7 @@ import { useCanvasStore } from '../stores/useCanvasStore';
 import { useToolStore } from '../stores/useToolStore';
 import { useDrawStore } from '../stores/useDrawStore';
 import { generateId } from '../utils/ids';
+import { clampCanvasY, clampStageY, liveCeiling } from '../utils/scrollCeiling';
 import type { Stroke } from '../types/data';
 
 export interface ShapePreview {
@@ -69,7 +70,7 @@ export function useShapeCreation(
     if (!pos) return { x: 0, y: 0 };
     return {
       x: (pos.x - stage.x()) / stage.scaleX(),
-      y: (pos.y - stage.y()) / stage.scaleY(),
+      y: clampCanvasY((pos.y - stage.y()) / stage.scaleY(), liveCeiling()),
     };
   }, [stageRef]);
 
@@ -80,7 +81,7 @@ export function useShapeCreation(
     const rect = stage.container().getBoundingClientRect();
     return {
       x: (clientX - rect.left - stage.x()) / stage.scaleX(),
-      y: (clientY - rect.top - stage.y()) / stage.scaleY(),
+      y: clampCanvasY((clientY - rect.top - stage.y()) / stage.scaleY(), liveCeiling()),
     };
   }, [stageRef]);
 
@@ -413,6 +414,8 @@ export function useShapeCreation(
       const dy = evt.clientY - panLast.current.y;
       panLast.current = { x: evt.clientX, y: evt.clientY };
       stage.position({ x: stage.x() + dx, y: stage.y() + dy });
+      const y = clampStageY(stage, liveCeiling());
+      if (y !== stage.y()) stage.position({ x: stage.x(), y });
       useCanvasStore.getState().setViewport({ x: stage.x(), y: stage.y() });
       return;
     }
@@ -621,9 +624,26 @@ export function useShapeCreation(
     if (evt.pointerType === 'touch') setPenCursorPos(null);
   }, [lassoRect, shapePreview]);
 
-  const handleDrawPointerCancel = useCallback(() => {
-    cancelInProgress();
-  }, [cancelInProgress]);
+  /**
+   * Discard the owning pointer's in-progress gesture.
+   *
+   * Konva remaps native `pointercancel` to a synthetic `pointerup` on a
+   * captured shape, and swallows it entirely when hit-testing misses (empty
+   * canvas). The Stage `onPointerCancel` therefore never runs. Callers must
+   * attach this to a native listener (capture phase on the canvas container)
+   * so a cancelled stylus does not leave `activePointer` stuck.
+   *
+   * A cancel for a pointer that does not own the gesture is ignored — a
+   * second stylus cancelling must not wipe the first stroke.
+   */
+  const handleDrawPointerCancel = useCallback(
+    (e?: { pointerId?: number; evt?: { pointerId?: number } }) => {
+      const id = e?.evt?.pointerId ?? e?.pointerId;
+      if (id != null && activePointer.current && id !== activePointer.current.id) return;
+      cancelInProgress();
+    },
+    [cancelInProgress],
+  );
 
   return {
     // State

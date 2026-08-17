@@ -33,9 +33,37 @@ export const SCROLL_SEPARATOR_TICK = 12;
  */
 export const SCROLL_HEADER_HEIGHT = 40;
 
+/** A scroll record's width contribution to the band test. */
+export interface BandWidthSource {
+  column: number;
+  width?: number;
+}
+
+function hasCustomBandWidths(scrolls?: readonly BandWidthSource[]): boolean {
+  return !!scrolls?.some((s) => typeof s.width === 'number' && s.width > 0 && s.width !== A4_WIDTH);
+}
+
+/** Width of a column band. Absent / default records are one A4 sheet. */
+export function columnWidth(column: number, scrolls?: readonly BandWidthSource[]): number {
+  if (!scrolls) return A4_WIDTH;
+  const record = scrolls.find((s) => s.column === column);
+  return record?.width && record.width > 0 ? record.width : A4_WIDTH;
+}
+
 /** Left edge of a column band. 0 is the leftmost. */
-export function columnLeft(column: number): number {
-  return PAGE_MARGIN + column * (A4_WIDTH + PAGE_GAP);
+export function columnLeft(column: number, scrolls?: readonly BandWidthSource[]): number {
+  if (!hasCustomBandWidths(scrolls)) {
+    return PAGE_MARGIN + column * (A4_WIDTH + PAGE_GAP);
+  }
+  if (column === 0) return PAGE_MARGIN;
+  if (column > 0) {
+    let x = PAGE_MARGIN;
+    for (let c = 0; c < column; c++) x += columnWidth(c, scrolls) + PAGE_GAP;
+    return x;
+  }
+  let x = PAGE_MARGIN;
+  for (let c = 0; c > column; c--) x -= columnWidth(c - 1, scrolls) + PAGE_GAP;
+  return x;
 }
 
 /**
@@ -43,9 +71,26 @@ export function columnLeft(column: number): number {
  *
  * The single definition of a band boundary — page guides, block layout and
  * scroll membership all resolve through this, so they cannot drift apart.
+ * When a scroll has been explicitly widened, pass the page's records so the
+ * gap after that band still belongs to it (same rule as the uniform pitch).
  */
-export function columnAt(x: number): number {
-  return Math.floor((x - PAGE_MARGIN) / (A4_WIDTH + PAGE_GAP));
+export function columnAt(x: number, scrolls?: readonly BandWidthSource[]): number {
+  if (!hasCustomBandWidths(scrolls)) {
+    return Math.floor((x - PAGE_MARGIN) / (A4_WIDTH + PAGE_GAP));
+  }
+  const list = scrolls!;
+  if (x < PAGE_MARGIN) {
+    const pitch = columnWidth(0, list) + PAGE_GAP;
+    return Math.floor((x - PAGE_MARGIN) / pitch);
+  }
+  const maxCol = list.reduce((m, s) => Math.max(m, s.column), 0);
+  let left = PAGE_MARGIN;
+  for (let c = 0; c <= maxCol; c++) {
+    const pitch = columnWidth(c, list) + PAGE_GAP;
+    if (x < left + pitch) return c;
+    left += pitch;
+  }
+  return maxCol + 1 + Math.floor((x - left) / (A4_WIDTH + PAGE_GAP));
 }
 
 /** Default width for newly placed text blocks (= one page) */
@@ -65,6 +110,24 @@ export const SCROLL_TITLE_RESTING_Y = 12;
 /** Gap kept between a held title and the top of the viewport. */
 export const SCROLL_TITLE_PIN_INSET = 10;
 
+/** Resting title — heading size on the ceiling row (v0.52). */
+export const SCROLL_TITLE_RESTING_FONT_SIZE = 20;
+/** Pinned title — compact wayfinding size (v0.52). */
+export const SCROLL_TITLE_PINNED_FONT_SIZE = 12;
+/**
+ * Konva Text `fontStyle`. This codebase already passes numeric weights
+ * (DiagramNode uses `"600"`); the canvas font string accepts them as weight.
+ */
+export const SCROLL_TITLE_FONT_STYLE = '600';
+/** Written-title ink at rest; same ink when pinned so the name does not change colour. */
+export const SCROLL_TITLE_INK = '#14181A';
+export const SCROLL_TITLE_PINNED_FILL = '#ffffff';
+export const SCROLL_TITLE_PINNED_OPACITY = 0.92;
+/** Vertically tight strip while the title is held over content. */
+export const SCROLL_TITLE_PINNED_STRIP_HEIGHT = 22;
+export const SCROLL_TITLE_HAIRLINE = '#C3CBC9';
+export const SCROLL_TITLE_HAIRLINE_WIDTH = 1;
+
 /**
  * Where a scroll title should draw, given where the viewport is (v0.35).
  *
@@ -75,11 +138,23 @@ export const SCROLL_TITLE_PIN_INSET = 10;
  * Pure so the behaviour is testable without a stage: the component only feeds
  * it the viewport.
  */
-export function scrollTitleY(viewport: { y: number; scale: number }): {
+export function scrollTitleY(
+  viewport: { y: number; scale: number },
+  ceiling?: number | null,
+): {
   y: number;
   holding: boolean;
 } {
   const viewportTop = -viewport.y / (viewport.scale || 1);
+  // When a ceiling exists the rest row is AT the ceiling for every scroll.
+  // Pin-when-scrolled-down is unchanged (v0.35): once the viewport top passes
+  // the rest row, the title holds just below the top edge.
+  if (ceiling != null) {
+    if (viewportTop > ceiling) {
+      return { y: viewportTop + SCROLL_TITLE_PIN_INSET, holding: true };
+    }
+    return { y: ceiling, holding: false };
+  }
   const y = Math.max(SCROLL_TITLE_RESTING_Y, viewportTop + SCROLL_TITLE_PIN_INSET);
   return { y, holding: y > SCROLL_TITLE_RESTING_Y + 0.5 };
 }

@@ -152,7 +152,8 @@ export function useCanvasKeyboard(
           useCanvasStore.getState().pasteNodes();
         }
         // When internal clipboard is empty, don't preventDefault —
-        // the browser paste event will fire and useCanvasDragDrop handles images
+        // the browser paste event will fire and useCanvasDragDrop handles
+        // images plus mxGraph/SVG source text
       }
 
       // Ctrl+A: select all
