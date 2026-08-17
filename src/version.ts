@@ -1,2 +1,2 @@
 /** Single source of truth for the PowerNote app version */
-export const APP_VERSION = '0.52.2';
+export const APP_VERSION = '0.52.3';

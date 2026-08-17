@@ -18,6 +18,10 @@ jobs:
 
       - run: npm ci
 
+      # The MCP server is its own package (powernote-mcp/package.json owns
+      # `ws`); the root install never touches it, and test:bridge imports it.
+      - run: npm ci --prefix powernote-mcp
+
       - run: npx tsc -b --noEmit
 
       - run: npx eslint src --ext .ts,.tsx --max-warnings 9999

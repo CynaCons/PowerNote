@@ -21,6 +21,10 @@ jobs:
 
       - run: npm ci
 
+      # The MCP server is its own package (powernote-mcp/package.json owns
+      # `ws`); the root install never touches it, and test:bridge imports it.
+      - run: npm ci --prefix powernote-mcp
+
       - run: npm run build:template
 
       # A release that cannot be upgraded to is worse than no release, so the
