@@ -104,13 +104,16 @@ test.describe('142b - ZoomBar position is unchanged on a desktop viewport', () =
     expect(style.bottom).toBe('16px');
     expect(style.right).toBe('16px');
 
-    // Pinned against the values read from the running app at 1280x720 (this
-    // suite's default viewport, playwright.config.ts) before the narrow-
-    // viewport media query existed — today's layout, unchanged.
+    // Pin the CONTRACT, not this machine's pixels: right/bottom-anchored 16px
+    // off the viewport edge at 1280x720 (the suite's default). Absolute x/y
+    // were pinned here originally and broke on CI — Linux font metrics shift
+    // the bar's intrinsic width by a few px, which is not what this test
+    // guards. Height and anchoring are layout; width may breathe ±8px.
     const box = (await zoomBar.boundingBox())!;
-    expect(box.width).toBe(124);
+    const viewport = page.viewportSize()!;
     expect(box.height).toBe(36);
-    expect(box.x).toBe(1140);
-    expect(box.y).toBe(668);
+    expect(Math.abs(box.width - 124)).toBeLessThanOrEqual(8);
+    expect(box.x + box.width).toBeCloseTo(viewport.width - 16, 0);
+    expect(box.y + box.height).toBeCloseTo(viewport.height - 16, 0);
   });
 });
