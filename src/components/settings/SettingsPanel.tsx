@@ -125,7 +125,12 @@ export function SettingsPanel({
     const wsStore = useWorkspaceStore.getState();
     wsStore.savePageNodes(useCanvasStore.getState().nodes);
     wsStore.savePageStrokes(useDrawStore.getState().strokes);
-    const ws = wsStore.workspace;
+    // Re-read AFTER the saves: zustand states are immutable, so `wsStore` is
+    // the pre-save snapshot and its `.workspace` does not contain the nodes
+    // just saved — the updated file would embed a stale workspace, silently
+    // dropping any canvas edits made since the last save. Found by the
+    // v0.37.5 → v0.52.3 end-to-end update test (empty page in the output).
+    const ws = useWorkspaceStore.getState().workspace;
 
     const result = await performUpdate(updateInfo.url ?? '', ws, APP_VERSION, updateInfo.version);
     if (!result.ok) {
