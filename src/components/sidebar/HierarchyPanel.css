@@ -13,6 +13,51 @@
   position: relative;
 }
 
+/* ── Drawer mode (<=768px) ───────────────────────────
+   Same breakpoint as ZoomBar.css. The panel leaves the flex flow and
+   overlays the canvas instead of sharing width with it — at 390px, 240px
+   of reserved sidebar left only ~100px of canvas (T143's audit finding).
+   Backdrop is a plain sibling <button> (rendered by AppShell whenever the
+   panel is open) that only becomes visible/interactive here; above the
+   breakpoint it stays `display: none` so it has zero effect on today's
+   layout or hit-testing. */
+@media (max-width: 768px) {
+  .hierarchy-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    height: 100%;
+    z-index: 41;
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.18);
+  }
+}
+
+.hierarchy-panel__backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .hierarchy-panel__backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 40;
+    border: none;
+    padding: 0;
+    appearance: none;
+    cursor: default;
+  }
+
+  .hierarchy-panel__backdrop:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+  }
+}
+
 /* ── Resize handle ───────────────────────────────── */
 .hierarchy-panel__resize {
   position: absolute;

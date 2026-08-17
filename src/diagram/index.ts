@@ -42,6 +42,21 @@ export { transpileSvg } from './svg';
  */
 export type DiagramFormat = 'plantuml' | 'mermaid' | 'svg';
 
+/**
+ * The language a source is written in, read off the source itself.
+ *
+ * Each test is a header read rather than a guess: SVG opens with an `<svg>`
+ * root, Mermaid announces its diagram type on the first line, and PlantUML is
+ * what is left. Exported because the UI needs the same answer the builder
+ * reaches — a frame that labelled its source button "plantuml" regardless of
+ * what it was actually built from told an SVG diagram it was something else.
+ */
+export function sniffFormat(source: string): DiagramFormat {
+  if (/^\s*(<\?xml|<svg[\s>])/i.test(source)) return 'svg';
+  if (looksLikeMermaid(source)) return 'mermaid';
+  return 'plantuml';
+}
+
 export interface BuildDiagramOptions {
   /** Shared by every node produced, so the diagram can be found again. */
   groupId: string;
@@ -71,13 +86,7 @@ export interface BuildDiagramResult {
 export function buildDiagram(source: string, options: BuildDiagramOptions): BuildDiagramResult {
   const measureText = options.measureText ?? canvasMeasureText;
   try {
-    // Each sniff is a header read rather than a guess: SVG opens with an <svg>
-    // root, Mermaid announces its diagram type on the first line.
-    const sniffed: DiagramFormat = /^\s*(<\?xml|<svg[\s>])/i.test(source)
-      ? 'svg'
-      : looksLikeMermaid(source)
-        ? 'mermaid'
-        : 'plantuml';
+    const sniffed = sniffFormat(source);
     const format = options.format ?? sniffed;
 
     // A declared format that disagrees with the source is caught here rather

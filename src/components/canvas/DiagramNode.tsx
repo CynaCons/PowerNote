@@ -11,6 +11,8 @@ import { useDiagramStore } from '../../stores/useDiagramStore';
 import { isNodeInteractive } from '../../utils/toolConfig';
 import { multiDragStart, multiDragMove, multiDragEnd } from '../../utils/multiDrag';
 import { FRAME_TITLE_H } from '../../diagram/canvasOps';
+import { sniffFormat } from '../../diagram';
+import { FORMAT_LABEL } from '../../diagram/formatLabels';
 import type { SnapLine } from './SnapGuides';
 import './DiagramNode.css';
 
@@ -38,6 +40,11 @@ export function DiagramNode({ node, isSelected, onSelect, stageScale, onSnapChan
 
   const activeTool = useToolStore((s) => s.activeTool);
   const isInteractive = isNodeInteractive(activeTool);
+
+  // Read from the source, not stored on the node: the source editor lets you
+  // paste a different language over the old one, so a remembered format would
+  // go stale the moment it mattered.
+  const format = sniffFormat(data.source ?? '');
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
@@ -75,8 +82,11 @@ export function DiagramNode({ node, isSelected, onSelect, stageScale, onSnapChan
         onDblClick={handleDblClick}
         onDblTap={handleDblClick}
       >
-        {/* Frame. Paper with a hairline so the tinted contents stay the figure. */}
+        {/* Frame. Paper with a hairline so the tinted contents stay the figure.
+            The id is what the right-click walk looks for — without it a diagram
+            had no context menu at all, and so no way to change its layer. */}
         <Rect
+          id={node.id}
           width={node.width}
           height={node.height}
           fill="#FFFFFF"
@@ -97,23 +107,27 @@ export function DiagramNode({ node, isSelected, onSelect, stageScale, onSnapChan
           fill="#14181A"
         />
 
-        {/* The one control on the frame: the PlantUML behind it. */}
+        {/* The one control on the frame: the source behind it, named for the
+            language it is actually written in. This used to read "plantuml" on
+            every diagram, so an SVG or Mermaid frame said out loud that it was
+            something it was not. */}
         {isInteractive && (
           <Html
             divProps={{ style: { pointerEvents: 'auto' } }}
-            groupProps={{ x: node.width - 86, y: 7 }}
+            groupProps={{ x: node.width - (format.length * 7 + 30), y: 7 }}
           >
             <button
               type="button"
               className="diagram-node__src"
               data-testid={`diagram-source-btn-${node.id}`}
-              title="Show the PlantUML this diagram was built from"
+              data-format={format}
+              title={`Show the ${FORMAT_LABEL[format]} this diagram was built from`}
               onClick={(e) => {
                 e.stopPropagation();
                 useDiagramStore.getState().openSource(node.id);
               }}
             >
-              plantuml
+              {format}
             </button>
           </Html>
         )}

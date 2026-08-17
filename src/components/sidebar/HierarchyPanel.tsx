@@ -19,11 +19,18 @@ const KEY_STEP = 16;
 
 const clampWidth = (w: number) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, w));
 
+/** Drawer mode breakpoint — matches ZoomBar.css's narrow-viewport query. */
+const DRAWER_QUERY = '(max-width: 768px)';
+
 interface HierarchyPanelProps {
   isOpen: boolean;
+  /** Called after a page navigation, but only while the panel is rendered as
+   * an overlay drawer (<=768px) — on a full-width desktop panel, picking a
+   * page has never closed it, and existing hierarchy specs rely on that. */
+  onClose?: () => void;
 }
 
-export function HierarchyPanel({ isOpen }: HierarchyPanelProps) {
+export function HierarchyPanel({ isOpen, onClose }: HierarchyPanelProps) {
   const workspace = useWorkspaceStore((s) => s.workspace);
   const activePageId = useWorkspaceStore((s) => s.activePageId);
   const setActivePage = useWorkspaceStore((s) => s.setActivePage);
@@ -98,6 +105,11 @@ export function HierarchyPanel({ isOpen }: HierarchyPanelProps) {
     const page = section?.pages.find((p) => p.id === pageId);
     loadPageNodes(page?.nodes ?? []);
     useDrawStore.getState().loadPageStrokes(page?.strokes ?? []);
+
+    // Drawer mode only: a full desktop panel stays open after navigating.
+    if (window.matchMedia(DRAWER_QUERY).matches) {
+      onClose?.();
+    }
   };
 
   const handleDeleteSection = (sectionId: string) => {

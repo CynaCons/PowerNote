@@ -21,6 +21,57 @@ const settingsOf = async (page: import('@playwright/test').Page) =>
   (await getWorkspaceStore(page)).workspace.settings;
 
 test.describe('102 - Agent background control (REQ-SETTINGS-006)', () => {
+  test('set_background stays notebook-scoped unless a page scope is asked for', async ({ page }) => {
+    // The default is load-bearing, not incidental: this tool shipped meaning
+    // notebook-wide, and every agent already written against it assumes that.
+    const result = await runBridge(page, 'set_background', { guideStyle: 'grid' });
+    expect(result.scope).toBe('notebook');
+    expect((await settingsOf(page))?.backgroundMode).toBe('grid');
+
+    const pages = (await getWorkspaceStore(page)).workspace.sections[0].pages;
+    expect(pages[0].settings).toBeUndefined();
+  });
+
+  test('scope "page" overrides one page and leaves the default alone', async ({ page }) => {
+    await runBridge(page, 'set_background', { guideStyle: 'grid' });
+    const result = await runBridge(page, 'set_background', {
+      guideStyle: 'scroll',
+      scope: 'page',
+    });
+
+    expect(result.scope).toBe('page');
+    expect(result.guideStyle).toBe('scroll');
+    expect(result.source.guideStyle).toBe('page');
+    // The colour was never overridden, so it still reports as inherited.
+    expect(result.source.color).toBe('notebook');
+    expect(result.notebookDefault.guideStyle).toBe('grid');
+
+    const ws = await getWorkspaceStore(page);
+    expect(ws.workspace.settings?.backgroundMode).toBe('grid');
+    expect(ws.workspace.sections[0].pages[0].settings?.backgroundMode).toBe('scroll');
+  });
+
+  test('get_background answers for the page, not the raw notebook default', async ({ page }) => {
+    await runBridge(page, 'set_background', { guideStyle: 'grid' });
+    await runBridge(page, 'set_background', { guideStyle: 'scroll', scope: 'page' });
+
+    const bg = await runBridge(page, 'get_background');
+    // What is actually on screen — an agent restoring "the previous look" from
+    // the notebook default would otherwise put back something never displayed.
+    expect(bg.guideStyle).toBe('scroll');
+    expect(bg.source.guideStyle).toBe('page');
+    expect(bg.notebookDefault.guideStyle).toBe('grid');
+  });
+
+  test('an unknown scope is refused by name', async ({ page }) => {
+    const err = await runBridgeExpectingError(page, 'set_background', {
+      guideStyle: 'grid',
+      scope: 'section',
+    });
+    expect(err.code).toBe('BAD_PARAMS');
+    expect(err.message).toContain('notebook');
+  });
+
   test.beforeEach(async ({ page }) => {
     await stubBridgeUrl(page);
     await page.goto('/');

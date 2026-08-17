@@ -11,6 +11,15 @@
 :root {
   --nav-rail-width: 48px;
   --top-bar-height: 40px;
+  /* Rendered height of one .bottom-toolbar row (BottomToolbar.css): every
+     toolbar variant (text/draw/shape/image share `.text-toolbar`; the group
+     segment uses `.group-toolbar`) resolves to the same 32px button + 2×6px
+     padding + 2×1px border = 46px, so this is a true constant, not a guess.
+     Published here so ZoomBar.css can stack itself above the toolbar at
+     narrow widths without the two files drifting out of sync. Redefined
+     under (pointer: coarse) below, where BottomToolbar.css grows buttons to
+     44px for touch targets. */
+  --toolbar-row-height: 46px;
   --color-bg: #fafafa;
   --color-surface: #ffffff;
   --color-border: #e5e5e5;
@@ -23,6 +32,14 @@
   --color-canvas-bg: #f0f0f0;
 }
 
+/* Mirrors BottomToolbar.css's own (pointer: coarse) rule that grows buttons
+   to 44px for touch targets: 44px + 2×6px padding + 2×1px border = 58px. */
+@media (pointer: coarse) {
+  :root {
+    --toolbar-row-height: 58px;
+  }
+}
+
 html, body, #root {
   height: 100%;
   width: 100%;
@@ -33,6 +50,25 @@ html, body, #root {
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Touch devices: the canvas owns every gesture. Without these the browser
+     answers a two-finger pinch with page zoom and an edge drag with
+     pull-to-refresh / back-navigation, tearing the gesture away mid-stroke. */
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Long-press on touch selects text under the finger unless told otherwise —
+   on a drawing surface that means accidental blue selections mid-gesture.
+   Text entry surfaces opt back in. */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  /* Long-press callout (iOS) fights the context menu */
+  -webkit-touch-callout: none;
+}
+input, textarea, [contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 button {

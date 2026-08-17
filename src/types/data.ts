@@ -101,6 +101,13 @@ export interface Stroke {
   strokeWidth: number;
   /** Flat group membership (v0.27+), shared with shape nodes. */
   groupId?: string | null;
+  /**
+   * Per-point pen pressure 0..1, parallel to `points` (pressures.length ===
+   * points.length / 2). Only recorded for stylus input (v0.42+). Absent —
+   * every mouse/finger stroke and every stroke saved before v0.42 — means
+   * constant width.
+   */
+  pressures?: number[];
 }
 
 /** Optional group index entry (derived membership is canonical). */
@@ -114,6 +121,14 @@ export interface DrawOptions {
   eraserMode: 'stroke' | 'zone';
   eraserSize: number;
   isErasing: boolean;
+  /**
+   * What a single finger does while a drawing tool is active (v0.42+).
+   * `auto` — finger draws until the first pen contact is seen, then fingers
+   * pan (Samsung-style palm-friendly default); `always` — finger always
+   * draws; `never` — finger always pans. Device setting, kept in
+   * localStorage, not in the notebook file.
+   */
+  touchDraw: 'auto' | 'always' | 'never';
 }
 
 // ── Hierarchy types ─────────────────────────────────────────
@@ -146,6 +161,15 @@ export interface Page {
   groups?: GroupRecord[];
   /** Named scroll bands (v0.31+). Hydrated for older pages on load. */
   scrolls?: ScrollRecord[];
+  /**
+   * Per-page look (v0.40+) — an OVERRIDE, not a copy.
+   *
+   * Absent means inherit the notebook default, which is what every page written
+   * before this existed already is, so old files need no migration. Partial for
+   * the same reason: a page may pin its guide style and still follow the
+   * notebook's colour. Always read it through `resolvePageSettings`.
+   */
+  settings?: Partial<WorkspaceSettings>;
 }
 
 export interface Section {

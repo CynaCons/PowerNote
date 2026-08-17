@@ -2,12 +2,25 @@ import { create } from 'zustand';
 import type { ToolType, TextOptions, DrawOptions, ShapeOptions } from '../types/data';
 import { defaultTextOptions, defaultShapeOptions } from '../utils/defaults';
 
+const TOUCH_DRAW_KEY = 'powernote-touch-draw';
+
+/** Device preference, not notebook content — survives across notebooks. */
+function loadTouchDraw(): DrawOptions['touchDraw'] {
+  try {
+    const v = localStorage.getItem(TOUCH_DRAW_KEY);
+    return v === 'always' || v === 'never' ? v : 'auto';
+  } catch {
+    return 'auto';
+  }
+}
+
 const defaultDrawOptions: DrawOptions = {
   color: '#1a1a1a',
   strokeWidth: 3,
   eraserMode: 'stroke',
   eraserSize: 12,
   isErasing: false,
+  touchDraw: loadTouchDraw(),
 };
 
 interface ToolState {
@@ -15,11 +28,18 @@ interface ToolState {
   textOptions: TextOptions;
   drawOptions: DrawOptions;
   shapeOptions: ShapeOptions;
+  /**
+   * True once any stylus contact has been seen this session. With
+   * `touchDraw: 'auto'` this is the moment fingers stop drawing and start
+   * panning — the pen proves palms will be landing on the screen.
+   */
+  penDetected: boolean;
 
   setTool: (tool: ToolType) => void;
   setTextOptions: (options: Partial<TextOptions>) => void;
   setDrawOptions: (options: Partial<DrawOptions>) => void;
   setShapeOptions: (options: Partial<ShapeOptions>) => void;
+  setPenDetected: (detected: boolean) => void;
 }
 
 export const useToolStore = create<ToolState>((set) => ({
@@ -27,6 +47,7 @@ export const useToolStore = create<ToolState>((set) => ({
   textOptions: { ...defaultTextOptions },
   drawOptions: { ...defaultDrawOptions },
   shapeOptions: { ...defaultShapeOptions },
+  penDetected: false,
 
   setTool: (tool) => set({ activeTool: tool }),
 
@@ -35,13 +56,23 @@ export const useToolStore = create<ToolState>((set) => ({
       textOptions: { ...state.textOptions, ...options },
     })),
 
-  setDrawOptions: (options) =>
+  setDrawOptions: (options) => {
+    if (options.touchDraw) {
+      try {
+        localStorage.setItem(TOUCH_DRAW_KEY, options.touchDraw);
+      } catch {
+        // private mode — the in-memory value still applies
+      }
+    }
     set((state) => ({
       drawOptions: { ...state.drawOptions, ...options },
-    })),
+    }));
+  },
 
   setShapeOptions: (options) =>
     set((state) => ({
       shapeOptions: { ...state.shapeOptions, ...options },
     })),
+
+  setPenDetected: (detected) => set({ penDetected: detected }),
 }));

@@ -1,10 +1,13 @@
+import { useMemo } from 'react';
 import { Line, Circle, Rect } from 'react-konva';
 import type { Stroke } from '../../types/data';
+import { buildInkOutline } from '../../utils/inkOutline';
 
 interface DrawingLayerProps {
   strokes: Stroke[];
   selectedStrokeIds: string[];
   inProgressPoints: number[] | null;
+  inProgressPressures: number[] | null;
   inProgressColor: string;
   inProgressWidth: number;
   eraserPos: { x: number; y: number; radius: number } | null;
@@ -14,10 +17,55 @@ interface DrawingLayerProps {
   lassoRect: { x: number; y: number; w: number; h: number } | null;
 }
 
+/**
+ * One committed stroke. A pressure stroke (stylus, REQ-DRAW-011) renders as
+ * a closed filled ribbon whose width follows the recorded pressure; anything
+ * without pressures — mouse, finger, every pre-v0.42 stroke — stays the
+ * constant-width Line it always was. The outline is memoised: strokes are
+ * immutable between edits, so it computes once, not per frame.
+ */
+function CommittedStroke({ stroke }: { stroke: Stroke }) {
+  const outline = useMemo(
+    () =>
+      stroke.pressures
+        ? buildInkOutline(stroke.points, stroke.pressures, stroke.strokeWidth)
+        : null,
+    [stroke.points, stroke.pressures, stroke.strokeWidth],
+  );
+
+  if (outline) {
+    return (
+      <Line
+        points={outline}
+        closed
+        fill={stroke.color}
+        stroke={stroke.color}
+        strokeWidth={1}
+        lineJoin="round"
+        listening={false}
+        perfectDrawEnabled={false}
+      />
+    );
+  }
+  return (
+    <Line
+      points={stroke.points}
+      stroke={stroke.color}
+      strokeWidth={stroke.strokeWidth}
+      tension={0.3}
+      lineCap="round"
+      lineJoin="round"
+      globalCompositeOperation="source-over"
+      listening={false}
+    />
+  );
+}
+
 export function DrawingLayer({
   strokes,
   selectedStrokeIds,
   inProgressPoints,
+  inProgressPressures,
   inProgressColor,
   inProgressWidth,
   eraserPos,
@@ -28,21 +76,20 @@ export function DrawingLayer({
 }: DrawingLayerProps) {
   const selectedSet = new Set(selectedStrokeIds);
 
+  // Live stylus ink previews with the same ribbon it will commit as —
+  // pressure feedback that only appears on lift teaches nothing.
+  const inProgressOutline =
+    inProgressPoints &&
+    inProgressPressures &&
+    inProgressPressures.length * 2 === inProgressPoints.length
+      ? buildInkOutline(inProgressPoints, inProgressPressures, inProgressWidth)
+      : null;
+
   return (
     <>
       {/* Committed strokes */}
       {strokes.map((stroke) => (
-        <Line
-          key={stroke.id}
-          points={stroke.points}
-          stroke={stroke.color}
-          strokeWidth={stroke.strokeWidth}
-          tension={0.3}
-          lineCap="round"
-          lineJoin="round"
-          globalCompositeOperation="source-over"
-          listening={false}
-        />
+        <CommittedStroke key={stroke.id} stroke={stroke} />
       ))}
 
       {/* Selected stroke highlights */}
@@ -64,15 +111,28 @@ export function DrawingLayer({
 
       {/* In-progress stroke (while drawing) */}
       {inProgressPoints && inProgressPoints.length >= 4 && (
-        <Line
-          points={inProgressPoints}
-          stroke={inProgressColor}
-          strokeWidth={inProgressWidth}
-          tension={0.3}
-          lineCap="round"
-          lineJoin="round"
-          listening={false}
-        />
+        inProgressOutline ? (
+          <Line
+            points={inProgressOutline}
+            closed
+            fill={inProgressColor}
+            stroke={inProgressColor}
+            strokeWidth={1}
+            lineJoin="round"
+            listening={false}
+            perfectDrawEnabled={false}
+          />
+        ) : (
+          <Line
+            points={inProgressPoints}
+            stroke={inProgressColor}
+            strokeWidth={inProgressWidth}
+            tension={0.3}
+            lineCap="round"
+            lineJoin="round"
+            listening={false}
+          />
+        )
       )}
 
       {/* Eraser cursor circle */}

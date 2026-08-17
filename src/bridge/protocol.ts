@@ -180,8 +180,17 @@ export interface DeleteResult {
  * to get subtly wrong by a digit.
  */
 export interface BackgroundResult {
+  /** The look the page is actually drawn with, override resolved. */
   guideStyle: BackgroundMode;
   color: string;
+  /** Which layer each value came from, so an agent can tell inherited from set. */
+  source?: { guideStyle: 'page' | 'notebook'; color: 'page' | 'notebook' };
+  /** What a page without an override falls back to. */
+  notebookDefault?: { guideStyle: BackgroundMode; color: string };
+  /** The page the answer is about. */
+  pageId?: string;
+  /** Which layer a write went to. */
+  scope?: 'page' | 'notebook';
   /** Only present on set_background, so the agent can report what it changed. */
   previous?: { guideStyle: BackgroundMode; color: string };
 }

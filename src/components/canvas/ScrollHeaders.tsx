@@ -103,6 +103,7 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
           <Group
             key={`scroll-header-${scroll.id}`}
             onDblClick={() => setEditingId(scroll.id)}
+            onDblTap={() => setEditingId(scroll.id)}
             // Single click makes it the scroll the outline follows. It does not
             // move the viewport — you are already looking at it.
             onClick={() => setActiveScroll(scroll.id)}

@@ -15,6 +15,31 @@
   user-select: none;
 }
 
+/* ── Narrow viewports ────────────────────────────── */
+/* Both this bar and .bottom-toolbar (BottomToolbar.css) are position:
+   absolute, bottom:16px, same z-index, inside .canvas-area__content — on a
+   phone-width viewport the toolbar's centered box can grow wide enough for
+   its right edge to slide under this corner, and being later in DOM order
+   this bar wins every tap there.
+   Reserving horizontal clearance for this instead (shrinking the toolbar's
+   box) was tried and rejected: centering is symmetric, so clamping the
+   toolbar's right edge before this bar's left edge costs it equal space on
+   the left too, and a 390px phone doesn't have enough width to spare —
+   most of the toolbar ends up needing a horizontal scroll to reach at all.
+   Stacking vertically instead costs nothing from the toolbar's width (it
+   keeps its full centered layout, unchanged from today) and phones have
+   the room to spare vertically. The offset is exactly one toolbar row
+   (--toolbar-row-height, index.css — a true constant: every toolbar variant
+   shares the same button/padding/border sizing) plus an 8px gap, so this
+   stays flush above the toolbar regardless of which context toolbar (text/
+   draw/shape/image/group) is showing. Wide viewports (>768px) are
+   untouched — bottom stays 16px exactly as today. */
+@media (max-width: 768px) {
+  .zoom-bar {
+    bottom: calc(16px + var(--toolbar-row-height) + 8px);
+  }
+}
+
 .zoom-bar button {
   border: none;
   background: none;

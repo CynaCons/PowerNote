@@ -3,7 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Installable app manifest (v0.45.0, T145). Offline support (a service
+         worker) is deferred deliberately — this only makes the app
+         add-to-home-screen/installable, it does not cache anything. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- maximum-scale/user-scalable pin BROWSER zoom on touch devices so a
+         pinch always reaches the canvas (which zooms itself); viewport-fit
+         covers notches/rounded corners on tablets. Desktop browsers ignore
+         the caps, and Ctrl+wheel/keyboard zoom still work everywhere. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="theme-color" content="#fafafa" />
     <title>PowerNote</title>
   </head>
   <body>

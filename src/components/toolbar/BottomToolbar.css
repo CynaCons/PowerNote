@@ -1,10 +1,125 @@
 /* ── Bottom Toolbar Container ────────────────────── */
+/* Positioning only — each child carries its own pill chrome. Flex so the group
+   segment sits beside the context toolbar instead of under it; with a single
+   child this lays out exactly as the old block container did. */
 .bottom-toolbar {
   position: absolute;
   bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Narrow/mobile viewports can be narrower than the toolbar's natural
+     width, so it scrolls horizontally instead of spilling off-screen.
+     This is safe now: the colour/size/eraser popovers are portaled to
+     document.body and positioned via getBoundingClientRect() (see
+     PopoverPortal.tsx), so they are no longer clipped-descendants of this
+     box and this overflow can no longer cut them off. */
+  /* Relative to .canvas-area__content (its positioned ancestor — see
+     AppShell.css), not 100vw: that ancestor is already narrower than the
+     viewport (the NavRail takes a grid column beside it), so vw-based
+     sizing would let the centered/translated toolbar spill past the right
+     edge of the screen instead of the edge of its own container. */
+  max-width: calc(100% - 16px);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.bottom-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Touch devices ───────────────────────────────── */
+/* Fingers need ~44px targets (Apple HIG / Android touch guidance); the
+   32px mouse-sized buttons are precise but unhittable with a thumb. */
+@media (pointer: coarse) {
+  .bottom-toolbar {
+    bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .bottom-toolbar button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .group-toolbar__btn {
+    height: 44px;
+  }
+}
+
+/* ── Group Toolbar ───────────────────────────────── */
+.group-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  user-select: none;
+  white-space: nowrap;
+}
+
+/* Darkened while isolated, so "you are inside a group" reads at a glance
+   without a second floating bar competing for the same strip of screen. */
+.group-toolbar--editing {
+  background: #1e293b;
+  border-color: #1e293b;
+}
+
+.group-toolbar__label {
+  padding: 0 4px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.group-toolbar--editing .group-toolbar__btn {
+  color: #cbd5e1;
+}
+
+.group-toolbar--editing .group-toolbar__btn:hover {
+  background: rgba(248, 250, 252, 0.12);
+  color: #f8fafc;
+}
+
+.group-toolbar--editing .group-toolbar__btn--primary,
+.group-toolbar--editing .group-toolbar__btn--primary:hover {
+  background: #2563eb;
+  color: #fff;
+}
+
+.group-toolbar__btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  transition: all 0.15s ease;
+}
+
+.group-toolbar__btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.group-toolbar__btn--primary {
+  background: var(--color-active);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.group-toolbar__btn--primary:hover {
+  background: var(--color-active);
+  color: var(--color-primary);
+  filter: brightness(0.96);
 }
 
 /* ── Text Toolbar ────────────────────────────────── */

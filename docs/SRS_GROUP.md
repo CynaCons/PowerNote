@@ -29,3 +29,7 @@ moves together, with isolation mode to edit individual members without ungroupin
 - REQ-CANVAS-015 multi-select move (strengthened by multi-drag implementation)
 - REQ-SHAPE family for shape create/select
 - REQ-DRAW for freehand strokes
+| REQ-GROUP-020 | The selection toolbar shall offer a VISIBLE way into group isolation for a single selection that belongs to a group. Double-click, Ctrl+Enter and the context menu are all hidden affordances, so nothing on screen announced that the mode existed | Must | T132 |
+| REQ-GROUP-021 | The way out of isolation shall be offered whatever member is selected, not only when the frame itself is, so a user editing one mark inside a group is never stranded | Must | T132 |
+| REQ-GROUP-022 | The group segment shall render independently of the node-type toolbar contexts. A diagram matches none of them, so gating it the same way left the bar empty for the selection that most needed a control | Must | T132 |
+

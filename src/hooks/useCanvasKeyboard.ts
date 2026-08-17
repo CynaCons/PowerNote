@@ -5,6 +5,7 @@ import { useDrawStore } from '../stores/useDrawStore';
 import { useGroupStore } from '../stores/useGroupStore';
 import { groupSelection, ungroupSelection } from '../utils/groupOps';
 import { getGroupMembers } from '../utils/groups';
+import { redoActive, undoActive } from '../utils/undoOps';
 
 /**
  * Hook for all keyboard event handlers on the canvas.
@@ -162,26 +163,17 @@ export function useCanvasKeyboard(
         useCanvasStore.setState({ selectedNodeIds: allIds });
       }
 
-      // Ctrl+Z: undo (route to draw store if drawing tools active)
+      // Ctrl+Z: undo. Routed by tool — see undoOps, shared with the toolbar
+      // button so the two cannot disagree about which history to unwind.
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
-        const tool = useToolStore.getState().activeTool;
-        if (tool === 'draw' || tool === 'lasso') {
-          useDrawStore.getState().undo();
-        } else {
-          useCanvasStore.getState().undo();
-        }
+        undoActive();
       }
 
       // Ctrl+Shift+Z / Ctrl+Y: redo
       if ((e.ctrlKey || e.metaKey) && ((e.key === 'z' && e.shiftKey) || e.key === 'y')) {
         e.preventDefault();
-        const tool = useToolStore.getState().activeTool;
-        if (tool === 'draw' || tool === 'lasso') {
-          useDrawStore.getState().redo();
-        } else {
-          useCanvasStore.getState().redo();
-        }
+        redoActive();
       }
     };
 

@@ -5,9 +5,24 @@
  * Verifies that shapes can be created via click+drag on the canvas,
  * that the committed shape matches the drag area, and that all 5 shape
  * types work correctly including arrows/lines with signed dimensions.
+ *
+ * Drags are dispatched as POINTER events: since v0.42 the draw/shape/lasso
+ * pipeline listens to pointer events (which is what real mice, pens and
+ * fingers deliver), not to bare mouse events.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator } from '@playwright/test';
 import { waitForCanvasReady, getCanvasStore } from '../helpers';
+
+async function dragShape(
+  canvas: Locator,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+) {
+  const base = { pointerId: 1, pointerType: 'mouse', isPrimary: true, buttons: 1 };
+  await canvas.dispatchEvent('pointerdown', { ...base, clientX: from.x, clientY: from.y });
+  await canvas.dispatchEvent('pointermove', { ...base, clientX: to.x, clientY: to.y });
+  await canvas.dispatchEvent('pointerup', { ...base, buttons: 0, clientX: to.x, clientY: to.y });
+}
 
 test.describe('54 - Shape Click+Drag Creation (REQ-SHAPE-001..003)', () => {
   test.beforeEach(async ({ page }) => {
@@ -25,9 +40,7 @@ test.describe('54 - Shape Click+Drag Creation (REQ-SHAPE-001..003)', () => {
     });
 
     const canvas = page.locator('[data-testid="canvas-container"] canvas').last();
-    await canvas.dispatchEvent('mousedown', { clientX: 200, clientY: 200 });
-    await canvas.dispatchEvent('mousemove', { clientX: 400, clientY: 350 });
-    await canvas.dispatchEvent('mouseup', {});
+    await dragShape(canvas, { x: 200, y: 200 }, { x: 400, y: 350 });
     await page.waitForTimeout(200);
 
     const store = await getCanvasStore(page);
@@ -45,9 +58,7 @@ test.describe('54 - Shape Click+Drag Creation (REQ-SHAPE-001..003)', () => {
     });
 
     const canvas = page.locator('[data-testid="canvas-container"] canvas').last();
-    await canvas.dispatchEvent('mousedown', { clientX: 300, clientY: 200 });
-    await canvas.dispatchEvent('mousemove', { clientX: 450, clientY: 350 });
-    await canvas.dispatchEvent('mouseup', {});
+    await dragShape(canvas, { x: 300, y: 200 }, { x: 450, y: 350 });
     await page.waitForTimeout(200);
 
     const store = await getCanvasStore(page);
@@ -62,9 +73,7 @@ test.describe('54 - Shape Click+Drag Creation (REQ-SHAPE-001..003)', () => {
     });
 
     const canvas = page.locator('[data-testid="canvas-container"] canvas').last();
-    await canvas.dispatchEvent('mousedown', { clientX: 200, clientY: 200 });
-    await canvas.dispatchEvent('mousemove', { clientX: 350, clientY: 400 });
-    await canvas.dispatchEvent('mouseup', {});
+    await dragShape(canvas, { x: 200, y: 200 }, { x: 350, y: 400 });
     await page.waitForTimeout(200);
 
     const store = await getCanvasStore(page);
@@ -80,9 +89,7 @@ test.describe('54 - Shape Click+Drag Creation (REQ-SHAPE-001..003)', () => {
 
     const canvas = page.locator('[data-testid="canvas-container"] canvas').last();
     // Drag from left to right
-    await canvas.dispatchEvent('mousedown', { clientX: 200, clientY: 300 });
-    await canvas.dispatchEvent('mousemove', { clientX: 500, clientY: 300 });
-    await canvas.dispatchEvent('mouseup', {});
+    await dragShape(canvas, { x: 200, y: 300 }, { x: 500, y: 300 });
     await page.waitForTimeout(200);
 
     const store = await getCanvasStore(page);
@@ -99,9 +106,7 @@ test.describe('54 - Shape Click+Drag Creation (REQ-SHAPE-001..003)', () => {
     });
 
     const canvas = page.locator('[data-testid="canvas-container"] canvas').last();
-    await canvas.dispatchEvent('mousedown', { clientX: 200, clientY: 200 });
-    await canvas.dispatchEvent('mousemove', { clientX: 400, clientY: 400 });
-    await canvas.dispatchEvent('mouseup', {});
+    await dragShape(canvas, { x: 200, y: 200 }, { x: 400, y: 400 });
     await page.waitForTimeout(200);
 
     const store = await getCanvasStore(page);
@@ -112,8 +117,9 @@ test.describe('54 - Shape Click+Drag Creation (REQ-SHAPE-001..003)', () => {
 
   test('small click (no drag) does NOT create a shape', async ({ page }) => {
     const canvas = page.locator('[data-testid="canvas-container"] canvas').last();
-    await canvas.dispatchEvent('mousedown', { clientX: 300, clientY: 300 });
-    await canvas.dispatchEvent('mouseup', {});
+    const base = { pointerId: 1, pointerType: 'mouse', isPrimary: true };
+    await canvas.dispatchEvent('pointerdown', { ...base, buttons: 1, clientX: 300, clientY: 300 });
+    await canvas.dispatchEvent('pointerup', { ...base, buttons: 0, clientX: 300, clientY: 300 });
     await page.waitForTimeout(200);
 
     const store = await getCanvasStore(page);
@@ -127,9 +133,7 @@ test.describe('54 - Shape Click+Drag Creation (REQ-SHAPE-001..003)', () => {
 
     const canvas = page.locator('[data-testid="canvas-container"] canvas').last();
     // Drag from right to left
-    await canvas.dispatchEvent('mousedown', { clientX: 500, clientY: 300 });
-    await canvas.dispatchEvent('mousemove', { clientX: 200, clientY: 300 });
-    await canvas.dispatchEvent('mouseup', {});
+    await dragShape(canvas, { x: 500, y: 300 }, { x: 200, y: 300 });
     await page.waitForTimeout(200);
 
     const store = await getCanvasStore(page);

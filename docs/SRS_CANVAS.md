@@ -32,6 +32,9 @@ Provide an infinite, pannable, zoomable canvas as the primary workspace for plac
 | REQ-CANVAS-024 | Shift+1 shall zoom to fit and Shift+0 shall reset to 100%; neither shall fire while a text field has focus | Must | T99 |
 | REQ-CANVAS-025 | A two-finger pinch on a touch device shall zoom the canvas, anchored on the midpoint between the two fingers | Must | T106 |
 | REQ-CANVAS-026 | Pinch zoom shall respect the same 0.1x–5.0x bounds as wheel and bar zoom | Must | T106 |
+| REQ-CANVAS-027 | Moving two fingers together shall pan the canvas without changing zoom; each pinch gesture initializes its own finger-distance baseline so a malformed touchend cannot leak the previous gesture's zoom into the next | Should | T136 |
+| REQ-CANVAS-028 | With the select tool active, a ~500ms still press on a node (touch) shall select it and open the same context menu right-click uses, at the press position; moving past ~10px or lifting early cancels it, and it shall not fire while draw/shape/lasso own touch for their own gestures | Should | T138 |
+| REQ-CANVAS-029 | The top bar's filename/section/page breadcrumb shall ellipsize each segment individually when the bar is too narrow to show them in full, rather than hard-clipping the trailing (active-page) segment invisibly with no truncation indicator | Should | T143 |
 
 ### Not implemented
 
@@ -39,5 +42,6 @@ Recorded so the gap is visible rather than inferred from silence.
 
 | ID | Description | Priority | Status |
 |----|-------------|----------|--------|
-| REQ-CANVAS-027 | Moving two fingers together shall pan the canvas without changing zoom | Should | **Not implemented.** `handleTouchMove` tracks `lastPinchCenter` but never translates by it, so an unchanged finger distance leaves the viewport untouched. Open on PLAN v0.11.4 |
-| REQ-CANVAS-028 | A long press on a node shall select it, for touch devices with no hover | Should | **Not implemented.** Open on PLAN v0.11.4 |
+| REQ-CANVAS-010 | A visible undo control shall sit in the top bar, immediately left of zoom-to-fit, disabled when there is nothing to undo and titled to say so | Must | T134 |
+| REQ-CANVAS-011 | The button and Ctrl+Z shall unwind the SAME history, routed by the active tool from one shared definition (`src/utils/undoOps.ts`) — there are two independent stacks (nodes in the canvas store, strokes in the draw store) and a second copy of the routing rule would eventually disagree with the first | Must | T134 |
+

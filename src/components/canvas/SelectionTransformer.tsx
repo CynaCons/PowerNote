@@ -8,6 +8,26 @@ interface SelectionTransformerProps {
   stageRef: React.RefObject<Konva.Stage | null>;
 }
 
+// Desktop anchor/padding values, unchanged from before touch support existed.
+const DESKTOP_ANCHOR_SIZE = 8;
+const DESKTOP_PADDING_SINGLE = 2;
+const DESKTOP_PADDING_MULTI = 6;
+
+// Finger-sized handles for touch devices (Apple HIG / Android touch guidance
+// call for ~24-44px targets; the 8px desktop anchor is unhittable with a
+// thumb). Extra padding keeps the bigger anchors clear of the shape's edge.
+const TOUCH_ANCHOR_SIZE = 24;
+const TOUCH_PADDING_SINGLE = 10;
+const TOUCH_PADDING_MULTI = 16;
+
+// Checked once at module load: a device's pointer class (mouse vs. touch)
+// doesn't change mid-session, so there's no need for a matchMedia listener
+// that reacts to it live.
+const isCoarsePointer =
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia('(pointer: coarse)').matches
+    : false;
+
 export function SelectionTransformer({ selectedNodeIds, stageRef }: SelectionTransformerProps) {
   const transformerRef = useRef<Konva.Transformer>(null);
   const nodes = useCanvasStore((s) => s.nodes);
@@ -94,6 +114,14 @@ export function SelectionTransformer({ selectedNodeIds, stageRef }: SelectionTra
 
   const isMultiSelect = selectedNodeIds.length > 1;
 
+  const padding = isMultiSelect
+    ? (isCoarsePointer ? TOUCH_PADDING_MULTI : DESKTOP_PADDING_MULTI)
+    : (isCoarsePointer ? TOUCH_PADDING_SINGLE : DESKTOP_PADDING_SINGLE);
+
+  const anchorSize = resizeEnabled && !isMultiSelect
+    ? (isCoarsePointer ? TOUCH_ANCHOR_SIZE : DESKTOP_ANCHOR_SIZE)
+    : 0;
+
   return (
     <Transformer
       key={resizeEnabled ? 'resize' : 'no-resize'}
@@ -101,10 +129,10 @@ export function SelectionTransformer({ selectedNodeIds, stageRef }: SelectionTra
       borderStroke="#2563eb"
       borderStrokeWidth={isMultiSelect ? 2.5 : 1.5}
       borderDash={isMultiSelect ? [8, 4] : undefined}
-      padding={isMultiSelect ? 6 : 2}
+      padding={padding}
       resizeEnabled={resizeEnabled}
       rotateEnabled={false}
-      anchorSize={resizeEnabled && !isMultiSelect ? 8 : 0}
+      anchorSize={anchorSize}
       anchorFill="#ffffff"
       anchorStroke="#2563eb"
       anchorStrokeWidth={1}

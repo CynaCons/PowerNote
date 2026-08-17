@@ -197,6 +197,10 @@ in the same notebook as a PlantUML component diagram.
 | REQ-DIAG-097 | Sequence messages shall be numbered in source order, since the row layout cannot otherwise show order | Must | T126 |
 | REQ-DIAG-098 | Anything outside the documented Mermaid subset shall raise a diagnostic and be skipped; the parser shall never throw | Must | T126 |
 | REQ-DIAG-099 | The agent-facing diagram tools shall be named for the language each accepts, and shall route to the one app command carrying that format | Must | test:bridge |
+| REQ-DIAG-100 | A diagram frame's source control shall be labelled with the language the source is ACTUALLY written in, derived by sniffing the source rather than stored or assumed. It was hardcoded to "plantuml", so every SVG and Mermaid diagram stated on its face that it was something it was not | Must | T132 |
+| REQ-DIAG-101 | The source dialog shall name the format of the DRAFT, updating as it is typed, so pasting one language over another shows what Redraw is about to do before it is committed | Should | T132 |
+| REQ-DIAG-102 | A diagram frame shall offer the same right-click context menu as any other canvas node, including the layer control. The menu resolves a node by walking up from the click for a `Rect` carrying the node id, so the frame shall tag its Rect accordingly | Must | T132 |
+| REQ-DIAG-103 | Changing a diagram frame's layer shall move the whole drawing relative to other canvas content, WITHOUT rewriting its members' layers. A diagram's marks already span layers 2..5 among themselves to keep containers behind entities and links under text, so the frame's layer shall act as a band its members sort inside, the frame pinned to the back of that band | Must | T132 |
 
 **Documented subset.** Flowcharts: `flowchart`/`graph` with `TB`, `TD`, `BT`,
 `LR` or `RL`; nodes `A`, `A[Label]`, `A(Label)`, `A{Label}`, with quoted labels;
@@ -267,3 +271,4 @@ Two additions to `ShapeNodeData` are required before the notation above can be r
 | T125 | REQ-DIAG-070..076 |
 | T126 | REQ-DIAG-090..098 |
 | test:bridge | REQ-DIAG-099 |
+| T132 | REQ-DIAG-100..103 |

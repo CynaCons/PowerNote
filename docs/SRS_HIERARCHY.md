@@ -27,3 +27,4 @@ Organize the workspace into sections and pages, with a navigable hierarchy panel
 | REQ-HIER-013 | Panel width shall be clamped to 180–560px; double-clicking the handle shall reset it to the 240px default | Must | T107 |
 | REQ-HIER-014 | The resize handle shall be keyboard operable: focusable, with Arrow keys resizing in 16px steps and Home resetting to the default | Should | T107 |
 | REQ-HIER-015 | Panel width shall be session-only — held in component state, written neither to the notebook file nor to localStorage, so a reload returns to the default | Must | T107 |
+| REQ-HIER-016 | At viewport widths <=768px the hierarchy panel shall render as an overlay drawer over the canvas, with a dimmed backdrop, rather than sharing width with it; it shall close on backdrop click, on Escape, and after navigating to a page. Above 768px, layout and behavior shall be unchanged | Must | T144 |

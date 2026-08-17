@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDiagramStore } from '../../stores/useDiagramStore';
 import { diagramMembers, diagramSourceOf, rebuildDiagram } from '../../diagram/canvasOps';
-import type { Diagnostic } from '../../diagram';
+import { sniffFormat, type Diagnostic } from '../../diagram';
+import { FORMAT_LABEL } from '../../diagram/formatLabels';
 import type { DiagramNodeData } from '../../types/data';
 import './DiagramNode.css';
 
@@ -61,6 +62,7 @@ export function DiagramSourceDialog() {
   };
 
   const errors = diagnostics.filter((d) => d.severity === 'error').length;
+  const draftFormat = sniffFormat(draft);
 
   return (
     <div className="diagram-modal-backdrop" onClick={closeSource}>
@@ -72,7 +74,11 @@ export function DiagramSourceDialog() {
         onClick={(e) => e.stopPropagation()}
       >
         <header>
-          <span>diagram source</span>
+          {/* Named from the DRAFT, not the saved source, so pasting one language
+              over another shows what Redraw is about to do before you commit. */}
+          <span data-testid="diagram-dialog-format" data-format={draftFormat}>
+            {FORMAT_LABEL[draftFormat]} source
+          </span>
           <button type="button" onClick={closeSource} aria-label="Close">
             ×
           </button>

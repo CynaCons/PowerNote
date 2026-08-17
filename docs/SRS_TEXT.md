@@ -43,3 +43,4 @@ Allow users to create, edit, move, and delete markdown-capable text blocks on th
 | REQ-TEXT-029 | When a text block is selected (not editing), left/right resize handles shall change width; height remains content-driven after reflow | Must | T92 |
 | REQ-TEXT-030 | Markdown headings shall render visually larger and heavier than body text — `#` at 1.6em/700, `##` at 1.3em/600, `###` at 1.1em/600 | Must | T58 |
 | REQ-TEXT-031 | Heading sizes shall be expressed relative to the block's own `fontSize`, so changing a block's font size scales its headings with it | Must | T58 |
+| REQ-TEXT-032 | Double-tapping an existing text block (touch) shall enter inline edit mode, matching double-click (REQ-TEXT-003) | Must | T139 |

@@ -4,6 +4,7 @@ import { TextToolbar } from './TextToolbar';
 import { ImageToolbar } from './ImageToolbar';
 import { DrawToolbar } from './DrawToolbar';
 import { ShapeToolbar } from './ShapeToolbar';
+import { GroupToolbar, useGroupControls } from './GroupToolbar';
 import type { TextOptions, ShapeOptions, ShapeNodeData } from '../../types/data';
 import './BottomToolbar.css';
 
@@ -20,6 +21,7 @@ export function BottomToolbar() {
   const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds);
   const nodes = useCanvasStore((s) => s.nodes);
   const updateNode = useCanvasStore((s) => s.updateNode);
+  const hasGroupControls = useGroupControls() !== null;
 
   // Track last creation tool (not select/lasso)
   if (activeTool !== 'select' && activeTool !== 'lasso') {
@@ -44,12 +46,25 @@ export function BottomToolbar() {
   const isImageContext = effectiveTool === 'image' || !!selectedImageNode;
   const isTextContext = effectiveTool === 'text' || !!selectedTextNode;
 
-  if (!isTextContext && !isImageContext && !isDrawContext && !isShapeContext) return null;
+  // The group segment is deliberately outside the context chain below. A
+  // diagram matches no context at all, so gating it the same way is what left
+  // the bar completely empty for the one selection that most needed a control.
+  const group = hasGroupControls ? <GroupToolbar /> : null;
+
+  if (!isTextContext && !isImageContext && !isDrawContext && !isShapeContext) {
+    if (!group) return null;
+    return (
+      <div className="bottom-toolbar" data-testid="bottom-toolbar">
+        {group}
+      </div>
+    );
+  }
 
   if (isDrawContext && !selectedShapeNode && !selectedImageNode && !selectedTextNode) {
     return (
       <div className="bottom-toolbar" data-testid="bottom-toolbar">
         <DrawToolbar />
+        {group}
       </div>
     );
   }
@@ -78,6 +93,7 @@ export function BottomToolbar() {
     return (
       <div className="bottom-toolbar" data-testid="bottom-toolbar">
         <ShapeToolbar options={currentShapeOptions} onChange={handleShapeChange} hasSelectedShape={!!selectedShapeNode} />
+        {group}
       </div>
     );
   }
@@ -86,6 +102,7 @@ export function BottomToolbar() {
     return (
       <div className="bottom-toolbar" data-testid="bottom-toolbar">
         <ImageToolbar node={selectedImageNode ?? undefined} />
+        {group}
       </div>
     );
   }
@@ -112,6 +129,7 @@ export function BottomToolbar() {
   return (
     <div className="bottom-toolbar" data-testid="bottom-toolbar">
       <TextToolbar options={currentOptions} onChange={handleChange} />
+      {group}
     </div>
   );
 }

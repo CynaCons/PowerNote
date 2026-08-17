@@ -970,10 +970,21 @@ const TOOLS = [
   {
     name: 'get_background',
     description:
-      'Read the notebook\'s canvas look: which guide style is active and which ' +
-      'background colour. Call before set_background when you intend to restore ' +
-      'the previous look afterwards.',
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      'Read the canvas look a page is actually drawn with: which guide style is ' +
+      'active and which background colour. A page may override the notebook ' +
+      'default, so the reply also carries "source" (whether each value came from ' +
+      'the page or the notebook) and "notebookDefault". Call before ' +
+      'set_background when you intend to restore the previous look afterwards.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pageId: {
+          type: 'string',
+          description: 'Page to read. Defaults to the active page.',
+        },
+      },
+      additionalProperties: false,
+    },
   },
   {
     name: 'set_background',
@@ -983,7 +994,10 @@ const TOOLS = [
       'reading and for notes an agent is filling in. "pages" shows detached A4 ' +
       'cards, "grid" a dot grid, "none" a blank canvas. The setting is stored in ' +
       'the notebook itself, so it survives closing and reopening. Pass at least ' +
-      'one of guideStyle or color.',
+      'one of guideStyle or color.\n\n' +
+      'Scope defaults to "notebook" (every page that has not overridden it). Pass ' +
+      'scope:"page" to change one page only — useful when a notebook wants a ' +
+      'scrolling page of notes next to a grid page of diagrams.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -996,6 +1010,18 @@ const TOOLS = [
           type: 'string',
           enum: ['white', 'light-gray', 'gray', 'paper'],
           description: 'Canvas background colour. "paper" is a warm off-white.',
+        },
+        scope: {
+          type: 'string',
+          enum: ['notebook', 'page'],
+          description:
+            'Which layer to write. "notebook" (default) sets the default every ' +
+            'page follows unless it overrides it, and leaves existing overrides ' +
+            'alone. "page" overrides one page only.',
+        },
+        pageId: {
+          type: 'string',
+          description: 'Page to change when scope is "page". Defaults to the active page.',
         },
       },
       additionalProperties: false,

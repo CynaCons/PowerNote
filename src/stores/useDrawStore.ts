@@ -36,7 +36,7 @@ let undoStack: Stroke[][] = [];
 let redoStack: Stroke[][] = [];
 
 function pushUndo(strokes: Stroke[]) {
-  undoStack.push(strokes.map((s) => ({ ...s, points: [...s.points] })));
+  undoStack.push(deepCopy(strokes));
   if (undoStack.length > MAX_HISTORY) undoStack.shift();
   redoStack = [];
 }
@@ -53,7 +53,11 @@ export function replaceStrokesSilent(strokes: Stroke[]) {
 }
 
 function deepCopy(strokes: Stroke[]): Stroke[] {
-  return strokes.map((s) => ({ ...s, points: [...s.points] }));
+  return strokes.map((s) => ({
+    ...s,
+    points: [...s.points],
+    ...(s.pressures ? { pressures: [...s.pressures] } : {}),
+  }));
 }
 
 export const useDrawStore = create<DrawState>((set, get) => ({

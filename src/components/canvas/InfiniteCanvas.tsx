@@ -4,6 +4,7 @@ import type Konva from 'konva';
 import { useCanvasStore, MIN_SCALE, MAX_SCALE } from '../../stores/useCanvasStore';
 import { useToolStore } from '../../stores/useToolStore';
 import { getToolConfig } from '../../utils/toolConfig';
+import { sortNodesForPaint } from '../../utils/zOrder';
 import { useDrawStore } from '../../stores/useDrawStore';
 import { CanvasNode } from './CanvasNode';
 import { SelectionTransformer } from './SelectionTransformer';
@@ -13,7 +14,6 @@ import { PageGuides } from './PageGuides';
 import { ScrollHeaders } from './ScrollHeaders';
 import { DrawingLayer } from './DrawingLayer';
 import { TrashButton } from './TrashButton';
-import { GroupIsolationBar } from './GroupIsolationBar';
 import { DiagramSourceDialog } from './DiagramSourceDialog';
 import { useShapeCreation } from '../../hooks/useShapeCreation';
 import { useTextPlacement, consumeAutoEditNodeId } from '../../hooks/useTextPlacement';
@@ -70,20 +70,32 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
   // ── Extracted hooks ─────────────────────────────────────────
   const {
     inProgressPoints,
+    inProgressPressures,
     eraserPos,
     penCursorPos,
     lassoRect,
     shapePreview,
-    handleDrawMouseDown,
-    handleDrawMouseMove,
-    handleDrawMouseUp,
+    handleDrawPointerDown,
+    handleDrawPointerMove,
+    handleDrawPointerUp,
+    handleDrawPointerCancel,
+    cancelInProgress,
+    isPenGestureActive,
   } = useShapeCreation(stageRef);
 
   const { handleStageClick } = useTextPlacement(stageRef, addNode, selectNode, clearSelection);
 
   useCanvasKeyboard(clearSelection);
 
-  const { contextMenu, handleContextMenu, closeContextMenu } = useContextMenu(stageRef);
+  const {
+    contextMenu,
+    handleContextMenu,
+    closeContextMenu,
+    handleLongPressPointerDown,
+    handleLongPressPointerMove,
+    handleLongPressPointerUp,
+    handleLongPressPointerCancel,
+  } = useContextMenu(stageRef);
 
   useCanvasDragDrop(containerRef, stageRef, dimensions);
 
@@ -180,16 +192,29 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
 
   const handleTouchStart = useCallback(
     (e: Konva.KonvaEventObject<TouchEvent>) => {
+      // Palm rejection: while the pen writes, a second contact is a resting
+      // hand, not a pinch (REQ-DRAW-013).
+      if (isPenGestureActive()) return;
       if (e.evt.touches.length >= 2) {
         isPinching.current = true;
+        // Each pinch initializes itself: trusting touchend to have reset
+        // these leaves the previous gesture's finger distance behind when
+        // an end event arrives malformed, and the next pinch then opens
+        // with a violent phantom zoom.
+        lastPinchDist.current = null;
+        lastPinchCenter.current = null;
         stageRef.current?.stopDrag();
+        // A stroke the first finger started belongs to the zoom gesture,
+        // not the page — discard it before pinch takes over.
+        cancelInProgress();
       }
     },
-    [],
+    [isPenGestureActive, cancelInProgress],
   );
 
   const handleTouchMove = useCallback(
     (e: Konva.KonvaEventObject<TouchEvent>) => {
+      if (isPenGestureActive()) return;
       const touches = e.evt.touches;
       if (touches.length !== 2) {
         lastPinchDist.current = null;
@@ -232,6 +257,15 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
         x: pointerOnStage.x - mousePointTo.x * newScale,
         y: pointerOnStage.y - mousePointTo.y * newScale,
       };
+
+      // Two fingers moving together pan (REQ-CANVAS-027): the zoom math
+      // above anchors the canvas under the centroid's CURRENT position, but
+      // only translating by the centroid's motion makes an unchanged finger
+      // distance drag the page.
+      if (lastPinchCenter.current) {
+        newPos.x += center.x - lastPinchCenter.current.x;
+        newPos.y += center.y - lastPinchCenter.current.y;
+      }
 
       stage.scale({ x: newScale, y: newScale });
       stage.position(newPos);
@@ -295,9 +329,14 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
           onClick={(e) => { closeContextMenu(); handleStageClick(e); }}
           onTap={handleStageClick}
           onContextMenu={handleContextMenu}
-          onMouseDown={isDrawTool ? handleDrawMouseDown : undefined}
-          onMouseMove={isDrawTool ? handleDrawMouseMove : undefined}
-          onMouseUp={isDrawTool ? handleDrawMouseUp : undefined}
+          // Draw/shape/lasso own touch for drawing/panning; every other tool
+          // gets the long-press path instead (REQ-CANVAS-028) — it no-ops
+          // for mouse and for anything but the select tool, so this never
+          // collides with node dragging or the other tools' own handlers.
+          onPointerDown={isDrawTool ? handleDrawPointerDown : handleLongPressPointerDown}
+          onPointerMove={isDrawTool ? handleDrawPointerMove : handleLongPressPointerMove}
+          onPointerUp={isDrawTool ? handleDrawPointerUp : handleLongPressPointerUp}
+          onPointerCancel={isDrawTool ? handleDrawPointerCancel : handleLongPressPointerCancel}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -328,8 +367,9 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
               return null;
             })()}
 
-            {/* Sort nodes by layer for z-ordering */}
-            {[...nodes].sort((a, b) => (a.layer ?? 3) - (b.layer ?? 3)).map((node) => {
+            {/* Paint order. Group-aware: a diagram's members sort inside its
+                band, so the frame's layer moves the whole drawing at once. */}
+            {sortNodesForPaint(nodes).map((node) => {
               const isAutoEdit = consumeAutoEditNodeId(node.id);
               const dimmed =
                 !!editingGroupId && node.groupId !== editingGroupId;
@@ -362,6 +402,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
               strokes={drawStrokes}
               selectedStrokeIds={selectedStrokeIds}
               inProgressPoints={inProgressPoints}
+              inProgressPressures={inProgressPressures}
               inProgressColor={useToolStore.getState().drawOptions?.color ?? '#1a1a1a'}
               inProgressWidth={useToolStore.getState().drawOptions?.strokeWidth ?? 3}
               eraserPos={eraserPos}
@@ -382,7 +423,6 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
       {selectedNodeIds.length > 0 && (
         <TrashButton />
       )}
-      <GroupIsolationBar />
       {/* PlantUML behind a diagram. DOM, outside the Stage on purpose. */}
       <DiagramSourceDialog />
       {/* Right-click context menu */}

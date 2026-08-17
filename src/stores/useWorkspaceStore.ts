@@ -41,7 +41,15 @@ interface WorkspaceState {
   setSaving: (saving: boolean) => void;
   updateWorkspace: (updates: Partial<WorkspaceData>) => void;
   /** Update canvas look settings and mark the notebook dirty */
+  /** The notebook-wide default. Does NOT touch pages that carry an override. */
   updateSettings: (updates: Partial<WorkspaceSettings>) => void;
+  /** Override the look of one page (the active one unless a target is given). */
+  updatePageSettings: (
+    updates: Partial<WorkspaceSettings>,
+    target?: { sectionId: string; pageId: string },
+  ) => void;
+  /** Drop a page's override so it follows the notebook default again. */
+  clearPageSettings: (target?: { sectionId: string; pageId: string }) => void;
 
   // Getters
   getActiveSection: () => Section | undefined;
@@ -126,6 +134,57 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
           workspace: {
             ...state.workspace,
             settings: { ...prev, ...updates },
+          },
+        };
+      }),
+
+    updatePageSettings: (updates, target) =>
+      set((state) => {
+        const sectionId = target?.sectionId ?? state.activeSectionId;
+        const pageId = target?.pageId ?? state.activePageId;
+        return {
+          isDirty: true,
+          workspace: {
+            ...state.workspace,
+            sections: state.workspace.sections.map((section) =>
+              section.id !== sectionId
+                ? section
+                : {
+                    ...section,
+                    pages: section.pages.map((page) =>
+                      page.id !== pageId
+                        ? page
+                        : { ...page, settings: { ...(page.settings ?? {}), ...updates } },
+                    ),
+                  },
+            ),
+          },
+        };
+      }),
+
+    clearPageSettings: (target) =>
+      set((state) => {
+        const sectionId = target?.sectionId ?? state.activeSectionId;
+        const pageId = target?.pageId ?? state.activePageId;
+        return {
+          isDirty: true,
+          workspace: {
+            ...state.workspace,
+            sections: state.workspace.sections.map((section) =>
+              section.id !== sectionId
+                ? section
+                : {
+                    ...section,
+                    pages: section.pages.map((page) => {
+                      if (page.id !== pageId) return page;
+                      // Dropped rather than emptied: an absent `settings` is what
+                      // every page written before overrides existed looks like,
+                      // and keeping one shape means one code path on load.
+                      const { settings: _dropped, ...rest } = page;
+                      return rest;
+                    }),
+                  },
+            ),
           },
         };
       }),

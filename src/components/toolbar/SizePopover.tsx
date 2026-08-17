@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { ALargeSmall, Minus } from 'lucide-react';
+import { PopoverPortal } from './PopoverPortal';
 import './Popover.css';
 
 interface SizePopoverProps {
@@ -24,27 +25,16 @@ export function SizePopover({
   unit = 'px',
 }: SizePopoverProps) {
   const [open, setOpen] = useState(false);
-  const popoverRef = useRef<HTMLDivElement>(null);
-
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    const handleClick = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [open]);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const Icon = icon === 'text' ? ALargeSmall : Minus;
 
   return (
-    <div className="popover-anchor" ref={popoverRef}>
+    <div className="popover-anchor">
       <button
+        ref={triggerRef}
         className="toolbar-popover-trigger"
-        onClick={() => setOpen(!open)}
+        onClick={() => setOpen((o) => !o)}
         title={label}
         data-testid="size-trigger"
       >
@@ -52,41 +42,45 @@ export function SizePopover({
         <span className="toolbar-popover-trigger__value">{value}</span>
       </button>
 
-      {open && (
-        <div className="toolbar-popover toolbar-popover--size" data-testid="size-popover">
-          <div className="toolbar-popover__title">{label}</div>
+      <PopoverPortal
+        open={open}
+        anchorRef={triggerRef}
+        onClose={() => setOpen(false)}
+        className="toolbar-popover toolbar-popover--size"
+        testId="size-popover"
+      >
+        <div className="toolbar-popover__title">{label}</div>
 
-          {/* Slider */}
-          <div className="size-popover__slider">
-            <input
-              type="range"
-              min={min}
-              max={max}
-              step={step}
-              value={value}
-              onChange={(e) => onChange(Number(e.target.value))}
-              className="size-popover__range"
-              data-testid="size-slider"
-            />
-            <span className="size-popover__readout">{value}{unit}</span>
-          </div>
-
-          <div className="toolbar-popover__divider" />
-
-          {/* Quick presets */}
-          <div className="size-popover__presets">
-            {getPresets(min, max, icon).map((preset) => (
-              <button
-                key={preset}
-                className={`size-popover__preset ${value === preset ? 'size-popover__preset--active' : ''}`}
-                onClick={() => onChange(preset)}
-              >
-                {preset}{unit}
-              </button>
-            ))}
-          </div>
+        {/* Slider */}
+        <div className="size-popover__slider">
+          <input
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            onChange={(e) => onChange(Number(e.target.value))}
+            className="size-popover__range"
+            data-testid="size-slider"
+          />
+          <span className="size-popover__readout">{value}{unit}</span>
         </div>
-      )}
+
+        <div className="toolbar-popover__divider" />
+
+        {/* Quick presets */}
+        <div className="size-popover__presets">
+          {getPresets(min, max, icon).map((preset) => (
+            <button
+              key={preset}
+              className={`size-popover__preset ${value === preset ? 'size-popover__preset--active' : ''}`}
+              onClick={() => onChange(preset)}
+            >
+              {preset}{unit}
+            </button>
+          ))}
+        </div>
+      </PopoverPortal>
     </div>
   );
 }

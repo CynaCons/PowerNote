@@ -62,3 +62,16 @@
   background: var(--color-active);
   color: var(--color-primary);
 }
+
+/* ── Touch devices ───────────────────────────────── */
+/* Finger-sized tool targets; the rail widens with them via its grid track. */
+@media (pointer: coarse) {
+  :root {
+    --nav-rail-width: 56px;
+  }
+
+  .nav-rail__btn {
+    width: 44px;
+    height: 44px;
+  }
+}

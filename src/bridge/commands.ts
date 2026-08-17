@@ -18,14 +18,14 @@ import type {
   TextNodeData,
   WorkspaceSettings,
 } from '../types/data';
-import { DEFAULT_WORKSPACE_SETTINGS } from '../utils/defaults';
+import { notebookSettings, resolvePageSettings } from '../utils/pageSettings';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useCanvasStore } from '../stores/useCanvasStore';
 import { useDrawStore } from '../stores/useDrawStore';
 import { createBlockNode, blockHeight, columnOf, orderedTextNodes, nextBlockY } from './blocks';
 import { columnX } from './blocks';
 import { rebuildDiagram, FRAME_MIN_W, FRAME_MIN_H } from '../diagram/canvasOps';
-import { looksLikeMermaid } from '../diagram/mermaid';
+import { sniffFormat } from '../diagram';
 import { generateId } from '../utils/ids';
 import { A4_WIDTH } from '../utils/pageLayout';
 import { scrollById } from '../utils/scrolls';
@@ -580,21 +580,61 @@ const NAME_BY_COLOR: Record<CanvasBgColor, string> = {
   paper: 'paper',
 };
 
-function currentSettings(): WorkspaceSettings {
-  return useWorkspaceStore.getState().workspace.settings ?? DEFAULT_WORKSPACE_SETTINGS;
+/** The look a page is actually drawn with — its override over the default. */
+function currentSettings(pageId?: string): WorkspaceSettings {
+  const { workspace } = useWorkspaceStore.getState();
+  const page = pageId
+    ? workspace.sections.flatMap((s) => s.pages).find((p) => p.id === pageId)
+    : useWorkspaceStore.getState().getActivePage();
+  return resolvePageSettings(page, workspace);
 }
 
 function describeBackground(settings: WorkspaceSettings) {
   return { guideStyle: settings.backgroundMode, color: NAME_BY_COLOR[settings.bgColor] };
 }
 
-function getBackground(): BackgroundResult {
-  return describeBackground(currentSettings());
+const BACKGROUND_SCOPES = ['notebook', 'page'];
+
+function readScope(params: Record<string, unknown>): 'notebook' | 'page' {
+  const scope = optionalString(params, 'scope');
+  if (scope === undefined) return 'notebook';
+  if (!BACKGROUND_SCOPES.includes(scope)) {
+    throw new BridgeCommandError(
+      'BAD_PARAMS',
+      `"${scope}" is not a scope. Valid values: ${BACKGROUND_SCOPES.join(', ')}.`,
+    );
+  }
+  return scope as 'notebook' | 'page';
+}
+
+/**
+ * Reports the EFFECTIVE look of a page plus where each value came from.
+ *
+ * Resolving rather than reading the notebook default straight off is what makes
+ * the answer match the screen; `notebookDefault` and `source` are additive, so
+ * an agent that only reads `guideStyle`/`color` is unaffected.
+ */
+function getBackground(params: Record<string, unknown>): BackgroundResult {
+  const { workspace } = useWorkspaceStore.getState();
+  const { page } = resolvePage(optionalString(params, 'pageId'));
+  const resolved = resolvePageSettings(page, workspace);
+
+  return {
+    ...describeBackground(resolved),
+    source: { guideStyle: resolved.source.backgroundMode, color: resolved.source.bgColor },
+    notebookDefault: describeBackground(notebookSettings(workspace)),
+    pageId: page.id,
+  };
 }
 
 function setBackground(params: Record<string, unknown>): BackgroundResult {
   flush();
-  const previous = describeBackground(currentSettings());
+  // Notebook by default. `set_background` shipped meaning notebook-wide, and
+  // quietly re-pointing it at the current page would change what every agent
+  // already written against it does.
+  const scope = readScope(params);
+  const { section, page } = resolvePage(optionalString(params, 'pageId'));
+  const previous = describeBackground(currentSettings(page.id));
   const updates: Partial<WorkspaceSettings> = {};
 
   const guideStyle = optionalString(params, 'guideStyle');
@@ -632,11 +672,31 @@ function setBackground(params: Record<string, unknown>): BackgroundResult {
     );
   }
 
-  // updateSettings marks the notebook dirty, so the normal auto-save pipeline
+  // Either action marks the notebook dirty, so the normal auto-save pipeline
   // persists this exactly like a change made from the settings panel.
-  useWorkspaceStore.getState().updateSettings(updates);
+  if (scope === 'page') {
+    useWorkspaceStore.getState().updatePageSettings(updates, {
+      sectionId: section.id,
+      pageId: page.id,
+    });
+  } else {
+    useWorkspaceStore.getState().updateSettings(updates);
+  }
 
-  return { ...describeBackground(currentSettings()), previous };
+  const { workspace } = useWorkspaceStore.getState();
+  const after = resolvePageSettings(
+    workspace.sections.flatMap((s) => s.pages).find((p) => p.id === page.id),
+    workspace,
+  );
+
+  return {
+    ...describeBackground(after),
+    source: { guideStyle: after.source.backgroundMode, color: after.source.bgColor },
+    notebookDefault: describeBackground(notebookSettings(workspace)),
+    pageId: page.id,
+    scope,
+    previous,
+  };
 }
 
 // ── Notebook management ─────────────────────────────────────
@@ -948,7 +1008,7 @@ async function createDiagram(params: Record<string, unknown>): Promise<CreateDia
     pageId: page.id,
     diagramId: frameId,
     title,
-    format: format ?? (looksLikeMermaid(source) ? 'mermaid' : 'plantuml'),
+    format: format ?? sniffFormat(source),
     column,
     elementCount: built.contents.length,
     width: built.frame.width,

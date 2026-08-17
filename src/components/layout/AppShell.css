@@ -1,6 +1,9 @@
 .app-shell {
   display: grid;
-  grid-template-columns: var(--nav-rail-width) 1fr;
+  /* minmax(0, 1fr), not bare 1fr: a fr track refuses to shrink below its
+     content's min-content width, so on a phone-width viewport the canvas
+     column overflowed the screen (found by T141 on a 390px viewport). */
+  grid-template-columns: var(--nav-rail-width) minmax(0, 1fr);
   grid-template-rows: var(--top-bar-height) 1fr;
   grid-template-areas:
     "nav topbar"
@@ -19,6 +22,9 @@
 
 .canvas-area__content {
   flex: 1;
+  /* Same rule at the flex level: without min-width: 0 a flex item bottoms
+     out at min-content and pushes past a narrow viewport. */
+  min-width: 0;
   position: relative;
   overflow: hidden;
 }

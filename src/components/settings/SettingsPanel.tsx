@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { BackgroundMode, CanvasBgColor } from '../../types/data';
+import type { BackgroundMode, CanvasBgColor, WorkspaceSettings } from '../../types/data';
+import type { ResolvedPageSettings, SettingsScope } from '../../utils/pageSettings';
 import { APP_VERSION } from '../../version';
 import { checkForUpdate, performUpdate, isLiveUpdateEnabled } from '../../utils/updateChecker';
 import { isFSASupported } from '../../utils/fileSystemAccess';
@@ -7,17 +8,28 @@ import { getCurrentHandle } from '../../utils/fileHandleStore';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
+import { useToolStore } from '../../stores/useToolStore';
 import { useBridgeStore, type BridgeStatus } from '../../stores/useBridgeStore';
 import { DEFAULT_BRIDGE_URL } from '../../bridge/protocol';
 import { showToast } from '../layout/Toast';
 import './SettingsPanel.css';
 
 interface SettingsPanelProps {
-  backgroundMode: BackgroundMode;
-  onChangeBackgroundMode: (mode: BackgroundMode) => void;
-  bgColor: CanvasBgColor;
-  onChangeBgColor: (color: CanvasBgColor) => void;
+  /** The look the active page is actually drawn with, and where it came from. */
+  resolved: ResolvedPageSettings;
+  /** What a page falls back to — shown while the scope is All pages. */
+  notebookDefault: WorkspaceSettings;
+  pageTitle: string;
+  onChange: (updates: Partial<WorkspaceSettings>, scope: SettingsScope) => void;
+  onClearPageOverride: () => void;
 }
+
+const GUIDE_STYLES: { value: BackgroundMode; label: string }[] = [
+  { value: 'pages', label: 'Pages' },
+  { value: 'scroll', label: 'Scroll' },
+  { value: 'grid', label: 'Grid' },
+  { value: 'none', label: 'None' },
+];
 
 const BG_COLORS: { value: CanvasBgColor; label: string; preview: string }[] = [
   { value: '#ffffff', label: 'White', preview: '#ffffff' },
@@ -28,6 +40,12 @@ const BG_COLORS: { value: CanvasBgColor; label: string; preview: string }[] = [
 
 type UpdateStatus = 'idle' | 'checking' | 'available' | 'updating-live' | 'updating-download' | 'failed';
 
+const TOUCH_DRAW_MODES: { value: 'auto' | 'always' | 'never'; label: string }[] = [
+  { value: 'auto', label: 'Auto — finger draws until a pen is used, then pans' },
+  { value: 'always', label: 'Finger always draws' },
+  { value: 'never', label: 'Finger always pans' },
+];
+
 const BRIDGE_STATUS_LABEL: Record<BridgeStatus, { text: string; color: string }> = {
   off: { text: 'Off', color: '#64748b' },
   connecting: { text: 'Waiting for agent server…', color: '#d97706' },
@@ -36,9 +54,31 @@ const BRIDGE_STATUS_LABEL: Record<BridgeStatus, { text: string; color: string }>
   displaced: { text: 'Another notebook took over', color: '#d97706' },
 };
 
-export function SettingsPanel({ backgroundMode, onChangeBackgroundMode, bgColor, onChangeBgColor }: SettingsPanelProps) {
+export function SettingsPanel({
+  resolved,
+  notebookDefault,
+  pageTitle,
+  onChange,
+  onClearPageOverride,
+}: SettingsPanelProps) {
+  // Which scope the controls WRITE to.
+  //
+  // Notebook by default, for the same reason the bridge command defaults there:
+  // these controls meant notebook-wide before per-page overrides existed, so
+  // starting on the page would silently change what an unchanged click does.
+  // The switch is visible, so choosing the page is one deliberate click.
+  const [scope, setScope] = useState<SettingsScope>('notebook');
+
+  // Editing the notebook default shows the default, not the page's override —
+  // otherwise the radio you see selected is not the one you are about to change.
+  const shown = scope === 'page' ? resolved : notebookDefault;
+  const backgroundMode = shown.backgroundMode;
+  const bgColor = shown.bgColor;
+
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
   const [updateInfo, setUpdateInfo] = useState<{ version: string; url?: string; releaseUrl?: string } | null>(null);
+
+  const touchDraw = useToolStore((s) => s.drawOptions.touchDraw);
 
   const bridgeEnabled = useBridgeStore((s) => s.enabled);
   const bridgeStatus = useBridgeStore((s) => s.status);
@@ -108,49 +148,43 @@ export function SettingsPanel({ backgroundMode, onChangeBackgroundMode, bgColor,
     <div className="settings-panel" data-testid="settings-panel">
       <h3 className="settings-panel__title">Settings</h3>
 
+      <div className="settings-panel__scope" data-testid="settings-scope" data-scope={scope}>
+        <button
+          type="button"
+          className={`settings-panel__scope-btn ${scope === 'page' ? 'settings-panel__scope-btn--active' : ''}`}
+          onClick={() => setScope('page')}
+          data-testid="settings-scope-page"
+          title={`Change the look of "${pageTitle}" only`}
+        >
+          This page
+        </button>
+        <button
+          type="button"
+          className={`settings-panel__scope-btn ${scope === 'notebook' ? 'settings-panel__scope-btn--active' : ''}`}
+          onClick={() => setScope('notebook')}
+          data-testid="settings-scope-notebook"
+          title="Change the default every page follows unless it overrides it"
+        >
+          All pages
+        </button>
+      </div>
+
       <div className="settings-panel__columns">
         <div className="settings-panel__section">
           <span className="settings-panel__label">Guide style</span>
 
-          <label className="settings-panel__radio">
-            <input
-              type="radio" name="bg-mode"
-              checked={backgroundMode === 'pages'}
-              onChange={() => onChangeBackgroundMode('pages')}
-              data-testid="settings-bg-pages"
-            />
-            <span>Pages</span>
-          </label>
-
-          <label className="settings-panel__radio">
-            <input
-              type="radio" name="bg-mode"
-              checked={backgroundMode === 'scroll'}
-              onChange={() => onChangeBackgroundMode('scroll')}
-              data-testid="settings-bg-scroll"
-            />
-            <span>Scroll</span>
-          </label>
-
-          <label className="settings-panel__radio">
-            <input
-              type="radio" name="bg-mode"
-              checked={backgroundMode === 'grid'}
-              onChange={() => onChangeBackgroundMode('grid')}
-              data-testid="settings-bg-grid"
-            />
-            <span>Grid</span>
-          </label>
-
-          <label className="settings-panel__radio">
-            <input
-              type="radio" name="bg-mode"
-              checked={backgroundMode === 'none'}
-              onChange={() => onChangeBackgroundMode('none')}
-              data-testid="settings-bg-none"
-            />
-            <span>None</span>
-          </label>
+          {GUIDE_STYLES.map((style) => (
+            <label className="settings-panel__radio" key={style.value}>
+              <input
+                type="radio"
+                name="bg-mode"
+                checked={backgroundMode === style.value}
+                onChange={() => onChange({ backgroundMode: style.value }, scope)}
+                data-testid={`settings-bg-${style.value}`}
+              />
+              <span>{style.label}</span>
+            </label>
+          ))}
         </div>
 
         <div className="settings-panel__section">
@@ -162,13 +196,59 @@ export function SettingsPanel({ backgroundMode, onChangeBackgroundMode, bgColor,
                 key={c.value}
                 className={`settings-panel__color-swatch ${bgColor === c.value ? 'settings-panel__color-swatch--active' : ''}`}
                 style={{ backgroundColor: c.preview }}
-                onClick={() => onChangeBgColor(c.value)}
+                onClick={() => onChange({ bgColor: c.value }, scope)}
                 title={c.label}
                 data-testid={`settings-bg-color-${c.value}`}
               />
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Only offered when there is something to undo, and only in page scope —
+          in notebook scope it would read as resetting the notebook. */}
+      {scope === 'page' && resolved.hasOverride && (
+        <button
+          type="button"
+          className="settings-panel__reset"
+          onClick={onClearPageOverride}
+          data-testid="settings-clear-page-override"
+        >
+          Use the notebook default for this page
+        </button>
+      )}
+
+      {scope === 'notebook' && (
+        <span className="settings-panel__note" data-testid="settings-scope-note">
+          {resolved.hasOverride
+            ? // Without this the panel would show one look while the canvas shows
+              // another, and the change you just made would appear to do nothing.
+              `Pages with their own look keep it — including "${pageTitle}", which you are looking at.`
+            : 'Pages with their own look keep it.'}
+        </span>
+      )}
+
+      {/* Device setting, not a notebook look — no page/notebook scope. */}
+      <div className="settings-panel__section" style={{ marginTop: 12, borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
+        <span className="settings-panel__label">Touch drawing</span>
+
+        {TOUCH_DRAW_MODES.map((mode) => (
+          <label className="settings-panel__radio" key={mode.value}>
+            <input
+              type="radio"
+              name="touch-draw"
+              checked={touchDraw === mode.value}
+              onChange={() => useToolStore.getState().setDrawOptions({ touchDraw: mode.value })}
+              data-testid={`settings-touchdraw-${mode.value}`}
+            />
+            <span>{mode.label}</span>
+          </label>
+        ))}
+
+        <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, display: 'block' }}>
+          The pen always draws, with pressure. Two fingers pan and zoom in any
+          mode. Saved for this device, not in the notebook.
+        </span>
       </div>
 
       <div className="settings-panel__section" style={{ marginTop: 12, borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>

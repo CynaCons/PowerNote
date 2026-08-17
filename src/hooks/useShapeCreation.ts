@@ -13,16 +13,33 @@ export interface ShapePreview {
   h: number;
 }
 
+/** Stylus eraser end: bit 32 of PointerEvent.buttons (S Pen, Surface pen). */
+const ERASER_BUTTON = 32;
+
 /**
- * Hook for all shape creation logic: draw tool (pen + eraser), shape tool (click+drag),
- * and lasso selection. Manages mouse down/move/up handlers, shape preview state,
- * in-progress drawing points, eraser position, pen cursor, and lasso rect.
+ * Touch is distrusted for this long after the last pen contact — a palm
+ * stays on the glass after the pen lifts, and must not pan, pinch or draw.
+ */
+const PALM_COOLDOWN_MS = 500;
+
+/**
+ * Hook for all shape creation logic: draw tool (pen + eraser), shape tool
+ * (click+drag), and lasso selection — driven by POINTER events (v0.42), so
+ * mouse, stylus and finger all reach the tools through one pipeline.
+ * Pen contacts record per-point pressure; fingers draw or pan depending on
+ * the touch-draw mode; a stylus held on its eraser end erases.
  */
 export function useShapeCreation(
   stageRef: React.RefObject<Konva.Stage | null>,
 ) {
-  // Drawing state
+  // Drawing state. The REFS are authoritative — a pointerup arriving in the
+  // same frame as the last pointermove must commit every point, and state
+  // read through a callback closure is one render behind by construction.
+  // The state mirrors the refs purely so the in-progress ink paints.
   const [inProgressPoints, setInProgressPoints] = useState<number[] | null>(null);
+  const [inProgressPressures, setInProgressPressures] = useState<number[] | null>(null);
+  const pointsRef = useRef<number[] | null>(null);
+  const pressuresRef = useRef<number[] | null>(null);
   const [eraserPos, setEraserPos] = useState<{ x: number; y: number; radius: number } | null>(null);
   const [penCursorPos, setPenCursorPos] = useState<{ x: number; y: number } | null>(null);
   const [lassoRect, setLassoRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
@@ -30,11 +47,22 @@ export function useShapeCreation(
   const lassoStart = useRef<{ x: number; y: number } | null>(null);
   const eraserState = useRef({ prevDir: null as { x: number; y: number } | null, shakeScore: 0, lastTime: 0 });
 
+  // One pointer owns the gesture. `erase` is latched at contact so flipping
+  // the stylus mid-stroke doesn't switch tools halfway through a line.
+  const activePointer = useRef<{
+    id: number;
+    type: string;
+    mode: 'draw' | 'erase' | 'shape' | 'lasso' | 'pan';
+  } | null>(null);
+  const panLast = useRef<{ x: number; y: number } | null>(null);
+  /** Wall-clock of the last pen contact — palms linger after the pen lifts. */
+  const lastPenActivity = useRef(0);
+
   // Shape creation state
   const [shapePreview, setShapePreview] = useState<ShapePreview | null>(null);
   const shapeStart = useRef<{ x: number; y: number } | null>(null);
 
-  const getCanvasPoint = useCallback((_e: Konva.KonvaEventObject<MouseEvent>) => {
+  const getCanvasPoint = useCallback(() => {
     const stage = stageRef.current;
     if (!stage) return { x: 0, y: 0 };
     const pos = stage.getPointerPosition();
@@ -42,6 +70,17 @@ export function useShapeCreation(
     return {
       x: (pos.x - stage.x()) / stage.scaleX(),
       y: (pos.y - stage.y()) / stage.scaleY(),
+    };
+  }, [stageRef]);
+
+  /** Client (viewport) coords → canvas coords, for coalesced pen samples. */
+  const clientToCanvas = useCallback((clientX: number, clientY: number) => {
+    const stage = stageRef.current;
+    if (!stage) return { x: 0, y: 0 };
+    const rect = stage.container().getBoundingClientRect();
+    return {
+      x: (clientX - rect.left - stage.x()) / stage.scaleX(),
+      y: (clientY - rect.top - stage.y()) / stage.scaleY(),
     };
   }, [stageRef]);
 
@@ -69,6 +108,8 @@ export function useShapeCreation(
    * Zone eraser: precise pixel-level erasing using circle-segment intersection.
    * Only the visual pixels under the eraser circle are removed.
    * Strokes are split at exact intersection points with the eraser boundary.
+   * A pressure stroke's pressures are carried through the split (interpolated
+   * at the cut), so the surviving pieces keep their varying width.
    */
   function eraseZoneAt(ex: number, ey: number, radius: number) {
     const store = useDrawStore.getState();
@@ -111,6 +152,10 @@ export function useShapeCreation(
     for (const stroke of strokes) {
       const pts = stroke.points;
       if (pts.length < 4) continue;
+      const prs =
+        stroke.pressures && stroke.pressures.length * 2 === pts.length
+          ? stroke.pressures
+          : null;
 
       // Quick bounding-box reject: skip strokes far from eraser
       let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -125,13 +170,26 @@ export function useShapeCreation(
 
       // Walk through segments, building "outside" runs
       // For each segment P1->P2, classify the segment parts as inside/outside
-      const outsideRuns: number[][] = [];
-      let currentRun: number[] = [];
+      const outsideRuns: { pts: number[]; prs: number[] | null }[] = [];
+      let runPts: number[] = [];
+      let runPrs: number[] = [];
       let modified = false;
+
+      const flushRun = () => {
+        if (runPts.length >= 4) outsideRuns.push({ pts: runPts, prs: prs ? runPrs : null });
+        runPts = [];
+        runPrs = [];
+      };
+      const pushPt = (x: number, y: number, p: number) => {
+        runPts.push(x, y);
+        if (prs) runPrs.push(p);
+      };
 
       for (let i = 0; i < pts.length - 2; i += 2) {
         const x1 = pts[i], y1 = pts[i + 1];
         const x2 = pts[i + 2], y2 = pts[i + 3];
+        const pr1 = prs ? prs[i / 2] : 0;
+        const pr2 = prs ? prs[i / 2 + 1] : 0;
         const p1in = isInside(x1, y1);
         const p2in = isInside(x2, y2);
 
@@ -139,13 +197,12 @@ export function useShapeCreation(
 
         if (!p1in && !p2in && crossings.length === 0) {
           // Entire segment outside — add both endpoints
-          if (currentRun.length === 0) currentRun.push(x1, y1);
-          currentRun.push(x2, y2);
+          if (runPts.length === 0) pushPt(x1, y1, pr1);
+          pushPt(x2, y2, pr2);
         } else if (p1in && p2in && crossings.length === 0) {
           // Entire segment inside — flush current run
           modified = true;
-          if (currentRun.length >= 4) outsideRuns.push(currentRun);
-          currentRun = [];
+          flushRun();
         } else {
           // Segment crosses the boundary
           modified = true;
@@ -163,18 +220,17 @@ export function useShapeCreation(
               // This sub-segment is outside
               const ax = lerp(x1, x2, ta), ay = lerp(y1, y2, ta);
               const bx = lerp(x1, x2, tb), by = lerp(y1, y2, tb);
-              if (currentRun.length === 0) currentRun.push(ax, ay);
-              currentRun.push(bx, by);
+              if (runPts.length === 0) pushPt(ax, ay, lerp(pr1, pr2, ta));
+              pushPt(bx, by, lerp(pr1, pr2, tb));
             } else {
               // This sub-segment is inside — flush
-              if (currentRun.length >= 4) outsideRuns.push(currentRun);
-              currentRun = [];
+              flushRun();
             }
           }
         }
       }
       // Flush last run
-      if (currentRun.length >= 4) outsideRuns.push(currentRun);
+      flushRun();
 
       if (!modified) continue;
 
@@ -182,9 +238,10 @@ export function useShapeCreation(
       for (const run of outsideRuns) {
         toAdd.push({
           id: generateId(),
-          points: run,
+          points: run.pts,
           color: stroke.color,
           strokeWidth: stroke.strokeWidth,
+          ...(run.prs ? { pressures: run.prs } : {}),
         });
       }
     }
@@ -197,8 +254,70 @@ export function useShapeCreation(
     }
   }
 
-  const handleDrawMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+  /**
+   * Discard whatever gesture is in progress WITHOUT committing it. Called on
+   * pointercancel, and by the pinch handler when a second finger lands —
+   * the half-drawn stroke belongs to a zoom, not to the page.
+   */
+  const cancelInProgress = useCallback(() => {
+    activePointer.current = null;
+    isDrawing.current = false;
+    panLast.current = null;
+    pointsRef.current = null;
+    pressuresRef.current = null;
+    setInProgressPoints(null);
+    setInProgressPressures(null);
+    shapeStart.current = null;
+    setShapePreview(null);
+    lassoStart.current = null;
+    setLassoRect(null);
+    setEraserPos(null);
+    setPenCursorPos(null);
+  }, []);
+
+  /**
+   * True while a pen gesture should suppress touch: a pen stroke is active,
+   * or one ended a moment ago and the palm is still on the glass.
+   */
+  const isPenGestureActive = useCallback(() => {
+    if (activePointer.current?.type === 'pen') return true;
+    return Date.now() - lastPenActivity.current < PALM_COOLDOWN_MS;
+  }, []);
+
+  /** Does a single finger draw right now, per the touch-draw mode? */
+  const touchDraws = () => {
+    const { drawOptions } = useToolStore.getState();
+    if (drawOptions.touchDraw === 'always') return true;
+    if (drawOptions.touchDraw === 'never') return false;
+    return !useToolStore.getState().penDetected;
+  };
+
+  const handleDrawPointerDown = useCallback((e: Konva.KonvaEventObject<PointerEvent>) => {
+    const evt = e.evt;
     const tool = useToolStore.getState().activeTool;
+
+    if (evt.pointerType === 'pen') {
+      lastPenActivity.current = Date.now();
+      // First pen contact of the session: in auto mode, fingers switch from
+      // drawing to panning from here on (REQ-DRAW-012).
+      if (!useToolStore.getState().penDetected) {
+        useToolStore.getState().setPenDetected(true);
+      }
+    }
+
+    // Palm rejection (REQ-DRAW-013): while the pen writes — or just wrote —
+    // touch contacts are noise, not intent.
+    if (evt.pointerType === 'touch' && isPenGestureActive()) return;
+
+    // One pointer owns the gesture. A second finger landing on top of a
+    // touch gesture hands over to pinch-zoom (the touch handlers see it too).
+    if (activePointer.current !== null) {
+      if (evt.pointerType === 'touch' && activePointer.current.type === 'touch') {
+        cancelInProgress();
+      }
+      return;
+    }
+
     // For shape tool: allow clicks on background elements (PageGuides, Stage)
     // For draw/erase/lasso: only trigger on Stage itself
     if (tool !== 'shape' && e.target !== stageRef.current) return;
@@ -213,13 +332,34 @@ export function useShapeCreation(
         target = target.parent;
       }
     }
-    const pt = getCanvasPoint(e);
+
+    // A finger that doesn't draw pans instead — in draw mode the stage isn't
+    // draggable, so the pan is driven here (REQ-DRAW-012).
+    if (evt.pointerType === 'touch' && !touchDraws()) {
+      activePointer.current = { id: evt.pointerId, type: 'touch', mode: 'pan' };
+      panLast.current = { x: evt.clientX, y: evt.clientY };
+      return;
+    }
+
+    // Keep receiving moves when the pointer leaves the canvas mid-gesture.
+    // Touch pointers are implicitly captured already; this is for pen/mouse.
+    try {
+      (evt.target as Element)?.setPointerCapture?.(evt.pointerId);
+    } catch {
+      // jsdom / detached target — capture is an enhancement, not a need
+    }
+
+    const pt = getCanvasPoint();
 
     if (tool === 'draw') {
       const drawOpts = useToolStore.getState().drawOptions;
-      if (drawOpts.isErasing) {
+      // The stylus eraser end erases without a toolbar round-trip
+      // (REQ-DRAW-014); latched for this contact.
+      const eraserHeld = evt.pointerType === 'pen' && (evt.buttons & ERASER_BUTTON) !== 0;
+      if (drawOpts.isErasing || eraserHeld) {
         // Eraser mode
         isDrawing.current = true;
+        activePointer.current = { id: evt.pointerId, type: evt.pointerType, mode: 'erase' };
         if (drawOpts.eraserMode === 'stroke') {
           eraseStrokeAt(pt.x, pt.y);
           setEraserPos({ ...pt, radius: 8 });
@@ -232,25 +372,60 @@ export function useShapeCreation(
       } else {
         // Pen mode
         isDrawing.current = true;
-        setInProgressPoints([pt.x, pt.y]);
+        activePointer.current = { id: evt.pointerId, type: evt.pointerType, mode: 'draw' };
+        pointsRef.current = [pt.x, pt.y];
+        // Pressure is only meaningful from a stylus: a mouse reports a flat
+        // 0.5 and most touchscreens a flat 1.0 (REQ-DRAW-011).
+        pressuresRef.current =
+          evt.pointerType === 'pen' ? [evt.pressure > 0 ? evt.pressure : 0.3] : null;
+        setInProgressPoints([...pointsRef.current]);
+        setInProgressPressures(pressuresRef.current ? [...pressuresRef.current] : null);
       }
     } else if (tool === 'shape') {
+      activePointer.current = { id: evt.pointerId, type: evt.pointerType, mode: 'shape' };
       shapeStart.current = pt;
       setShapePreview({ x: pt.x, y: pt.y, w: 0, h: 0 });
     } else if (tool === 'lasso') {
+      activePointer.current = { id: evt.pointerId, type: evt.pointerType, mode: 'lasso' };
       lassoStart.current = pt;
       setLassoRect({ x: pt.x, y: pt.y, w: 0, h: 0 });
     }
-  }, [getCanvasPoint, stageRef]);
+  }, [getCanvasPoint, stageRef, cancelInProgress, isPenGestureActive]);
 
-  const handleDrawMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleDrawPointerMove = useCallback((e: Konva.KonvaEventObject<PointerEvent>) => {
+    const evt = e.evt;
     const tool = useToolStore.getState().activeTool;
-    const pt = getCanvasPoint(e);
+
+    if (evt.pointerType === 'pen') lastPenActivity.current = Date.now();
+
+    // Only the owning pointer moves the gesture; a resting palm's moves and
+    // a second finger's moves are ignored here.
+    if (activePointer.current && evt.pointerId !== activePointer.current.id) return;
+
+    // Touch that isn't drawing never paints hover cursors.
+    if (!activePointer.current && evt.pointerType === 'touch') return;
+
+    // Finger pan (draw mode, non-drawing finger)
+    if (activePointer.current?.mode === 'pan') {
+      const stage = stageRef.current;
+      if (!stage || !panLast.current) return;
+      const dx = evt.clientX - panLast.current.x;
+      const dy = evt.clientY - panLast.current.y;
+      panLast.current = { x: evt.clientX, y: evt.clientY };
+      stage.position({ x: stage.x() + dx, y: stage.y() + dy });
+      useCanvasStore.getState().setViewport({ x: stage.x(), y: stage.y() });
+      return;
+    }
+
+    const pt = getCanvasPoint();
+    const erasing =
+      activePointer.current?.mode === 'erase' ||
+      (!activePointer.current && useToolStore.getState().drawOptions.isErasing);
 
     // Track cursor for draw tool
     if (tool === 'draw') {
       const drawOpts = useToolStore.getState().drawOptions;
-      if (drawOpts.isErasing) {
+      if (erasing) {
         // Eraser cursor
         setPenCursorPos(null);
         const radius = drawOpts.eraserMode === 'zone' ? drawOpts.eraserSize / 2 : 8;
@@ -271,8 +446,28 @@ export function useShapeCreation(
         setPenCursorPos({ x: pt.x, y: pt.y });
         setEraserPos(null);
 
-        if (isDrawing.current) {
-          setInProgressPoints((prev) => prev ? [...prev, pt.x, pt.y] : null);
+        if (isDrawing.current && activePointer.current?.mode === 'draw' && pointsRef.current) {
+          // A 120Hz+ stylus reports several samples per animation frame;
+          // the coalesced list keeps the curve smooth at speed.
+          const isPen = evt.pointerType === 'pen';
+          const samples =
+            isPen && typeof evt.getCoalescedEvents === 'function'
+              ? evt.getCoalescedEvents()
+              : [];
+          if (samples.length > 0) {
+            for (const s of samples) {
+              const c = clientToCanvas(s.clientX, s.clientY);
+              pointsRef.current.push(c.x, c.y);
+              pressuresRef.current?.push(s.pressure > 0 ? s.pressure : 0.3);
+            }
+          } else {
+            pointsRef.current.push(pt.x, pt.y);
+            pressuresRef.current?.push(evt.pressure > 0 ? evt.pressure : 0.3);
+          }
+          setInProgressPoints([...pointsRef.current]);
+          if (isPen && pressuresRef.current) {
+            setInProgressPressures([...pressuresRef.current]);
+          }
         }
       }
     } else {
@@ -286,7 +481,7 @@ export function useShapeCreation(
       let w = pt.x - start.x;
       let h = pt.y - start.y;
       // Shift constrains to square/circle
-      if (e.evt.shiftKey && shapeType !== 'arrow' && shapeType !== 'line') {
+      if (evt.shiftKey && shapeType !== 'arrow' && shapeType !== 'line') {
         const size = Math.max(Math.abs(w), Math.abs(h));
         w = Math.sign(w || 1) * size;
         h = Math.sign(h || 1) * size;
@@ -314,18 +509,36 @@ export function useShapeCreation(
         h: Math.abs(pt.y - start.y),
       });
     }
-  }, [getCanvasPoint, eraserPos]);
+  }, [getCanvasPoint, clientToCanvas, stageRef]);
 
-  const handleDrawMouseUp = useCallback(() => {
+  const handleDrawPointerUp = useCallback((e: Konva.KonvaEventObject<PointerEvent>) => {
+    const evt = e.evt;
+    if (evt.pointerType === 'pen') lastPenActivity.current = Date.now();
+    if (activePointer.current && evt.pointerId !== activePointer.current.id) return;
+
+    // Finger pan ends: viewport is already written per-move, just release.
+    if (activePointer.current?.mode === 'pan') {
+      activePointer.current = null;
+      panLast.current = null;
+      return;
+    }
+
     const tool = useToolStore.getState().activeTool;
 
     const drawOpts = useToolStore.getState().drawOptions;
-    if (tool === 'draw' && !drawOpts.isErasing && isDrawing.current && inProgressPoints && inProgressPoints.length >= 4) {
+    const wasErase = activePointer.current?.mode === 'erase';
+    const points = pointsRef.current;
+    if (tool === 'draw' && !wasErase && isDrawing.current && points && points.length >= 4) {
+      const pressures =
+        pressuresRef.current && pressuresRef.current.length * 2 === points.length
+          ? pressuresRef.current
+          : null;
       useDrawStore.getState().addStroke({
         id: generateId(),
-        points: inProgressPoints,
+        points,
         color: drawOpts.color,
         strokeWidth: drawOpts.strokeWidth,
+        ...(pressures ? { pressures } : {}),
       });
     } else if (tool === 'shape' && shapePreview) {
       // Commit shape node — different min size for shapes vs arrows/lines
@@ -390,26 +603,43 @@ export function useShapeCreation(
       }
     }
 
+    activePointer.current = null;
+    panLast.current = null;
     isDrawing.current = false;
+    pointsRef.current = null;
+    pressuresRef.current = null;
     setInProgressPoints(null);
+    setInProgressPressures(null);
     shapeStart.current = null;
     setShapePreview(null);
     lassoStart.current = null;
     setLassoRect(null);
     const opts = useToolStore.getState().drawOptions;
     if (!(tool === 'draw' && opts.isErasing)) setEraserPos(null);
-  }, [inProgressPoints, lassoRect, shapePreview]);
+    // A lifted finger leaves no hover: without this the pen dot sticks at
+    // the lift point until the next mouse move.
+    if (evt.pointerType === 'touch') setPenCursorPos(null);
+  }, [lassoRect, shapePreview]);
+
+  const handleDrawPointerCancel = useCallback(() => {
+    cancelInProgress();
+  }, [cancelInProgress]);
 
   return {
     // State
     inProgressPoints,
+    inProgressPressures,
     eraserPos,
     penCursorPos,
     lassoRect,
     shapePreview,
     // Handlers
-    handleDrawMouseDown,
-    handleDrawMouseMove,
-    handleDrawMouseUp,
+    handleDrawPointerDown,
+    handleDrawPointerMove,
+    handleDrawPointerUp,
+    handleDrawPointerCancel,
+    // Pinch/palm coordination
+    cancelInProgress,
+    isPenGestureActive,
   };
 }

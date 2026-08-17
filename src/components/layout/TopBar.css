@@ -47,6 +47,15 @@
   color: var(--color-text-muted);
   font-weight: 500;
   cursor: pointer;
+  /* Flex items block-ify, so this (and .top-bar__crumb below) can ellipsize
+     instead of being silently hard-clipped by .top-bar__breadcrumb's own
+     overflow:hidden — on a phone-width viewport with a long filename/section/
+     page title, that clipping could hide the active page's name entirely
+     with no indication anything was cut off. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .top-bar__filename:hover {
@@ -77,6 +86,10 @@
 
 .top-bar__crumb {
   color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .top-bar__crumb--active {
