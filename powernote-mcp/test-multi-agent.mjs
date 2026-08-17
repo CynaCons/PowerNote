@@ -191,6 +191,71 @@ async function main() {
     JSON.stringify(dioFrame),
   );
 
+  check('delete_diagram is offered', tools.includes('delete_diagram'));
+  const delDiag = await beta.call('delete_diagram', { diagramId: 'frame-1', confirm: true });
+  check('delete_diagram reaches the notebook', !delDiag.isError, delDiag.text);
+  const delFrame = notebook.frames.filter((f) => f.cmd === 'delete_diagram').pop();
+  check(
+    'delete_diagram routes as delete_diagram',
+    !!delFrame && delFrame.cmd === 'delete_diagram' && delFrame.params.diagramId === 'frame-1',
+    JSON.stringify(delFrame),
+  );
+
+  check('read_diagram is offered', tools.includes('read_diagram'));
+  check('get_block is offered', tools.includes('get_block'));
+  check('fit_diagram is offered', tools.includes('fit_diagram'));
+  const readDiag = await beta.call('read_diagram', { diagramId: 'frame-1' });
+  check('read_diagram reaches the notebook', !readDiag.isError, readDiag.text);
+  const readDiagFrame = notebook.frames.filter((f) => f.cmd === 'read_diagram').pop();
+  check(
+    'read_diagram routes as read_diagram',
+    !!readDiagFrame && readDiagFrame.cmd === 'read_diagram' && readDiagFrame.params.diagramId === 'frame-1',
+    JSON.stringify(readDiagFrame),
+  );
+
+  check('insert_block is offered', tools.includes('insert_block'));
+  check('move_block is offered', tools.includes('move_block'));
+  const inserted = await beta.call('insert_block', {
+    scrollId: 's1',
+    markdown: 'mid',
+    index: 0,
+  });
+  check('insert_block reaches the notebook', !inserted.isError, inserted.text);
+  const insertFrame = notebook.frames.filter((f) => f.cmd === 'insert_block').pop();
+  check(
+    'insert_block routes as insert_block',
+    !!insertFrame &&
+      insertFrame.cmd === 'insert_block' &&
+      insertFrame.params.scrollId === 's1' &&
+      insertFrame.params.index === 0,
+    JSON.stringify(insertFrame),
+  );
+
+  const movedBlock = await beta.call('move_block', { blockId: 'b1', after: 'b0' });
+  check('move_block reaches the notebook', !movedBlock.isError, movedBlock.text);
+  const moveBlockFrame = notebook.frames.filter((f) => f.cmd === 'move_block').pop();
+  check(
+    'move_block routes as move_block',
+    !!moveBlockFrame &&
+      moveBlockFrame.cmd === 'move_block' &&
+      moveBlockFrame.params.blockId === 'b1' &&
+      moveBlockFrame.params.after === 'b0',
+    JSON.stringify(moveBlockFrame),
+  );
+
+  check('move_scroll is offered', tools.includes('move_scroll'));
+  const moved = await beta.call('move_scroll', { scrollId: 's1', direction: 'left' });
+  check('move_scroll reaches the notebook', !moved.isError, moved.text);
+  const moveFrame = notebook.frames.filter((f) => f.cmd === 'move_scroll').pop();
+  check(
+    'move_scroll routes as move_scroll',
+    !!moveFrame &&
+      moveFrame.cmd === 'move_scroll' &&
+      moveFrame.params.scrollId === 's1' &&
+      moveFrame.params.direction === 'left',
+    JSON.stringify(moveFrame),
+  );
+
   // --- exclusion --------------------------------------------------------
   // beta holds the lease from the write above; alpha must be refused.
   const aWrite = await alpha.call('append_block', { markdown: 'from alpha' });
@@ -206,6 +271,17 @@ async function main() {
   // --- reads are never blocked -----------------------------------------
   const aRead = await alpha.call('list_pages');
   check('blocked agent can still read', !aRead.isError, aRead.text);
+  let compactOk = false;
+  try {
+    compactOk = aRead.text === JSON.stringify(JSON.parse(aRead.text));
+  } catch {
+    compactOk = false;
+  }
+  check(
+    'MCP payloads are compact JSON (no pretty-print indent)',
+    compactOk && !aRead.text.includes('\n  '),
+    aRead.text.slice(0, 120),
+  );
 
   // --- the lease expires so nobody is wedged ---------------------------
   await sleep(1400); // > POWERNOTE_LOCK_IDLE_MS set below

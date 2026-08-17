@@ -118,18 +118,50 @@ export function createBlockNode(
   };
 }
 
+/** Ids of diagram frames — the groups whose text is chrome, not content. */
+export function diagramFrameIds(nodes: CanvasNode[]): Set<string> {
+  const ids = new Set<string>();
+  for (const n of nodes) if (n.type === 'diagram') ids.add(n.id);
+  return ids;
+}
+
 /**
- * Text nodes on a page in reading order: column by column, top to bottom within
- * each. Column-major rather than pure top-to-bottom, so a two-column page reads
- * as two pages rather than interleaving the columns line by line.
+ * A free-standing text block: not a diagram label.
+ *
+ * Every diagram label is a `type:'text'` node carrying the frame's `groupId`.
+ * Including those in `read_page` leaked them as fake content and attributed
+ * the label's own x as the block's scroll. Only DIAGRAM-owned text is chrome,
+ * though: a user's Ctrl+G group of ordinary text blocks is still content —
+ * excluding every grouped text node would make grouped notes invisible to
+ * agents, which is data hidden, not noise removed.
+ */
+export function isContentBlock(node: CanvasNode, diagramIds: Set<string>): boolean {
+  if (node.type !== 'text') return false;
+  return !node.groupId || !diagramIds.has(node.groupId);
+}
+
+function compareReadingOrder(a: CanvasNode, b: CanvasNode): number {
+  const colDiff = columnOf(a) - columnOf(b);
+  if (colDiff !== 0) return colDiff;
+  if (Math.abs(a.y - b.y) > 20) return a.y - b.y;
+  return a.x - b.x;
+}
+
+/**
+ * Content text nodes on a page in reading order: column by column, top to
+ * bottom within each. Column-major rather than pure top-to-bottom, so a
+ * two-column page reads as two pages rather than interleaving the columns
+ * line by line. Group-owned text (diagram labels, grouped marks) is excluded.
  */
 export function orderedTextNodes(nodes: CanvasNode[]): CanvasNode[] {
-  return nodes
-    .filter((n) => n.type === 'text')
-    .sort((a, b) => {
-      const colDiff = columnOf(a) - columnOf(b);
-      if (colDiff !== 0) return colDiff;
-      if (Math.abs(a.y - b.y) > 20) return a.y - b.y;
-      return a.x - b.x;
-    });
+  const diagrams = diagramFrameIds(nodes);
+  return nodes.filter((n) => isContentBlock(n, diagrams)).sort(compareReadingOrder);
+}
+
+/**
+ * Diagram frames in the same reading order as blocks. Members stay out of
+ * this list — they are reached via `read_diagram`.
+ */
+export function orderedDiagramFrames(nodes: CanvasNode[]): CanvasNode[] {
+  return nodes.filter((n) => n.type === 'diagram').sort(compareReadingOrder);
 }

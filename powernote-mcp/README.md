@@ -43,10 +43,15 @@ socket on their machine.
 | Tool | What it does |
 |------|--------------|
 | `list_pages` | Every section and page, with block counts and which is open. Call first to get ids. |
-| `read_page` | A page as ordered markdown blocks with stable block ids. |
+| `read_page` | A page as ordered markdown blocks plus a diagrams[] index. Labels no longer leak. Supports include, scrollId, limit/cursor, and a hard 20k size cap (blocks, then sources, then diagrams, then markdown). |
+| `read_diagram` | One diagram (source + a page of members). `member_limit`/`member_cursor` page members; source that alone blows the 20k cap is truncated. Ids come from read_page diagrams[]. |
+| `get_block` | One markdown block by id. Cheap re-fetch after a capped read_page. Oversized markdown is truncated to the 20k cap. |
+| `fit_diagram` | Refit a diagram to its scroll band in both directions (grow or shrink). |
 | `create_section` | New section (sidebar tab), with an initial empty page. |
 | `create_page` | New titled page, opened. Also writes an `# Title` block unless `withHeading: false`. |
 | `append_block` | Append a markdown block to the bottom of a page. The main way to write. |
+| `insert_block` | Insert a block after an id (preferred) or at an index, shifting content below. |
+| `move_block` | Move a block within or across scrolls. Id-relative `after`. One undo. |
 | `update_block` | Replace an existing block's markdown, by id. |
 | `create_diagram_plantuml` | Draw a UML diagram from PlantUML source, as native canvas shapes. See [Diagrams](#diagrams). |
 | `create_diagram_mermaid` | Draw a flowchart or sequence from Mermaid source, as native canvas shapes. See [Diagrams](#diagrams). |
@@ -55,6 +60,7 @@ socket on their machine.
 | `list_scrolls` | The named scrolls (columns) on a page, with block counts. Call before writing to a shared page. |
 | `create_scroll` | New titled scroll to the right of the existing ones. Returns a `scrollId`. |
 | `rename_scroll` | Retitle a scroll. The title shows at the top of the column on the canvas. |
+| `move_scroll` | Move a scroll left/right or to a column. Members, grouped ink and width travel with the band. |
 | `delete_page` | Delete a page and its content. Requires `confirm`. |
 | `delete_section` | Delete a section and every page in it. Requires `confirm`. |
 | `delete_scroll` | Delete a scroll; keeps its blocks unless `withBlocks`. Requires `confirm`. |
@@ -234,7 +240,13 @@ workstreams to share a page.
 
 Target one with `append_block({ scrollId })`, using an id from `list_scrolls`.
 `read_page` reports each block's `scrollId` and returns blocks column-major —
-all of the leftmost scroll top to bottom, then the next.
+all of the leftmost scroll top to bottom, then the next. Diagram labels no
+longer appear in `blocks[]`; diagrams are listed separately in `diagrams[]`
+(`id`, `title`, `format`, `memberCount`, `bounds`). Pass `include: ["diagrams"]`
+for a diagrams-only fetch, `scrollId` to filter a band, and `limit`/`cursor`
+to page. A response that would exceed 20000 characters is trimmed at a
+block boundary (`truncated.at`), then sources, then diagrams — rather than
+failing. An oversized single block has its markdown cut (`markdownTruncated`).
 
 Membership is **positional**: a block belongs to whichever scroll it physically
 sits in, so a block the user drags into another scroll moves with it, and

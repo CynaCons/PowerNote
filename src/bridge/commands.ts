@@ -15,34 +15,70 @@ import type {
   BackgroundMode,
   CanvasBgColor,
   CanvasNode,
+  DiagramNodeData,
+  ScrollRecord,
+  Stroke,
   TextNodeData,
   WorkspaceSettings,
 } from '../types/data';
 import { notebookSettings, resolvePageSettings } from '../utils/pageSettings';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
-import { useCanvasStore } from '../stores/useCanvasStore';
+import { useCanvasStore, undoBatchStart, undoBatchEnd } from '../stores/useCanvasStore';
 import { useDrawStore } from '../stores/useDrawStore';
-import { createBlockNode, blockHeight, columnOf, orderedTextNodes, nextBlockY } from './blocks';
+import { liveCeiling } from '../utils/scrollCeiling';
+import {
+  createBlockNode,
+  blockHeight,
+  columnOf,
+  diagramFrameIds,
+  isContentBlock,
+  orderedDiagramFrames,
+  orderedTextNodes,
+  nextBlockY,
+} from './blocks';
 import { columnX } from './blocks';
-import { placeDiagramOnCanvas } from '../diagram/canvasOps';
+import {
+  diagramMembers,
+  diagramSourceOf,
+  fitExistingDiagram,
+  placeDiagramOnCanvas,
+} from '../diagram/canvasOps';
 import { sniffFormat, normalizeDrawioSource } from '../diagram';
 import { A4_WIDTH } from '../utils/pageLayout';
-import { scrollById } from '../utils/scrolls';
+import { contentBelongsToScroll, scrollById, strokeBelongsToScrollBand } from '../utils/scrolls';
+import {
+  applyDisplacements,
+  insertBlockAt,
+  planMoveBlock,
+  type PageLike,
+} from './reflow';
 import type {
   AppendBlockResult,
   CreateDiagramResult,
   BackgroundResult,
+  BlockSummary,
   BridgeCommandName,
   BridgeErrorCode,
   CheckUpdateResult,
   CreatePageResult,
   CreateScrollResult,
   CreateSectionResult,
+  DeleteDiagramResult,
   DeleteResult,
+  DiagramDetail,
   DiagramSourceFormat,
+  DiagramSummary,
+  FitDiagramResult,
+  GetBlockResult,
+  InsertBlockResult,
   ListPagesResult,
   ListScrollsResult,
+  MarkdownTruncation,
+  SourceOmitted,
+  SourceTruncation,
+  MoveBlockResult,
   MovePageResult,
+  MoveScrollResult,
   PageContent,
   RenameNotebookResult,
   RenamePageResult,
@@ -52,6 +88,7 @@ import type {
   ScrollSummary,
   UpdateBlockResult,
 } from './protocol';
+import { READ_DIAGRAM_DEFAULT_MEMBER_LIMIT, READ_PAGE_RESPONSE_BUDGET } from './protocol';
 import { APP_VERSION } from '../version';
 import { checkForUpdate, performUpdate } from '../utils/updateChecker';
 import { isFSASupported } from '../utils/fileSystemAccess';
@@ -175,9 +212,429 @@ function summariseScrolls(page: import('../types/data').Page): ScrollSummary[] {
       title: scroll.title,
       column: scroll.column,
       blockCount: page.nodes.filter(
-        (n) => n.type === 'text' && columnOf(n) === scroll.column,
+        (n) =>
+          isContentBlock(n, diagramFrameIds(page.nodes)) &&
+          columnOf(n, page.scrolls) === scroll.column,
       ).length,
     }));
+}
+
+function findNodeInNotebook(id: string) {
+  const { workspace } = useWorkspaceStore.getState();
+  for (const section of workspace.sections) {
+    for (const page of section.pages) {
+      const node = page.nodes.find((n) => n.id === id);
+      if (node) return { section, page, node };
+    }
+  }
+  return null;
+}
+
+function diagramTitleOf(node: CanvasNode): string {
+  const data = node.data as DiagramNodeData;
+  return typeof data?.title === 'string' ? data.title : '';
+}
+
+/** A node that belongs to a diagram frame (not the frame itself). */
+function owningDiagramFrame(nodes: CanvasNode[], node: CanvasNode): CanvasNode | null {
+  if (!node.groupId || node.groupId === node.id) return null;
+  return nodes.find((n) => n.id === node.groupId && n.type === 'diagram') ?? null;
+}
+
+function refuseDiagramMember(
+  node: CanvasNode,
+  frame: CanvasNode,
+  action: 'delete' | 'update' | 'move',
+): never {
+  const title = diagramTitleOf(frame) || frame.id;
+  const redraw = 'redraw the diagram source';
+  if (action === 'delete') {
+    throw new BridgeCommandError(
+      'UNSUPPORTED',
+      `"${node.id}" is a member of diagram "${title}" (${frame.id}). ` +
+        `Use delete_diagram to remove the whole diagram, or ${redraw}. ` +
+        'Individual members cannot be deleted over the bridge.',
+    );
+  }
+  if (action === 'move') {
+    throw new BridgeCommandError(
+      'UNSUPPORTED',
+      `"${node.id}" is a member of diagram "${title}" (${frame.id}). ` +
+        'Diagram members stay with the frame and cannot be moved with move_block.',
+    );
+  }
+  throw new BridgeCommandError(
+    'UNSUPPORTED',
+    `"${node.id}" is a member of diagram "${title}" (${frame.id}). ` +
+      `Update the diagram by ${redraw}; individual members cannot be edited over the bridge.`,
+  );
+}
+
+/** Frames, members, shapes, images — anything that is not a free-standing text block. */
+function refuseNonContentBlock(node: CanvasNode, nodes: CanvasNode[], verb: 'insert' | 'move'): never {
+  const owner = owningDiagramFrame(nodes, node);
+  if (owner) refuseDiagramMember(node, owner, 'move');
+  if (node.type === 'diagram') {
+    throw new BridgeCommandError(
+      'UNSUPPORTED',
+      `"${node.id}" is a diagram frame, not a content block. ` +
+        'Diagrams do not participate in block reflow — they hold position when blocks around them move.',
+    );
+  }
+  throw new BridgeCommandError(
+    'UNSUPPORTED',
+    `"${node.id}" is a ${node.type} node, not a content block. ` +
+      `Only free-standing text blocks can be ${verb === 'move' ? 'moved' : 'used as an insert anchor'} over the bridge.`,
+  );
+}
+
+function summariseDiagram(
+  nodes: CanvasNode[],
+  frame: CanvasNode,
+  withSource: boolean,
+): DiagramSummary {
+  const source = diagramSourceOf(frame);
+  return {
+    id: frame.id,
+    title: diagramTitleOf(frame),
+    format: sniffFormat(source),
+    memberCount: diagramMembers(nodes, frame.id).length,
+    bounds: { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
+    ...(withSource ? { source } : {}),
+  };
+}
+
+const INCLUDE_FIELDS = ['blocks', 'diagrams', 'strokes-summary'] as const;
+type IncludeField = (typeof INCLUDE_FIELDS)[number];
+
+function parseInclude(params: Record<string, unknown>): Set<IncludeField> {
+  const raw = params.include;
+  if (raw === undefined || raw === null) return new Set(['blocks', 'diagrams']);
+  if (!Array.isArray(raw)) {
+    throw new BridgeCommandError(
+      'BAD_PARAMS',
+      '"include" must be an array of "blocks", "diagrams", and/or "strokes-summary"',
+    );
+  }
+  const set = new Set<IncludeField>();
+  for (const item of raw) {
+    if (item !== 'blocks' && item !== 'diagrams' && item !== 'strokes-summary') {
+      throw new BridgeCommandError(
+        'BAD_PARAMS',
+        `"${String(item)}" is not an include field. Valid values: blocks, diagrams, strokes-summary.`,
+      );
+    }
+    set.add(item);
+  }
+  return set;
+}
+
+function optionalPositiveInt(params: Record<string, unknown>, key: string): number | undefined {
+  const value = params[key];
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
+    throw new BridgeCommandError('BAD_PARAMS', `"${key}" must be a positive integer`);
+  }
+  return value;
+}
+
+function optionalBool(params: Record<string, unknown>, key: string): boolean {
+  const value = params[key];
+  if (value === undefined || value === null) return false;
+  if (typeof value !== 'boolean') {
+    throw new BridgeCommandError('BAD_PARAMS', `"${key}" must be a boolean when provided`);
+  }
+  return value;
+}
+
+function windowByCursor<T>(
+  items: T[],
+  idOf: (item: T) => string,
+  cursor: string | undefined,
+  limit: number | undefined,
+  missing: (cursor: string) => string,
+): { items: T[]; more: boolean } {
+  let start = 0;
+  if (cursor) {
+    const idx = items.findIndex((item) => idOf(item) === cursor);
+    if (idx < 0) {
+      throw new BridgeCommandError('BAD_PARAMS', missing(cursor));
+    }
+    start = idx + 1;
+  }
+  const sliced = limit === undefined ? items.slice(start) : items.slice(start, start + limit);
+  return { items: sliced, more: start + sliced.length < items.length };
+}
+
+function windowBlocks(
+  blocks: BlockSummary[],
+  cursor: string | undefined,
+  limit: number | undefined,
+): { blocks: BlockSummary[]; more: boolean } {
+  const windowed = windowByCursor(
+    blocks,
+    (b) => b.blockId,
+    cursor,
+    limit,
+    (c) =>
+      `cursor "${c}" is not a block on this page (after filters). ` +
+      'Pass the last blockId from the previous read_page.',
+  );
+  return { blocks: windowed.items, more: windowed.more };
+}
+
+function serializedLength(value: unknown): number {
+  return JSON.stringify(value).length;
+}
+
+function assertWithinBudget(payload: unknown, tool: string): void {
+  const length = serializedLength(payload);
+  if (length > READ_PAGE_RESPONSE_BUDGET) {
+    throw new BridgeCommandError(
+      'INTERNAL',
+      `${tool} budget invariant violated: serialized length ${length} exceeds ${READ_PAGE_RESPONSE_BUDGET}`,
+    );
+  }
+}
+
+const SOURCE_OMITTED_NOTICE = 'use read_diagram';
+
+function omitDiagramSources(diagrams: DiagramSummary[]): DiagramSummary[] {
+  return diagrams.map((d) => {
+    if (typeof d.source !== 'string') return d;
+    const omitted: SourceOmitted = { length: d.source.length, notice: SOURCE_OMITTED_NOTICE };
+    const rest: DiagramSummary = { ...d };
+    delete rest.source;
+    return { ...rest, sourceOmitted: omitted };
+  });
+}
+
+/**
+ * Cut a string inside `payload` so the serialized payload fits `budget`.
+ * One implementation for oversized block markdown (read_page + get_block)
+ * and for a diagram source that alone blows the cap. Measures the whole
+ * payload, not the field in isolation — the envelope counts.
+ */
+function fitStringIntoPayload<T>(
+  payload: T,
+  read: (p: T) => string,
+  write: (p: T, value: string, meta: { fullLength: number; notice: string }) => T,
+  noticeFor: (fullLength: number) => string,
+  budget: number,
+): T {
+  const raw = read(payload);
+  if (typeof raw !== 'string') return payload;
+  if (serializedLength(payload) <= budget) return payload;
+
+  const fullLength = raw.length;
+  const meta = { fullLength, notice: noticeFor(fullLength) };
+
+  let lo = 0;
+  let hi = raw.length;
+  let best = 0;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const trial = write(payload, raw.slice(0, mid), meta);
+    if (serializedLength(trial) <= budget) {
+      best = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return write(payload, raw.slice(0, best), meta);
+}
+
+function markdownNotice(fullLength: number, budget: number): string {
+  return `Block markdown is ${fullLength} characters; truncated to fit the ${budget}-character budget.`;
+}
+
+function sourceNotice(fullLength: number, budget: number): string {
+  return (
+    `Source is ${fullLength} characters; truncated to fit the ${budget}-character budget. ` +
+    'Export as .drawio for the whole file.'
+  );
+}
+
+function fitBlockMarkdownInPage(
+  page: PageContent,
+  blockIndex: number,
+  budget = READ_PAGE_RESPONSE_BUDGET,
+): PageContent {
+  return fitStringIntoPayload(
+    page,
+    (p) => p.blocks[blockIndex]?.markdown ?? '',
+    (p, markdown, markdownTruncated: MarkdownTruncation) => {
+      const blocks = p.blocks.slice();
+      const current = blocks[blockIndex];
+      if (!current) return p;
+      blocks[blockIndex] = { ...current, markdown, markdownTruncated };
+      return { ...p, blocks };
+    },
+    (n) => markdownNotice(n, budget),
+    budget,
+  );
+}
+
+function fitSourceToBudget<T extends { source: string }>(
+  payload: T,
+  budget = READ_PAGE_RESPONSE_BUDGET,
+): T {
+  return fitStringIntoPayload(
+    payload,
+    (p) => p.source,
+    (p, source, sourceTruncated: SourceTruncation) => ({ ...p, source, sourceTruncated }),
+    (n) => sourceNotice(n, budget),
+    budget,
+  );
+}
+
+function applyResponseBudget(result: PageContent, moreAfterWindow: boolean): PageContent {
+  const blockNotice =
+    `Response exceeded the ${READ_PAGE_RESPONSE_BUDGET}-character budget. ` +
+    'Blocks after this one were omitted. Pass cursor with this block id to continue, ' +
+    'or get_block for a single block.';
+  const diagramNotice =
+    `Response exceeded the ${READ_PAGE_RESPONSE_BUDGET}-character budget. ` +
+    'Diagrams after this one were omitted.';
+
+  const pack = (
+    blocks: BlockSummary[],
+    diagrams: DiagramSummary[],
+    more: boolean,
+    truncatedAt?: string,
+    diagramsTruncatedAt?: string,
+  ): PageContent => {
+    const last = blocks[blocks.length - 1];
+    return {
+      ...result,
+      blocks,
+      diagrams,
+      ...(more && last ? { nextCursor: last.blockId } : {}),
+      ...(truncatedAt ? { truncated: { at: truncatedAt, notice: blockNotice } } : {}),
+      ...(diagramsTruncatedAt
+        ? { diagramsTruncated: { at: diagramsTruncatedAt, notice: diagramNotice } }
+        : {}),
+    };
+  };
+
+  let blocks = result.blocks;
+  let diagrams = result.diagrams;
+  let more = moreAfterWindow;
+  let truncatedAt: string | undefined;
+  let diagramsTruncatedAt: string | undefined;
+
+  let out = pack(blocks, diagrams, more);
+
+  // 1. Trim blocks at a block boundary, always keeping one when any exist.
+  if (serializedLength(out) > READ_PAGE_RESPONSE_BUDGET && blocks.length > 0) {
+    const kept: BlockSummary[] = [];
+    for (const block of blocks) {
+      const trial = pack([...kept, block], diagrams, true, block.blockId);
+      if (serializedLength(trial) > READ_PAGE_RESPONSE_BUDGET && kept.length > 0) break;
+      kept.push(block);
+    }
+    if (kept.length === 0) kept.push(blocks[0]);
+    const last = kept[kept.length - 1];
+    more = moreAfterWindow || kept.length < blocks.length;
+    truncatedAt = last.blockId;
+    blocks = kept;
+    out = pack(blocks, diagrams, more, truncatedAt);
+  }
+
+  // 2. Drop per-diagram source fields (replaced with sourceOmitted).
+  if (serializedLength(out) > READ_PAGE_RESPONSE_BUDGET) {
+    diagrams = omitDiagramSources(diagrams);
+    out = pack(blocks, diagrams, more, truncatedAt);
+  }
+
+  // 3. Trim diagrams[] at an entry boundary.
+  if (serializedLength(out) > READ_PAGE_RESPONSE_BUDGET && diagrams.length > 0) {
+    const kept: DiagramSummary[] = [];
+    for (const diagram of diagrams) {
+      const trial = pack(blocks, [...kept, diagram], more, truncatedAt, diagram.id);
+      if (serializedLength(trial) > READ_PAGE_RESPONSE_BUDGET && kept.length > 0) break;
+      kept.push(diagram);
+    }
+    const dropped = kept.length < diagrams.length;
+    diagrams = kept;
+    const last = kept[kept.length - 1];
+    diagramsTruncatedAt = dropped && last ? last.id : undefined;
+    out = pack(blocks, diagrams, more, truncatedAt, diagramsTruncatedAt);
+  }
+
+  // 4. A single block larger than the budget: keep it, cut its markdown
+  // against the full page payload (envelope + diagrams + scrolls count).
+  if (serializedLength(out) > READ_PAGE_RESPONSE_BUDGET && out.blocks.length > 0) {
+    for (let i = 0; i < out.blocks.length; i++) {
+      if (serializedLength(out) <= READ_PAGE_RESPONSE_BUDGET) break;
+      out = fitBlockMarkdownInPage(out, i);
+    }
+  }
+
+  assertWithinBudget(out, 'read_page');
+  return out;
+}
+
+function applyDiagramBudget(
+  result: DiagramDetail,
+  moreAfterWindow: boolean,
+): DiagramDetail {
+  const notice =
+    `Response exceeded the ${READ_PAGE_RESPONSE_BUDGET}-character budget. ` +
+    'Members after this one were omitted. Pass member_cursor with this member id to continue.';
+
+  const pack = (
+    members: DiagramDetail['members'],
+    more: boolean,
+    truncatedAt?: string,
+    extra?: Partial<DiagramDetail>,
+  ): DiagramDetail => {
+    const last = members[members.length - 1];
+    return {
+      ...result,
+      ...extra,
+      members,
+      ...(more && last ? { nextCursor: last.id } : { nextCursor: undefined }),
+      ...(truncatedAt ? { truncated: { at: truncatedAt, notice } } : { truncated: undefined }),
+    };
+  };
+
+  let members = result.members;
+  let more = moreAfterWindow;
+  let truncatedAt: string | undefined;
+  let out = pack(members, more);
+
+  if (serializedLength(out) > READ_PAGE_RESPONSE_BUDGET && members.length > 0) {
+    const kept: DiagramDetail['members'] = [];
+    for (const member of members) {
+      const trial = pack([...kept, member], true, member.id);
+      // Do not force-keep a first member that itself overflows — source
+      // may be the whole problem, and the next stage handles that.
+      if (serializedLength(trial) > READ_PAGE_RESPONSE_BUDGET) break;
+      kept.push(member);
+    }
+    const last = kept[kept.length - 1];
+    more = moreAfterWindow || kept.length < members.length;
+    truncatedAt = last?.id;
+    members = kept;
+    out = pack(members, more, truncatedAt);
+  }
+
+  // Source alone still over (even with zero members): cut the source.
+  if (serializedLength(out) > READ_PAGE_RESPONSE_BUDGET) {
+    const emptied = pack([], moreAfterWindow || result.members.length > 0);
+    const fitted = fitSourceToBudget(emptied);
+    out = fitted;
+  }
+
+  // Drop leftover `nextCursor: undefined` / `truncated: undefined` so they
+  // do not serialize as explicit nulls and inflate the payload.
+  if (out.nextCursor === undefined) delete (out as { nextCursor?: string }).nextCursor;
+  if (out.truncated === undefined) delete (out as { truncated?: PageContent['truncated'] }).truncated;
+
+  assertWithinBudget(out, 'read_diagram');
+  return out;
 }
 
 /**
@@ -205,6 +662,92 @@ function optionalString(params: Record<string, unknown>, key: string): string | 
   return value;
 }
 
+function locateScroll(scrollId: string) {
+  const { workspace } = useWorkspaceStore.getState();
+  for (const section of workspace.sections) {
+    for (const page of section.pages) {
+      const scroll = scrollById(page.scrolls, scrollId);
+      if (scroll) return { section, page, scroll };
+    }
+  }
+  return null;
+}
+
+function missingScrollMessage(scrollId: string): string {
+  const { workspace } = useWorkspaceStore.getState();
+  const known = workspace.sections
+    .flatMap((s) => s.pages)
+    .flatMap((p) => p.scrolls ?? [])
+    .map((s) => `"${s.id}"${s.title ? ` (${s.title})` : ''}`)
+    .join(', ');
+  return (
+    `No scroll with id "${scrollId}" in this notebook. ` +
+    (known ? `Known scrolls: ${known}.` : 'This notebook has no scrolls.') +
+    ' Call list_scrolls to refresh.'
+  );
+}
+
+/**
+ * Exactly one of `after` (id, preferred) or `index`.
+ *
+ * Ids survive reordering; an index is a snapshot of reading order and goes
+ * stale the moment anything above it moves — the same reason resolveColumn
+ * prefers scrollId over a raw column integer.
+ */
+function parseBlockAnchor(
+  params: Record<string, unknown>,
+  verb: 'insert_block' | 'move_block',
+): { after: string } | { index: number } {
+  const hasAfter = params.after !== undefined && params.after !== null;
+  const hasIndex = params.index !== undefined && params.index !== null;
+  if (hasAfter && hasIndex) {
+    throw new BridgeCommandError(
+      'BAD_PARAMS',
+      'Pass after (a block id) or index, not both. Prefer after: ids survive reordering, indices do not.',
+    );
+  }
+  if (!hasAfter && !hasIndex) {
+    throw new BridgeCommandError(
+      'BAD_PARAMS',
+      `${verb} needs exactly one of after (block id, preferred) or index.`,
+    );
+  }
+  if (hasAfter) {
+    if (typeof params.after !== 'string' || params.after.length === 0) {
+      throw new BridgeCommandError('BAD_PARAMS', '"after" must be a non-empty block id');
+    }
+    return { after: params.after };
+  }
+  if (typeof params.index !== 'number' || !Number.isInteger(params.index) || params.index < 0) {
+    throw new BridgeCommandError('BAD_PARAMS', '"index" must be a non-negative integer');
+  }
+  return { index: params.index };
+}
+
+function applyNodesInOneUndo(nextNodes: CanvasNode[]): void {
+  undoBatchStart(useCanvasStore.getState().nodes);
+  useCanvasStore.setState({ nodes: nextNodes });
+  useWorkspaceStore.getState().markDirty();
+  undoBatchEnd();
+}
+
+function toBlockSummary(
+  node: CanvasNode,
+  page: { scrolls?: import('../types/data').ScrollRecord[] },
+): BlockSummary {
+  const column = columnOf(node, page.scrolls);
+  return {
+    blockId: node.id,
+    markdown: (node.data as TextNodeData).text,
+    column,
+    scrollId: scrollIdForColumn(page as import('../types/data').Page, column),
+  };
+}
+
+function throwReflow(err: { code: 'NOT_FOUND' | 'BAD_PARAMS' | 'UNSUPPORTED'; message: string }): never {
+  throw new BridgeCommandError(err.code, err.message);
+}
+
 // ── Commands ────────────────────────────────────────────────
 
 function listPages(): ListPagesResult {
@@ -216,7 +759,7 @@ function listPages(): ListPagesResult {
       sectionTitle: section.title,
       pageId: page.id,
       title: page.title,
-      blockCount: page.nodes.filter((n) => n.type === 'text').length,
+      blockCount: page.nodes.filter((n) => isContentBlock(n, diagramFrameIds(page.nodes))).length,
       isActive: page.id === activePageId,
     })),
   );
@@ -226,21 +769,70 @@ function listPages(): ListPagesResult {
 function readPage(params: Record<string, unknown>): PageContent {
   flush();
   const { section, page } = resolvePage(optionalString(params, 'pageId'));
-  return {
+  const include = parseInclude(params);
+  const withSource = optionalBool(params, 'include_diagram_source');
+  const limit = optionalPositiveInt(params, 'limit');
+  const cursor = optionalString(params, 'cursor');
+  const scrollId = optionalString(params, 'scrollId');
+
+  if (scrollId) {
+    const scroll = scrollById(page.scrolls, scrollId);
+    if (!scroll) {
+      const known = (page.scrolls ?? [])
+        .map((s) => `"${s.id}"${s.title ? ` (${s.title})` : ''}`)
+        .join(', ');
+      throw new BridgeCommandError(
+        'NOT_FOUND',
+        `No scroll with id "${scrollId}" on page "${page.title}". ` +
+          (known ? `Known scrolls: ${known}.` : 'This page has no scrolls.') +
+          ' Call list_scrolls to refresh.',
+      );
+    }
+  }
+
+  const toBlock = (node: CanvasNode): BlockSummary => {
+    const column = columnOf(node, page.scrolls);
+    return {
+      blockId: node.id,
+      markdown: (node.data as TextNodeData).text,
+      column,
+      scrollId: scrollIdForColumn(page, column),
+    };
+  };
+
+  let blocks = include.has('blocks') ? orderedTextNodes(page.nodes).map(toBlock) : [];
+  if (scrollId) blocks = blocks.filter((b) => b.scrollId === scrollId);
+
+  const windowed = windowBlocks(blocks, cursor, limit);
+
+  let diagrams: DiagramSummary[] = [];
+  if (include.has('diagrams')) {
+    diagrams = orderedDiagramFrames(page.nodes)
+      .filter((frame) => {
+        if (!scrollId) return true;
+        return scrollIdForColumn(page, columnOf(frame, page.scrolls)) === scrollId;
+      })
+      .map((frame) => summariseDiagram(page.nodes, frame, withSource));
+  }
+
+  const result: PageContent = {
     sectionId: section.id,
     pageId: page.id,
     title: page.title,
-    blocks: orderedTextNodes(page.nodes).map((node) => {
-      const column = columnOf(node);
-      return {
-        blockId: node.id,
-        markdown: (node.data as TextNodeData).text,
-        column,
-        scrollId: scrollIdForColumn(page, column),
-      };
-    }),
+    blocks: windowed.blocks,
+    diagrams,
     scrolls: summariseScrolls(page),
   };
+
+  if (include.has('strokes-summary')) {
+    const strokes = page.strokes ?? [];
+    result.strokesSummary = {
+      count: strokes.length,
+      grouped: strokes.filter((s) => !!s.groupId).length,
+    };
+  }
+
+  return applyResponseBudget(result, windowed.more);
 }
 
 function createSection(params: Record<string, unknown>): CreateSectionResult {
@@ -313,6 +905,118 @@ async function appendBlock(params: Record<string, unknown>): Promise<AppendBlock
   };
 }
 
+async function insertBlock(params: Record<string, unknown>): Promise<InsertBlockResult> {
+  flush();
+  const markdown = requireString(params, 'markdown');
+  const scrollId = requireString(params, 'scrollId');
+  const anchor = parseBlockAnchor(params, 'insert_block');
+
+  const located = locateScroll(scrollId);
+  if (!located) {
+    throw new BridgeCommandError('NOT_FOUND', missingScrollMessage(scrollId));
+  }
+  const { section, page, scroll } = located;
+
+  if ('after' in anchor) {
+    const found = findNodeInNotebook(anchor.after);
+    if (!found) {
+      throw new BridgeCommandError('NOT_FOUND', `No block with id "${anchor.after}"`);
+    }
+    if (
+      found.page.id !== page.id ||
+      !isContentBlock(found.node, diagramFrameIds(found.page.nodes)) ||
+      columnOf(found.node, found.page.scrolls) !== scroll.column
+    ) {
+      const col = columnOf(found.node, found.page.scrolls);
+      const owner = scrollIdForColumn(found.page, col);
+      throw new BridgeCommandError(
+        'BAD_PARAMS',
+        `"after" block "${anchor.after}" is not in scroll "${scrollId}" ` +
+          `(it sits in ${owner ? `scroll "${owner}"` : `column ${col}`}). ` +
+          'Pass a block from that scroll, or use index.',
+      );
+    }
+  }
+
+  navigateToPage(section.id, page.id);
+
+  const live: PageLike = {
+    nodes: useCanvasStore.getState().nodes,
+    scrolls: useWorkspaceStore.getState().getActivePage()?.scrolls ?? page.scrolls,
+  };
+  const node = createBlockNode(markdown, live.nodes as CanvasNode[], scroll.column, live.scrolls);
+  const plan = insertBlockAt(
+    live,
+    scrollId,
+    'after' in anchor ? anchor.after : anchor.index,
+    node,
+    liveCeiling(),
+  );
+  if (!plan.ok) throwReflow(plan);
+
+  node.x = plan.x;
+  node.y = plan.y;
+  const nextNodes = [...applyDisplacements(live.nodes, plan.displaced), node];
+  applyNodesInOneUndo(nextNodes);
+  flush();
+
+  return {
+    ...toBlockSummary(node, { scrolls: live.scrolls as import('../types/data').ScrollRecord[] }),
+    displacedCount: plan.displaced.length,
+  };
+}
+
+async function moveBlock(params: Record<string, unknown>): Promise<MoveBlockResult> {
+  flush();
+  const blockId = requireString(params, 'blockId');
+  const destScrollId = optionalString(params, 'scrollId');
+  const anchor = parseBlockAnchor(params, 'move_block');
+
+  const found = findNodeInNotebook(blockId);
+  if (!found) {
+    throw new BridgeCommandError('NOT_FOUND', `No block with id "${blockId}"`);
+  }
+  if (!isContentBlock(found.node, diagramFrameIds(found.page.nodes))) {
+    refuseNonContentBlock(found.node, found.page.nodes, 'move');
+  }
+
+  if (destScrollId) {
+    const dest = locateScroll(destScrollId);
+    if (!dest) {
+      throw new BridgeCommandError('NOT_FOUND', missingScrollMessage(destScrollId));
+    }
+    if (dest.page.id !== found.page.id) {
+      throw new BridgeCommandError(
+        'BAD_PARAMS',
+        `Scroll "${destScrollId}" is not on the same page as block "${blockId}". ` +
+          'move_block stays on one page; pass a scroll from list_scrolls for that page.',
+      );
+    }
+  }
+
+  navigateToPage(found.section.id, found.page.id);
+
+  const live: PageLike = {
+    nodes: useCanvasStore.getState().nodes,
+    scrolls: useWorkspaceStore.getState().getActivePage()?.scrolls ?? found.page.scrolls,
+  };
+  const dest = {
+    scrollId: destScrollId,
+    ...('after' in anchor ? { after: anchor.after } : { index: anchor.index }),
+  };
+  const plan = planMoveBlock(live, blockId, dest, liveCeiling());
+  if (!plan.ok) throwReflow(plan);
+
+  applyNodesInOneUndo(plan.nextNodes);
+  flush();
+
+  const moved = useCanvasStore.getState().nodes.find((n) => n.id === blockId)!;
+  return {
+    ...toBlockSummary(moved, { scrolls: live.scrolls as import('../types/data').ScrollRecord[] }),
+    displacedCount: plan.displaced.length,
+  };
+}
+
 // ── Scrolls ─────────────────────────────────────────────────
 
 function listScrolls(params: Record<string, unknown>): ListScrollsResult {
@@ -348,7 +1052,12 @@ function createScrollCmd(params: Record<string, unknown>): CreateScrollResult {
 function renameScrollCmd(params: Record<string, unknown>): RenameScrollResult {
   flush();
   const scrollId = requireString(params, 'scrollId');
-  const title = requireString(params, 'title');
+  // Empty is valid: it untitleds the scroll (header goes, ceiling disarms).
+  const rawTitle = optionalString(params, 'title');
+  if (rawTitle === undefined) {
+    throw new BridgeCommandError('BAD_PARAMS', '"title" must be a string');
+  }
+  const title = rawTitle.trim();
 
   const { workspace } = useWorkspaceStore.getState();
   for (const section of workspace.sections) {
@@ -366,26 +1075,82 @@ function renameScrollCmd(params: Record<string, unknown>): RenameScrollResult {
   );
 }
 
+function parseMoveScrollSpec(
+  params: Record<string, unknown>,
+): { direction: 'left' | 'right' } | { toColumn: number } {
+  const hasDirection = params.direction !== undefined && params.direction !== null;
+  const hasColumn = params.toColumn !== undefined && params.toColumn !== null;
+  if (hasDirection && hasColumn) {
+    throw new BridgeCommandError(
+      'BAD_PARAMS',
+      'Pass direction ("left" | "right") or toColumn, not both.',
+    );
+  }
+  if (hasColumn) {
+    const value = params.toColumn;
+    if (typeof value !== 'number' || !Number.isInteger(value)) {
+      throw new BridgeCommandError('BAD_PARAMS', '"toColumn" must be an integer');
+    }
+    return { toColumn: value };
+  }
+  if (hasDirection) {
+    const value = params.direction;
+    if (value !== 'left' && value !== 'right') {
+      throw new BridgeCommandError(
+        'BAD_PARAMS',
+        '"direction" must be "left" or "right"',
+      );
+    }
+    return { direction: value };
+  }
+  throw new BridgeCommandError(
+    'BAD_PARAMS',
+    'move_scroll needs direction ("left" | "right") or toColumn.',
+  );
+}
+
+async function moveScrollCmd(params: Record<string, unknown>): Promise<MoveScrollResult> {
+  flush();
+  const scrollId = requireString(params, 'scrollId');
+  const spec = parseMoveScrollSpec(params);
+
+  const { workspace } = useWorkspaceStore.getState();
+  for (const section of workspace.sections) {
+    for (const page of section.pages) {
+      const scroll = scrollById(page.scrolls, scrollId);
+      if (!scroll) continue;
+
+      const { moveScroll } = await import('../utils/scrollOps');
+      const result = moveScroll(page.id, scrollId, spec);
+      if (!result.ok) {
+        throw new BridgeCommandError(result.code, result.message);
+      }
+      return {
+        scrollId: result.scrollId,
+        title: result.title,
+        fromColumn: result.fromColumn,
+        toColumn: result.toColumn,
+      };
+    }
+  }
+
+  throw new BridgeCommandError(
+    'NOT_FOUND',
+    `No scroll with id "${scrollId}" in this notebook. Call list_scrolls to refresh.`,
+  );
+}
+
 async function updateBlock(params: Record<string, unknown>): Promise<UpdateBlockResult> {
   flush();
   const blockId = requireString(params, 'blockId');
   const markdown = requireString(params, 'markdown');
 
-  const { workspace } = useWorkspaceStore.getState();
-  let found: { sectionId: string; pageId: string; node: CanvasNode } | null = null;
-  for (const section of workspace.sections) {
-    for (const page of section.pages) {
-      const node = page.nodes.find((n) => n.id === blockId);
-      if (node) {
-        found = { sectionId: section.id, pageId: page.id, node };
-        break;
-      }
-    }
-    if (found) break;
-  }
+  const found = findNodeInNotebook(blockId);
   if (!found) {
     throw new BridgeCommandError('NOT_FOUND', `No block with id "${blockId}"`);
   }
+  const owner = owningDiagramFrame(found.page.nodes, found.node);
+  if (owner) refuseDiagramMember(found.node, owner, 'update');
   if (found.node.type !== 'text') {
     throw new BridgeCommandError(
       'UNSUPPORTED',
@@ -393,7 +1158,7 @@ async function updateBlock(params: Record<string, unknown>): Promise<UpdateBlock
     );
   }
 
-  navigateToPage(found.sectionId, found.pageId);
+  navigateToPage(found.section.id, found.page.id);
 
   const previous = found.node.data as TextNodeData;
   const updated: TextNodeData = { ...previous, text: markdown };
@@ -490,10 +1255,70 @@ function deleteSectionCmd(params: Record<string, unknown>): DeleteResult {
   return { deleted: 'section', id: sectionId, title: section.title };
 }
 
+/**
+ * `content: delete|keep` is required when the band holds anything. There is
+ * no default — keep used to be implicit, and a flip would silently destroy
+ * callers that never passed the flag. `withBlocks` is the old name.
+ */
+function resolveScrollContent(params: Record<string, unknown>): {
+  deleteContent: boolean;
+  usedLegacyAlias: boolean;
+} {
+  const usedLegacyAlias = params.withBlocks === true || params.withBlocks === false;
+  const content = params.content;
+  if (content !== undefined && content !== null) {
+    if (content !== 'delete' && content !== 'keep') {
+      throw new BridgeCommandError(
+        'BAD_PARAMS',
+        '"content" must be "delete" or "keep"',
+      );
+    }
+    return { deleteContent: content === 'delete', usedLegacyAlias };
+  }
+  if (params.withBlocks === true) return { deleteContent: true, usedLegacyAlias: true };
+  if (params.withBlocks === false) return { deleteContent: false, usedLegacyAlias: true };
+  return { deleteContent: false, usedLegacyAlias: false };
+}
+
+function hasScrollContentChoice(params: Record<string, unknown>): boolean {
+  if (params.content !== undefined && params.content !== null) return true;
+  return params.withBlocks === true || params.withBlocks === false;
+}
+
+function bandContentAtStake(
+  scroll: ScrollRecord,
+  scrolls: ScrollRecord[],
+  nodes: CanvasNode[],
+  strokes: Stroke[],
+): { nodes: number; groupMembers: number; strokes: number } {
+  const bandNodes = nodes.filter((n) => contentBelongsToScroll(n, scroll, scrolls, nodes));
+  return {
+    nodes: bandNodes.length,
+    groupMembers: bandNodes.filter((n) => n.groupId && n.id !== n.groupId).length,
+    strokes: strokes.filter((s) => strokeBelongsToScrollBand(s, scroll, scrolls, nodes)).length,
+  };
+}
+
+function missingScrollContentMessage(counts: {
+  nodes: number;
+  groupMembers: number;
+  strokes: number;
+}): string {
+  const nodePart =
+    `${counts.nodes} node${counts.nodes === 1 ? '' : 's'}` +
+    (counts.groupMembers > 0
+      ? ` (${counts.groupMembers} group member${counts.groupMembers === 1 ? '' : 's'})`
+      : '');
+  const strokePart = `${counts.strokes} stroke${counts.strokes === 1 ? '' : 's'}`;
+  return (
+    `"content" is required: this scroll holds ${nodePart} and ${strokePart}. ` +
+    'Pass content:"delete" to remove them with the band, or content:"keep" to close the gap and leave them where they are. ' +
+    'There is no default (the old default was keep).'
+  );
+}
+
 async function deleteScrollCmd(params: Record<string, unknown>): Promise<DeleteResult> {
   flush();
-  const withBlocks = params.withBlocks === true;
-  requireConfirm(params, withBlocks ? 'a scroll and its blocks' : 'a scroll');
   const scrollId = requireString(params, 'scrollId');
 
   const { workspace } = useWorkspaceStore.getState();
@@ -505,23 +1330,37 @@ async function deleteScrollCmd(params: Record<string, unknown>): Promise<DeleteR
       if ((page.scrolls ?? []).length <= 1) {
         throw new BridgeCommandError(
           'PRECONDITION',
-          `"${scroll.title || scrollId}" is the only scroll on "${page.title}", and a page must ` +
-            'keep at least one for content to be appended to.',
+          `"${scroll.title || scrollId}" is the only scroll on "${page.title}". ` +
+            'A plain page is one untitled scroll — untitle it instead of deleting the last one.',
         );
       }
 
-      const blocksRemoved = withBlocks
-        ? page.nodes.filter((n) => columnOf(n) === scroll.column).length
-        : 0;
+      const scrolls = page.scrolls ?? [];
+      const atStake = bandContentAtStake(scroll, scrolls, page.nodes, page.strokes ?? []);
+      const bandHasContent = atStake.nodes > 0 || atStake.strokes > 0;
+      if (bandHasContent && !hasScrollContentChoice(params)) {
+        throw new BridgeCommandError('BAD_PARAMS', missingScrollContentMessage(atStake));
+      }
+
+      const { deleteContent, usedLegacyAlias } = resolveScrollContent(params);
+      requireConfirm(params, deleteContent ? 'a scroll and its content' : 'a scroll');
+
+      const blocksRemoved = deleteContent ? atStake.nodes : 0;
 
       const { deleteScroll } = await import('../utils/scrollOps');
-      deleteScroll(page.id, scrollId, withBlocks);
+      deleteScroll(page.id, scrollId, deleteContent);
 
       return {
         deleted: 'scroll',
         id: scrollId,
         title: scroll.title,
         blocksRemoved,
+        ...(usedLegacyAlias
+          ? {
+              notice:
+                'withBlocks is deprecated; use content:"delete" or content:"keep".',
+            }
+          : {}),
       };
     }
   }
@@ -532,26 +1371,201 @@ async function deleteScrollCmd(params: Record<string, unknown>): Promise<DeleteR
   );
 }
 
+function deleteDiagramCmd(params: Record<string, unknown>): DeleteDiagramResult {
+  flush();
+  requireConfirm(params, 'a diagram and everything inside it');
+  const diagramId = requireString(params, 'diagramId');
+
+  const { workspace } = useWorkspaceStore.getState();
+  for (const section of workspace.sections) {
+    for (const page of section.pages) {
+      const node = page.nodes.find((n) => n.id === diagramId);
+      if (!node) continue;
+
+      if (node.type !== 'diagram') {
+        throw new BridgeCommandError(
+          'UNSUPPORTED',
+          `"${diagramId}" is a ${node.type} node, not a diagram. Use delete_block to remove it.`,
+        );
+      }
+
+      navigateToPage(section.id, page.id);
+      const members = diagramMembers(useCanvasStore.getState().nodes, diagramId);
+      const groupStrokes = useDrawStore.getState().strokes.filter((s) => s.groupId === diagramId);
+      useCanvasStore.getState().deleteNode(diagramId);
+      flush();
+
+      return { deletedMembers: members.length, deletedStrokes: groupStrokes.length };
+    }
+  }
+
+  throw new BridgeCommandError('NOT_FOUND', `No diagram with id "${diagramId}"`);
+}
+
 function deleteBlockCmd(params: Record<string, unknown>): DeleteResult {
   flush();
   requireConfirm(params, 'a block');
   const blockId = requireString(params, 'blockId');
 
-  const { workspace } = useWorkspaceStore.getState();
-  for (const section of workspace.sections) {
-    for (const page of section.pages) {
-      const node = page.nodes.find((n) => n.id === blockId);
-      if (!node) continue;
+  const found = findNodeInNotebook(blockId);
+  if (!found) {
+    throw new BridgeCommandError('NOT_FOUND', `No block with id "${blockId}"`);
+  }
+  const owner = owningDiagramFrame(found.page.nodes, found.node);
+  if (owner) refuseDiagramMember(found.node, owner, 'delete');
 
-      navigateToPage(section.id, page.id);
-      useCanvasStore.getState().deleteNode(blockId);
-      flush();
+  navigateToPage(found.section.id, found.page.id);
+  useCanvasStore.getState().deleteNode(blockId);
+  flush();
 
-      return { deleted: 'block', id: blockId };
-    }
+  return { deleted: 'block', id: blockId };
+}
+
+function getBlockCmd(params: Record<string, unknown>): GetBlockResult {
+  flush();
+  const blockId = requireString(params, 'blockId');
+  const found = findNodeInNotebook(blockId);
+  if (!found || !isContentBlock(found.node, diagramFrameIds(found.page.nodes))) {
+    throw new BridgeCommandError('NOT_FOUND', `No block with id "${blockId}"`);
+  }
+  const fullMarkdown = (found.node.data as TextNodeData).text;
+
+  // Substring paging: the budget truncates a CALL, never strands content. A
+  // block larger than the whole budget is read in slices via offset, so the
+  // tail of a giant block stays reachable through the bridge.
+  const offsetRaw = params.offset;
+  const offset =
+    offsetRaw === undefined ? 0 : typeof offsetRaw === 'number' && Number.isInteger(offsetRaw) && offsetRaw >= 0
+      ? offsetRaw
+      : (() => {
+          throw new BridgeCommandError('BAD_PARAMS', '"offset" must be a non-negative integer');
+        })();
+  if (offset > fullMarkdown.length) {
+    throw new BridgeCommandError(
+      'BAD_PARAMS',
+      `"offset" ${offset} is past the end of the block (length ${fullMarkdown.length})`,
+    );
   }
 
-  throw new BridgeCommandError('NOT_FOUND', `No block with id "${blockId}"`);
+  const column = columnOf(found.node, found.page.scrolls);
+  const base = {
+    blockId: found.node.id,
+    column,
+    scrollId: scrollIdForColumn(found.page, column),
+    sectionId: found.section.id,
+    pageId: found.page.id,
+    ...(offset > 0 ? { offset } : {}),
+  };
+
+  // The truncation fields (nextOffset, fullLength) must be INSIDE the payload
+  // when it is measured — appending them after a fit put the response 19
+  // characters over budget, which the invariant assertion caught in T162.
+  // Serialized length ≠ slice length (escapes), so converge iteratively.
+  let candidate: GetBlockResult = { ...base, markdown: fullMarkdown.slice(offset) };
+  if (serializedLength(candidate) > READ_PAGE_RESPONSE_BUDGET) {
+    let sliceLen = fullMarkdown.length - offset;
+    for (let i = 0; i < 20; i++) {
+      candidate = {
+        ...base,
+        markdown: fullMarkdown.slice(offset, offset + sliceLen),
+        markdownTruncated: {
+          fullLength: fullMarkdown.length,
+          notice: markdownNotice(fullMarkdown.length, READ_PAGE_RESPONSE_BUDGET),
+        },
+        nextOffset: offset + sliceLen,
+      };
+      const over = serializedLength(candidate) - READ_PAGE_RESPONSE_BUDGET;
+      if (over <= 0) break;
+      // Worst case every trimmed char was an escape (2 serialized chars), so
+      // each round removes at least over/2 — geometric, 20 rounds is ample.
+      sliceLen = Math.max(0, sliceLen - over);
+    }
+  }
+  assertWithinBudget(candidate, 'get_block');
+  return candidate;
+}
+
+function readDiagramCmd(params: Record<string, unknown>): DiagramDetail {
+  flush();
+  const diagramId = requireString(params, 'diagramId');
+  const found = findNodeInNotebook(diagramId);
+  if (!found) {
+    throw new BridgeCommandError('NOT_FOUND', `No diagram with id "${diagramId}"`);
+  }
+  if (found.node.type !== 'diagram') {
+    throw new BridgeCommandError(
+      'UNSUPPORTED',
+      `"${diagramId}" is a ${found.node.type} node, not a diagram.`,
+    );
+  }
+
+  const memberLimit = optionalPositiveInt(params, 'member_limit') ?? READ_DIAGRAM_DEFAULT_MEMBER_LIMIT;
+  const memberCursor = optionalString(params, 'member_cursor');
+
+  const allMembers = diagramMembers(found.page.nodes, diagramId).map((m) => ({
+    id: m.id,
+    type: m.type,
+    x: m.x,
+    y: m.y,
+    w: m.width,
+    h: m.height,
+    ...(m.type === 'text' ? { label: (m.data as TextNodeData).text } : {}),
+  }));
+  const windowed = windowByCursor(
+    allMembers,
+    (m) => m.id,
+    memberCursor,
+    memberLimit,
+    (c) =>
+      `member_cursor "${c}" is not a member of this diagram. ` +
+      'Pass the last member id from the previous read_diagram.',
+  );
+
+  const source = diagramSourceOf(found.node);
+  const result: DiagramDetail = {
+    id: found.node.id,
+    title: diagramTitleOf(found.node),
+    format: sniffFormat(source),
+    source,
+    bounds: {
+      x: found.node.x,
+      y: found.node.y,
+      width: found.node.width,
+      height: found.node.height,
+    },
+    memberCount: allMembers.length,
+    members: windowed.items,
+  };
+  return applyDiagramBudget(result, windowed.more);
+}
+
+function fitDiagramCmd(params: Record<string, unknown>): FitDiagramResult {
+  flush();
+  const diagramId = requireString(params, 'diagramId');
+  const found = findNodeInNotebook(diagramId);
+  if (!found) {
+    throw new BridgeCommandError('NOT_FOUND', `No diagram with id "${diagramId}"`);
+  }
+  if (found.node.type !== 'diagram') {
+    throw new BridgeCommandError(
+      'UNSUPPORTED',
+      `"${diagramId}" is a ${found.node.type} node, not a diagram.`,
+    );
+  }
+
+  navigateToPage(found.section.id, found.page.id);
+  const outcome = fitExistingDiagram(diagramId);
+  if (!outcome.ok) {
+    throw new BridgeCommandError(outcome.code, outcome.message);
+  }
+  flush();
+  return {
+    diagramId,
+    scale: outcome.scale,
+    width: outcome.width,
+    height: outcome.height,
+    ...(outcome.warning ? { warning: outcome.warning } : {}),
+  };
 }
 
 // ── Canvas look ─────────────────────────────────────────────
@@ -1011,20 +2025,27 @@ async function createDiagram(params: Record<string, unknown>): Promise<CreateDia
 const HANDLERS: Record<BridgeCommandName, Handler> = {
   list_pages: listPages,
   read_page: readPage,
+  read_diagram: readDiagramCmd,
   create_section: createSection,
   create_page: createPage,
   append_block: appendBlock,
+  insert_block: insertBlock,
+  move_block: moveBlock,
   create_diagram: createDiagram,
+  fit_diagram: fitDiagramCmd,
+  get_block: getBlockCmd,
   update_block: updateBlock,
   rename_page: renamePage,
   move_page: movePage,
   list_scrolls: listScrolls,
   create_scroll: createScrollCmd,
   rename_scroll: renameScrollCmd,
+  move_scroll: moveScrollCmd,
   delete_page: deletePageCmd,
   delete_section: deleteSectionCmd,
   delete_scroll: deleteScrollCmd,
   delete_block: deleteBlockCmd,
+  delete_diagram: deleteDiagramCmd,
   get_background: getBackground,
   set_background: setBackground,
   rename_notebook: renameNotebook,

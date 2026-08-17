@@ -35,8 +35,12 @@
   opacity: 0.8;
 }
 
-.context-menu__item:hover {
+.context-menu__item:hover:not(:disabled) {
   background: var(--color-hover);
+}
+
+.context-menu__item:disabled {
+  cursor: not-allowed;
 }
 
 .context-menu__item--danger:hover {

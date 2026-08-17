@@ -7,13 +7,14 @@
  */
 
 import type { CanvasNode, DiagramNodeData } from '../types/data';
-import { useCanvasStore } from '../stores/useCanvasStore';
+import { undoBatchStart, undoBatchEnd, useCanvasStore } from '../stores/useCanvasStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { generateId } from '../utils/ids';
 import { buildDiagram } from './index';
 import type { DiagramFormat } from './index';
 import type { Diagnostic } from './types';
 import { fitDiagramToScroll } from './fitToScroll';
+import { columnAt } from '../utils/pageLayout';
 
 /** Space between the frame edge and its contents. */
 export const FRAME_PAD = 20;
@@ -177,6 +178,74 @@ export function placeDiagramOnCanvas(opts: PlaceDiagramOptions): PlaceDiagramRes
 export function diagramSourceOf(node: CanvasNode): string {
   const data = node.data as DiagramNodeData;
   return typeof data?.source === 'string' ? data.source : '';
+}
+
+export type FitExistingOutcome =
+  | { ok: true; scale: number; width: number; height: number; warning?: string }
+  | { ok: false; code: 'NOT_FOUND' | 'UNSUPPORTED' | 'PRECONDITION'; message: string };
+
+/**
+ * On-demand refit of an existing diagram to the band its frame sits in.
+ * Scales UP to fill band-width − padding when under, and down with the
+ * same 0.45 floor when over. Out-of-band frames are refused. One undo.
+ */
+export function fitExistingDiagram(frameId: string): FitExistingOutcome {
+  const nodes = useCanvasStore.getState().nodes;
+  const frame = nodes.find((n) => n.id === frameId);
+  if (!frame) {
+    return { ok: false, code: 'NOT_FOUND', message: `No diagram with id "${frameId}"` };
+  }
+  if (frame.type !== 'diagram') {
+    return {
+      ok: false,
+      code: 'UNSUPPORTED',
+      message: `"${frameId}" is a ${frame.type} node, not a diagram.`,
+    };
+  }
+
+  const data = frame.data as DiagramNodeData;
+  const title = typeof data?.title === 'string' && data.title.trim() ? data.title.trim() : frameId;
+  const scrolls = useWorkspaceStore.getState().getActivePage()?.scrolls;
+  const column = columnAt(frame.x, scrolls);
+  const band = scrolls?.find((s) => s.column === column);
+  if (!band) {
+    return {
+      ok: false,
+      code: 'PRECONDITION',
+      message: `Diagram "${title}" (${frameId}) is not inside a scroll band.`,
+    };
+  }
+
+  const members = diagramMembers(nodes, frameId);
+  const fitted = fitDiagramToScroll(frame, members, scrolls, { allowGrow: true });
+  if (
+    fitted.scale === 1 &&
+    fitted.frame.width === frame.width &&
+    fitted.frame.height === frame.height
+  ) {
+    return { ok: true, scale: 1, width: frame.width, height: frame.height };
+  }
+
+  const byId = new Map(fitted.members.map((m) => [m.id, m]));
+  undoBatchStart(nodes);
+  useCanvasStore.setState({
+    nodes: nodes.map((n) => {
+      if (n.id === frameId) {
+        return { ...n, width: fitted.frame.width, height: fitted.frame.height };
+      }
+      return byId.get(n.id) ?? n;
+    }),
+  });
+  useWorkspaceStore.getState().markDirty();
+  undoBatchEnd();
+
+  return {
+    ok: true,
+    scale: fitted.scale,
+    width: fitted.frame.width,
+    height: fitted.frame.height,
+    warning: fitted.warning,
+  };
 }
 
 export const STARTER_DIAGRAM = `@startuml

@@ -1,7 +1,7 @@
 # SRS: Diagrams
 
 **Project:** PowerNote
-**Version:** 0.51.0
+**Version:** 0.54.0
 **Date:** 2026-08-17
 
 ## Purpose
@@ -17,7 +17,7 @@ Because the output is ordinary canvas objects, the user can drag, restyle and de
 This document specifies more than has shipped. Requirements are written ahead of
 implementation on purpose, but the difference matters when reading it:
 
-| Area | State as of v0.51.0 |
+| Area | State as of v0.54.0 |
 |------|---------------------|
 | Diagram node, PlantUML parsing, layout, materialize | Shipped — REQ-DIAG-001, 006, 010..014, 017, 040..046, 050..067, 070..076 |
 | Activity and swimlane grammar | Shipped — REQ-DIAG-070..076 |
@@ -28,6 +28,9 @@ implementation on purpose, but the difference matters when reading it:
 | File ingestion (drop/paste of drawio + svg) | Shipped — REQ-DIAG-127..129 |
 | draw.io round-trip export | Shipped — REQ-DIAG-130..135 |
 | Fit diagram to the scroll it lands in | Shipped — REQ-DIAG-136..139 |
+| Frame-deletion cascade + `delete_diagram` | Shipped — REQ-DIAG-140..141 |
+| Agent `read_page` diagrams index + label-leak closed | Shipped — REQ-DIAG-006 (v0.34.0 debt closed in v0.54.0; T159) |
+| On-demand fit to scroll (both directions) | Shipped — REQ-DIAG-142 |
 | Frame reflow and document flow (REQ-DIAG-002..005) | **Not built.** Diagrams sit on the canvas; blocks below a frame do not move when it resizes |
 | Pin loop (REQ-DIAG-020..023) | **Not built, and descoped 2026-08-13.** Redrawing replaces every content node, so a manual nudge is lost on the next redraw |
 | Geometric warnings (REQ-DIAG-016) | **Partial.** Parse diagnostics ship; overlap, crossing and density checks do not |
@@ -60,7 +63,7 @@ implementation on purpose, but the difference matters when reading it:
 | REQ-DIAG-003 | When a block or frame's height changes, blocks below it in the same scroll shall move down; when it shrinks, they shall close the gap | Must | T110 |
 | REQ-DIAG-004 | Reflow shall be scoped to the affected column, leaving other columns unchanged | Must | T110 |
 | REQ-DIAG-005 | A frame, its spec and its rendered elements shall survive a save/load round-trip | Must | T110 |
-| REQ-DIAG-006 | A frame shall appear in agent-facing reading order identified by its title, without expanding its children into the block list | Must | T111 |
+| REQ-DIAG-006 | A frame shall appear in agent-facing reading order identified by its title, without expanding its children into the block list. Closed in v0.54.0: `read_page` returns `diagrams[]` `{id, title, format, memberCount, bounds}` and excludes every `groupId`-owned text node from `blocks[]` (the v0.34.0 label-leak / invisible-frame debt) | Must | T159 |
 | REQ-DIAG-007 | An entity shall belong to the frame its rendered element physically sits in; an element dragged outside the frame shall drop its entity from the spec | Must | T112 |
 | REQ-DIAG-008 | Deleting a rendered element shall drop its entity from the spec | Must | T112 |
 
@@ -243,6 +246,30 @@ re-applied when the user later moves or resizes the frame.
 | REQ-DIAG-137 | If the scale needed to fit is below 0.45, the diagram shall be placed at 0.45× and the write response shall carry a warning naming the scroll, the requested (unfitted) width and the applied scale. Any scale strictly below 1 shall produce a warning naming the scroll and the scale. The warning joins the existing `warnings` array on `create_diagram` (v0.34 same-response contract) and the drop/paste toast | Must | T151 |
 | REQ-DIAG-138 | A diagram whose frame origin does not fall inside any scroll record shall be left unscaled, with no warning | Must | T151 |
 | REQ-DIAG-139 | Redrawing a frame (`rebuildDiagram` via the source dialog) shall apply the same fit against the band the frame currently sits in | Must | T151 |
+
+### Frame deletion cascade (v0.53)
+
+Deleting the frame used to leave every member and every grouped stroke behind.
+The cascade belongs in the canvas-store primitive so the delete key, the
+context menu, `delete_block` on the frame id, and `delete_diagram` cannot
+drift apart.
+
+| ID | Description | Priority | Test Ref |
+|----|-------------|----------|----------|
+| REQ-DIAG-140 | Deleting a `type:'diagram'` node shall also delete every node whose `groupId` is the frame id and every stroke with that `groupId`, as one undo entry that restores nodes and strokes together. The cascade shall live in the canvas-store deletion primitive so every caller inherits it | Must | T155 |
+| REQ-DIAG-141 | `delete_diagram` shall take `diagramId` (and `confirm: true`). It shall return `{ deletedMembers, deletedStrokes }`. An unknown id shall be `NOT_FOUND`. A non-diagram node id shall be refused (`UNSUPPORTED`) naming the node's type and pointing at `delete_block`. `delete_block` on a frame id shall use the same cascade | Must | T155 |
+
+### On-demand fit to the landing scroll (v0.54)
+
+Placement-time fit is shrink-only (REQ-DIAG-136). The on-demand action is the
+opposite contract: fit-to-width means fill the column, so a diagram sitting
+under-width grows, and one sitting over-width still shrinks with the same 0.45
+floor. The geometry is the same `fitDiagramToScroll` math; only the ≤1 clamp
+is lifted. Out-of-band frames are refused rather than silently left alone.
+
+| ID | Description | Priority | Test Ref |
+|----|-------------|----------|----------|
+| REQ-DIAG-142 | An on-demand fit (`fit_diagram` over the bridge, and "Fit to scroll width" on the diagram frame context menu) shall scale the frame and its members about the frame origin to band-width minus padding. Scale may be greater than 1. Scale is floored at 0.45. A frame whose origin is outside every scroll record shall be refused (`PRECONDITION`) naming the diagram. Placement-time fit remains shrink-only (REQ-DIAG-136). One undo shall restore the previous geometry | Must | T160 |
 
 ### Activity and swimlane diagrams (v0.35.1)
 

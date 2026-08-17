@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { Copy, Trash2, CopyPlus, Layers, Group as GroupIcon, Ungroup, Download } from 'lucide-react';
+import { Copy, Trash2, CopyPlus, Layers, Group as GroupIcon, Ungroup, Download, Maximize2 } from 'lucide-react';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
 import { useGroupStore } from '../../stores/useGroupStore';
 import { groupSelection, ungroupSelection } from '../../utils/groupOps';
 import { exportDrawio } from '../../diagram/drawioExport';
+import { fitExistingDiagram } from '../../diagram/canvasOps';
 import { downloadFile } from '../../utils/serialization';
 import { showToast } from '../layout/Toast';
 import type { DiagramNodeData } from '../../types/data';
@@ -80,6 +81,14 @@ export function ContextMenu({ x, y, nodeId, onClose }: ContextMenuProps) {
   const hasGroup = !!node.groupId;
   const isolating = useGroupStore.getState().editingGroupId === node.groupId;
   const exportGroupId = node.type === 'diagram' ? node.id : node.groupId ?? null;
+
+  const handleFitToScroll = () => {
+    const outcome = fitExistingDiagram(node.id);
+    if (!outcome.ok) {
+      showToast(outcome.message, 'error');
+    }
+    onClose();
+  };
 
   const handleExportDrawio = () => {
     if (!exportGroupId) {
@@ -164,6 +173,16 @@ export function ContextMenu({ x, y, nodeId, onClose }: ContextMenuProps) {
         >
           <Layers size={14} />
           <span>Edit group</span>
+        </button>
+      )}
+      {node.type === 'diagram' && (
+        <button
+          className="context-menu__item"
+          data-testid="context-fit-diagram"
+          onClick={handleFitToScroll}
+        >
+          <Maximize2 size={14} />
+          <span>Fit to scroll width</span>
         </button>
       )}
       {exportGroupId && (

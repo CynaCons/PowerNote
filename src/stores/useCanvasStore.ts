@@ -143,6 +143,71 @@ export function undoBatchEnd() {
   if (batchDepth > 0) batchDepth--;
 }
 
+/**
+ * Frame-deletion cascade (v0.53). Deleting a `type:'diagram'` node also
+ * removes every node and stroke whose groupId is the frame id, as one undo
+ * entry. Lives in the store primitive so the delete key, context menu, and
+ * bridge delete_block inherit it — do not special-case those call sites.
+ */
+function collectDeletion(
+  nodes: CanvasNode[],
+  strokes: Stroke[],
+  seedIds: readonly string[],
+): { nodeIds: Set<string>; strokeIds: Set<string>; cascaded: boolean } {
+  const nodeIds = new Set<string>();
+  const strokeIds = new Set<string>();
+  let cascaded = false;
+  for (const id of seedIds) {
+    nodeIds.add(id);
+    const node = nodes.find((n) => n.id === id);
+    if (node?.type !== 'diagram') continue;
+    cascaded = true;
+    for (const n of nodes) {
+      if (n.groupId === id) nodeIds.add(n.id);
+    }
+    for (const s of strokes) {
+      if (s.groupId === id) strokeIds.add(s.id);
+    }
+  }
+  return { nodeIds, strokeIds, cascaded };
+}
+
+function applyNodeDeletion(
+  get: () => CanvasState,
+  set: (partial: Partial<CanvasState> | ((s: CanvasState) => Partial<CanvasState>)) => void,
+  seedIds: readonly string[],
+): void {
+  const state = get();
+  const strokes = useDrawStore.getState().strokes;
+  const { nodeIds, strokeIds, cascaded } = collectDeletion(state.nodes, strokes, seedIds);
+
+  useWorkspaceStore.getState().markDirty();
+
+  if (cascaded) {
+    const scrolls = useWorkspaceStore.getState().getActivePage()?.scrolls ?? [];
+    undoBatchStartFull({ nodes: state.nodes, scrolls, strokes });
+    set({
+      nodes: state.nodes.filter((n) => !nodeIds.has(n.id)),
+      selectedNodeIds: state.selectedNodeIds.filter((id) => !nodeIds.has(id)),
+    });
+    const selectedStrokeIds = useDrawStore.getState().selectedStrokeIds;
+    useDrawStore.setState({
+      strokes: strokes.filter((s) => !strokeIds.has(s.id)),
+      selectedStrokeIds: selectedStrokeIds.filter((id) => !strokeIds.has(id)),
+    });
+    undoBatchEnd();
+    return;
+  }
+
+  set((s) => {
+    pushUndo(s.nodes);
+    return {
+      nodes: s.nodes.filter((n) => !nodeIds.has(n.id)),
+      selectedNodeIds: s.selectedNodeIds.filter((id) => !nodeIds.has(id)),
+    };
+  });
+}
+
 function deepCopyNodes(nodes: CanvasNode[]): CanvasNode[] {
   return nodes.map((n) => ({ ...n, data: { ...n.data } }));
 }
@@ -183,25 +248,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       };
     }),
 
-  deleteNode: (id) =>
-    set((state) => {
-      pushUndo(state.nodes);
-      useWorkspaceStore.getState().markDirty();
-      return {
-        nodes: state.nodes.filter((n) => n.id !== id),
-        selectedNodeIds: state.selectedNodeIds.filter((sid) => sid !== id),
-      };
-    }),
+  deleteNode: (id) => applyNodeDeletion(get, set, [id]),
 
-  deleteSelectedNodes: () =>
-    set((state) => {
-      pushUndo(state.nodes);
-      useWorkspaceStore.getState().markDirty();
-      return {
-        nodes: state.nodes.filter((n) => !state.selectedNodeIds.includes(n.id)),
-        selectedNodeIds: [],
-      };
-    }),
+  deleteSelectedNodes: () => applyNodeDeletion(get, set, get().selectedNodeIds),
 
   loadPageNodes: (nodes) => {
     // Reset history on page switch

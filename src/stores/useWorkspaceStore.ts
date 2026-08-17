@@ -14,8 +14,7 @@ import {
   DEFAULT_WORKSPACE_SETTINGS,
 } from '../utils/defaults';
 import { generateId } from '../utils/ids';
-import { columnAt } from '../utils/pageLayout';
-import { compactColumns, nextFreeColumn } from '../utils/scrolls';
+import { compactColumns, contentBelongsToScroll, nextFreeColumn, strokeBelongsToScrollBand } from '../utils/scrolls';
 
 interface WorkspaceState {
   workspace: WorkspaceData;
@@ -76,7 +75,7 @@ interface WorkspaceState {
   // Scroll (column band) actions — see utils/scrolls.ts for the model
   createScroll: (pageId: string, title: string) => ScrollRecord | null;
   renameScroll: (pageId: string, scrollId: string, title: string) => void;
-  /** Removes the record; `withBlocks` also deletes the blocks sitting in its band. */
+  /** Removes the record; `withBlocks` also deletes the band's nodes and ink. */
   deleteScroll: (pageId: string, scrollId: string, withBlocks: boolean) => void;
   reorderScroll: (pageId: string, scrollId: string, toIndex: number) => void;
   /** Replace the page's scroll records (fit-to-content / undo restore). */
@@ -425,16 +424,26 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         // A page always keeps one scroll — otherwise there is nowhere to append.
         if (remaining.length === 0) return state;
 
+        const scrolls = page.scrolls ?? [];
+        // Group-aware: a diagram is owned by the band of its FRAME origin;
+        // members and group strokes follow that verdict, not their own x.
         const keptNodes = withBlocks
-          ? page.nodes.filter((n) => columnAt(n.x, page.scrolls) !== target.column)
+          ? page.nodes.filter((n) => !contentBelongsToScroll(n, target, scrolls, page.nodes))
           : page.nodes;
+        const keptStrokes = withBlocks
+          ? (page.strokes ?? []).filter(
+              (s) => !strokeBelongsToScrollBand(s, target, scrolls, page.nodes),
+            )
+          : page.strokes;
 
         // Close the gap the removed band leaves, moving the surviving blocks
-        // with their scrolls so membership survives the renumber. Sorted first
-        // because compactColumns reads array order as the target order.
+        // AND strokes with their scrolls so membership survives the renumber.
+        // compactColumns is group-aware: a straddling diagram travels whole.
+        // Sorted first because compactColumns reads array order as the target.
         const compacted = compactColumns(
           [...remaining].sort((a, b) => a.column - b.column),
           keptNodes,
+          keptStrokes ?? [],
         );
 
         return {
@@ -443,6 +452,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
             ...p,
             scrolls: compacted.scrolls,
             nodes: compacted.nodes,
+            strokes: compacted.strokes,
           })),
         };
       });
@@ -471,10 +481,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         const [moved] = ordered.splice(from, 1);
         ordered.splice(to, 0, moved);
 
-        // compactColumns reads each record's CURRENT column to find its blocks,
-        // then renumbers by array order — so the spliced array is exactly the
-        // instruction it needs, and blocks follow their scroll.
-        const compacted = compactColumns(ordered, page.nodes);
+        // compactColumns reads each record's CURRENT column (via the
+        // group-aware membership test) then renumbers by array order — so
+        // the spliced array is the instruction, and members, group strokes
+        // and per-scroll width follow the band.
+        const compacted = compactColumns(ordered, page.nodes, page.strokes ?? []);
 
         return {
           isDirty: true,
@@ -482,6 +493,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
             ...p,
             scrolls: compacted.scrolls,
             nodes: compacted.nodes,
+            strokes: compacted.strokes,
           })),
         };
       });

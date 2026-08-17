@@ -48,6 +48,16 @@ function scaleNode(node: CanvasNode, originX: number, originY: number, scale: nu
   };
 }
 
+export interface FitToScrollOptions {
+  /**
+   * Placement-time fit is shrink-only (`false`, the default). The on-demand
+   * `fit_diagram` / "Fit to scroll width" path passes `true` so an under-width
+   * diagram grows to fill the band. The 0.45 floor is shared; the ≤1 clamp is
+   * the only thing this flag lifts.
+   */
+  allowGrow?: boolean;
+}
+
 /**
  * Scale `members` and the frame size about the frame origin so the diagram
  * fits in the band under `frame.x`. Stroke weight is left alone (legibility,
@@ -58,6 +68,7 @@ export function fitDiagramToScroll(
   frame: { x: number; y: number; width: number; height: number },
   members: CanvasNode[],
   scrolls: ScrollRecord[] | undefined,
+  opts?: FitToScrollOptions,
 ): FitToScrollResult {
   const identity: FitToScrollResult = {
     members,
@@ -65,6 +76,7 @@ export function fitDiagramToScroll(
     scale: 1,
   };
   if (!scrolls || scrolls.length === 0 || members.length === 0) return identity;
+  if (!(frame.width > 0)) return identity;
 
   const column = columnAt(frame.x, scrolls);
   const band = scrolls.find((s) => s.column === column);
@@ -81,16 +93,24 @@ export function fitDiagramToScroll(
       warning: `scroll '${name}' is too narrow to fit a diagram`,
     };
   }
-  if (frame.width <= available) return identity;
+
+  const allowGrow = opts?.allowGrow === true;
+  if (!allowGrow && frame.width <= available) return identity;
 
   const requested = available / frame.width;
-  const scale = clamp(requested, FIT_SCROLL_FLOOR, 1);
-  if (scale >= 1) return identity;
+  const scale = allowGrow
+    ? requested < FIT_SCROLL_FLOOR
+      ? FIT_SCROLL_FLOOR
+      : requested
+    : clamp(requested, FIT_SCROLL_FLOOR, 1);
+  if (Math.abs(scale - 1) < 1e-4) return identity;
 
   const warning =
     requested < FIT_SCROLL_FLOOR
       ? `scaled to ${formatScale(scale)}× to fit scroll '${name}' (requested width ${Math.round(frame.width)}px)`
-      : `scaled to ${formatScale(scale)}× to fit scroll '${name}'`;
+      : scale < 1
+        ? `scaled to ${formatScale(scale)}× to fit scroll '${name}'`
+        : `scaled to ${formatScale(scale)}× to fill scroll '${name}'`;
 
   return {
     members: members.map((m) => scaleNode(m, frame.x, frame.y, scale)),

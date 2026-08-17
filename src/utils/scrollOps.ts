@@ -24,15 +24,31 @@ function flush(): void {
   ws.savePageStrokes(useDrawStore.getState().strokes);
 }
 
-/** Reload the canvas from the workspace, if `pageId` is the page on screen. */
-function reloadIfActive(pageId: string): void {
+function findPage(pageId: string) {
+  const { workspace } = useWorkspaceStore.getState();
+  for (const section of workspace.sections) {
+    const page = section.pages.find((p) => p.id === pageId);
+    if (page) return page;
+  }
+  return undefined;
+}
+
+/**
+ * Pull rewritten nodes/strokes back onto the live canvas without
+ * `loadPageNodes` — that would wipe the undo stack we just pushed.
+ */
+function applyLiveGeometry(pageId: string): void {
   const ws = useWorkspaceStore.getState();
   if (ws.activePageId !== pageId) return;
-
-  const section = ws.workspace.sections.find((s) => s.id === ws.activeSectionId);
-  const page = section?.pages.find((p) => p.id === pageId);
-  if (!page) return;
-  useCanvasStore.getState().loadPageNodes(page.nodes);
+  const page = ws.getActivePage();
+  useCanvasStore.setState({
+    nodes: page?.nodes ?? [],
+    selectedNodeIds: [],
+  });
+  useDrawStore.setState({
+    strokes: page?.strokes ?? [],
+    selectedStrokeIds: [],
+  });
 }
 
 export function createScroll(pageId: string, title: string): ScrollRecord | null {
@@ -45,14 +61,176 @@ export function renameScroll(pageId: string, scrollId: string, title: string): v
 
 export function deleteScroll(pageId: string, scrollId: string, withBlocks: boolean): void {
   flush();
-  useWorkspaceStore.getState().deleteScroll(pageId, scrollId, withBlocks);
-  reloadIfActive(pageId);
+  const ws = useWorkspaceStore.getState();
+  const page = ws.workspace.sections
+    .flatMap((s) => s.pages)
+    .find((p) => p.id === pageId);
+  const target = page?.scrolls?.find((s) => s.id === scrollId);
+  if (!page || !target) return;
+  // Match the store guard: last scroll is an append-target invariant.
+  if ((page.scrolls ?? []).length <= 1) return;
+
+  const isActive = ws.activePageId === pageId;
+  if (isActive) {
+    // One undo restores the band, its nodes, and its ink. Must snapshot
+    // before the store write, and must not go through loadPageNodes —
+    // that clears history.
+    undoBatchStartFull({
+      nodes: useCanvasStore.getState().nodes,
+      scrolls: page.scrolls ?? [],
+      strokes: useDrawStore.getState().strokes,
+    });
+  }
+
+  ws.deleteScroll(pageId, scrollId, withBlocks);
+
+  if (isActive) {
+    const next = useWorkspaceStore.getState().getActivePage();
+    useCanvasStore.setState({
+      nodes: next?.nodes ?? [],
+      selectedNodeIds: [],
+    });
+    useDrawStore.setState({
+      strokes: next?.strokes ?? [],
+      selectedStrokeIds: [],
+    });
+    undoBatchEnd();
+  }
+}
+
+/**
+ * Apply a column reorder with one undo entry on the active page.
+ * Returns false when the scroll is missing or already at `toIndex`.
+ */
+function applyScrollReorder(pageId: string, scrollId: string, toIndex: number): boolean {
+  flush();
+  const ws = useWorkspaceStore.getState();
+  const page = findPage(pageId);
+  if (!page) return false;
+
+  const ordered = [...(page.scrolls ?? [])].sort((a, b) => a.column - b.column);
+  const from = ordered.findIndex((s) => s.id === scrollId);
+  if (from < 0) return false;
+  const clamped = Math.max(0, Math.min(toIndex, ordered.length - 1));
+  if (clamped === from) return false;
+
+  const isActive = ws.activePageId === pageId;
+  if (isActive) {
+    undoBatchStartFull({
+      nodes: useCanvasStore.getState().nodes,
+      scrolls: page.scrolls ?? [],
+      strokes: useDrawStore.getState().strokes,
+    });
+  }
+
+  ws.reorderScroll(pageId, scrollId, clamped);
+
+  if (isActive) {
+    applyLiveGeometry(pageId);
+    undoBatchEnd();
+  }
+  return true;
 }
 
 export function reorderScroll(pageId: string, scrollId: string, toIndex: number): void {
-  flush();
-  useWorkspaceStore.getState().reorderScroll(pageId, scrollId, toIndex);
-  reloadIfActive(pageId);
+  applyScrollReorder(pageId, scrollId, toIndex);
+}
+
+export type MoveScrollSpec = { direction: 'left' | 'right' } | { toColumn: number };
+
+export type MoveScrollOk = {
+  ok: true;
+  scrollId: string;
+  title: string;
+  fromColumn: number;
+  toColumn: number;
+};
+
+export type MoveScrollErr = {
+  ok: false;
+  code: 'NOT_FOUND' | 'PRECONDITION';
+  message: string;
+};
+
+/**
+ * Move a scroll to a neighbour band or an absolute column.
+ *
+ * Members, grouped ink and per-scroll width travel with the band
+ * (`compactColumns`). One undo restores nodes, strokes, order and widths.
+ */
+export function moveScroll(
+  pageId: string,
+  scrollId: string,
+  spec: MoveScrollSpec,
+): MoveScrollOk | MoveScrollErr {
+  const page = findPage(pageId);
+  const ordered = [...(page?.scrolls ?? [])].sort((a, b) => a.column - b.column);
+  const from = ordered.findIndex((s) => s.id === scrollId);
+  if (!page || from < 0) {
+    return {
+      ok: false,
+      code: 'NOT_FOUND',
+      message: `No scroll with id "${scrollId}" in this notebook. Call list_scrolls to refresh.`,
+    };
+  }
+
+  const scroll = ordered[from];
+  const label = scroll.title || scrollId;
+  const last = ordered.length - 1;
+  let to: number;
+  if ('direction' in spec) {
+    to = spec.direction === 'left' ? from - 1 : from + 1;
+    if (to < 0) {
+      return {
+        ok: false,
+        code: 'PRECONDITION',
+        message: `"${label}" is already at the left edge.`,
+      };
+    }
+    if (to > last) {
+      return {
+        ok: false,
+        code: 'PRECONDITION',
+        message: `"${label}" is already at the right edge.`,
+      };
+    }
+  } else {
+    to = spec.toColumn;
+    if (to === from) {
+      const edge = from === 0 ? 'left' : from === last ? 'right' : 'same';
+      return {
+        ok: false,
+        code: 'PRECONDITION',
+        message:
+          edge === 'same'
+            ? `"${label}" is already at column ${from}.`
+            : `"${label}" is already at the ${edge} edge.`,
+      };
+    }
+    if (to < 0) {
+      return {
+        ok: false,
+        code: 'PRECONDITION',
+        message: `"${label}" cannot move past the left edge (column 0).`,
+      };
+    }
+    if (to > last) {
+      return {
+        ok: false,
+        code: 'PRECONDITION',
+        message: `"${label}" cannot move past the right edge (column ${last}).`,
+      };
+    }
+  }
+
+  applyScrollReorder(pageId, scrollId, to);
+  return {
+    ok: true,
+    scrollId,
+    title: scroll.title,
+    fromColumn: from,
+    toColumn: to,
+  };
 }
 
 function nodeBelongsToScroll(

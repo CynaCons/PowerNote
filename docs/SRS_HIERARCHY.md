@@ -1,7 +1,7 @@
 # SRS: Hierarchy Panel
 
 **Project:** PowerNote
-**Version:** 0.52.0
+**Version:** 0.54.0
 **Date:** 2026-08-17
 
 ## Purpose
@@ -31,3 +31,6 @@ Organize the workspace into sections and pages, with a navigable hierarchy panel
 | REQ-HIER-017 | On a page with at least one TITLED scroll the workspace top is y=0 by convention (stored nowhere). Titled, because every page is born with one untitled scroll as an agent append target — gating on mere presence would bound every canvas in the app (caught by T01/T71). Scroll titles rest as one aligned row at the derived ceiling `min(0, topmostContentY − PAD)` spanning nodes and strokes, so legacy content at negative y stays reachable; the v0.35 pin-to-viewport-top behaviour when scrolled down is unchanged. Pages with no titled scroll keep a fully infinite canvas | Must | T150 |
 | REQ-HIER-018 | The user shall be able to widen a scroll band to its widest member plus padding via an explicit "Fit scroll to content" action on the scroll title header. Scrolls to its right, and their members, shall shift rightward by the delta. The action is never automatic. One undo shall restore the band width and the shifted members | Must | T151 |
 | REQ-HIER-019 | A titled scroll shall render its title in two visual states, switched by the existing v0.35 pin threshold (no extra stored state). At rest on the ceiling row the title is a heading (larger semibold ink, no background strip). When pinned over content it is a compact wayfinding strip (~22px tall, ~12px type, white background at ~0.92 opacity, hairline bottom edge). Both states remain double-click / double-tap renameable. An untitled scroll draws no header in either state | Must | T152 |
+| REQ-HIER-020 | Renaming a scroll to an empty title shall untitled it: the header disappears (REQ-HIER-019) and the page ceiling disarms (REQ-HIER-017 titled gate). Re-titling shall restore both. Creating a scroll with an empty name still creates nothing (T122) | Must | T157 |
+| REQ-HIER-021 | The last scroll on a page shall remain undeletable (the append-target invariant). A plain page is one untitled scroll — untitle it instead of deleting the last one. `delete_scroll` shall say so when it refuses | Must | T157, T109 |
+| REQ-HIER-022 | Column operations that renumber bands (delete-keep, reorder, move) shall use one group-aware membership/shift path: a diagram or group belongs to the band of its FRAME origin and every member and grouped stroke follows that verdict, never split; ungrouped strokes belong to the band of their first point and shift with it. This closes the straddling-diagram tearing class for ALL column operations | Must | T158 |

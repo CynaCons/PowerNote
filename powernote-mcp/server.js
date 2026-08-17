@@ -52,6 +52,8 @@ const AGENT_LABEL = process.env.POWERNOTE_AGENT_NAME || `agent-${AGENT_ID}`;
 const READ_ONLY = new Set([
   'list_pages',
   'read_page',
+  'read_diagram',
+  'get_block',
   'list_scrolls',
   'get_background',
   'check_update',
@@ -451,8 +453,20 @@ const TOOLS = [
   {
     name: 'read_page',
     description:
-      'Read a page back as ordered markdown blocks. Use this before editing so you ' +
-      'know the current contents and each block id.',
+      'Read a page. DEFAULT CHANGED in v0.54: blocks[] is free-standing markdown ' +
+      'only — diagram labels (text nodes with a groupId) no longer leak in as fake ' +
+      'content, and diagrams are collapsed to diagrams[] {id, title, format, ' +
+      'memberCount, bounds} with NO members and NO source. Discovery flow: read_page ' +
+      '→ diagrams[].id → read_diagram / delete_diagram / fit_diagram. ' +
+      'include defaults to ["blocks","diagrams"]; pass ["diagrams"] for a diagrams-only ' +
+      'fetch. Optional scrollId filters both lists. limit + cursor page blocks in ' +
+      'column-major reading order (cursor = last block id from the previous page; ' +
+      'stable across appends). Serialized reads are hard-capped at 20000 characters ' +
+      'and never fail for size: blocks drop first (truncated {at, notice}), then ' +
+      'per-diagram source is replaced with sourceOmitted {length, notice: "use read_diagram"}, ' +
+      'then diagrams[] trims at an entry boundary. A single oversized block has its ' +
+      'markdown cut (markdownTruncated {fullLength, notice}). include_diagram_source:true ' +
+      'adds source on each diagrams[] entry. Use get_block(blockId) to re-fetch one block after a cap.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -460,7 +474,112 @@ const TOOLS = [
           type: 'string',
           description: 'Page to read. Defaults to the page currently open in the app.',
         },
+        include: {
+          type: 'array',
+          items: { type: 'string', enum: ['blocks', 'diagrams', 'strokes-summary'] },
+          description:
+            'Which collections to return. Default ["blocks","diagrams"]. ' +
+            '"diagrams" alone is the diagrams-only fetch.',
+        },
+        scrollId: {
+          type: 'string',
+          description: 'Restrict blocks and diagrams to this scroll band.',
+        },
+        limit: {
+          type: 'integer',
+          minimum: 1,
+          description: 'Max blocks to return (after filters). Combine with cursor to page.',
+        },
+        cursor: {
+          type: 'string',
+          description:
+            'Block id to start AFTER. Pass the last blockId (or nextCursor) from the ' +
+            'previous read_page. Stable across appends.',
+        },
+        include_diagram_source: {
+          type: 'boolean',
+          description:
+            'If true, each diagrams[] entry includes its source text. Default false.',
+        },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'read_diagram',
+    description:
+      'Read one diagram: id, title, format, source, bounds, memberCount, and a page of ' +
+      'members [{id, type, x, y, w, h, label?}]. member_limit + member_cursor page members ' +
+      '(cursor = last member id; same style as read_page). Default member_limit is derived ' +
+      'from the 20000-character budget so a typical page sits well under it. If the ' +
+      'serialized response still exceeds the budget, members trim at an entry boundary ' +
+      '(truncated {at, notice}). Source counts toward the budget; if source alone blows ' +
+      'it, source is cut (sourceTruncated {fullLength, notice}) and the notice names the ' +
+      'full length and suggests exporting as .drawio. Discover ids from read_page ' +
+      'diagrams[]. An unknown id is NOT_FOUND. A non-diagram id is UNSUPPORTED naming the type.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        diagramId: {
+          type: 'string',
+          description: 'Diagram frame id from read_page diagrams[].id or create_diagram.',
+        },
+        member_limit: {
+          type: 'integer',
+          minimum: 1,
+          description:
+            'Max members to return. Default is derived from the 20000-character budget.',
+        },
+        member_cursor: {
+          type: 'string',
+          description:
+            'Member id to start AFTER. Pass the last member id (or nextCursor) from the ' +
+            'previous read_diagram.',
+        },
+      },
+      required: ['diagramId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_block',
+    description:
+      'Re-fetch a single markdown block by id (BlockSummary plus page location). ' +
+      'Use this after read_page hits the size cap. A block larger than the 20000-character ' +
+      'budget is returned in slices: the response carries markdownTruncated {fullLength, notice} ' +
+      'and nextOffset — pass nextOffset back as offset to continue. Any block, any size, is ' +
+      'fully readable in bounded calls. Unknown or non-block ids are NOT_FOUND.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        blockId: { type: 'string', description: 'Block id from read_page.' },
+        offset: {
+          type: 'number',
+          description:
+            'Character offset into the block markdown (from a previous response's nextOffset). Omit to start at 0.',
+        },
+      },
+      required: ['blockId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'fit_diagram',
+    description:
+      'Refit an existing diagram to the scroll band its frame sits in. Unlike ' +
+      'placement-time fit (shrink-only), this scales BOTH directions: up to fill ' +
+      'band-width minus padding when the diagram is under-width, down with the same ' +
+      '0.45 floor when over. Out-of-band frames are refused (PRECONDITION, naming the ' +
+      'diagram). Discover ids from read_page diagrams[]. One undo in the app.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        diagramId: {
+          type: 'string',
+          description: 'Diagram frame id from read_page diagrams[].id.',
+        },
+      },
+      required: ['diagramId'],
       additionalProperties: false,
     },
   },
@@ -539,6 +658,80 @@ const TOOLS = [
         },
       },
       required: ['markdown'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'insert_block',
+    description:
+      'Insert a markdown block into a scroll at a chosen position, shifting ' +
+      'content blocks below it down by the new block\'s height + 12px. Prefer ' +
+      'after (a block id): ids survive reordering, indices do not — the same ' +
+      'reason scrollId is preferred over a raw column. Exactly one of after or ' +
+      'index. index 0 is the top of the column (ceiling-clamped when a titled ' +
+      'scroll arms the page ceiling). Only free-standing content blocks move; ' +
+      'diagrams, shapes and strokes hold position (an insert that lands on a ' +
+      'diagram overlaps it). Returns the new block plus displacedCount.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        scrollId: {
+          type: 'string',
+          description: 'Scroll to insert into (from list_scrolls). Required.',
+        },
+        markdown: { type: 'string', description: 'Markdown content for the block.' },
+        after: {
+          type: 'string',
+          description:
+            'Insert after this block id (must be a content block in the same scroll). ' +
+            'Preferred. Do not pass index at the same time.',
+        },
+        index: {
+          type: 'integer',
+          minimum: 0,
+          description:
+            '0-based index in the scroll\'s content-block reading order. 0 = column top. ' +
+            'Do not pass after at the same time.',
+        },
+      },
+      required: ['scrollId', 'markdown'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'move_block',
+    description:
+      'Move a content block inside a scroll or across scrolls on the same page. ' +
+      'Closes the gap at the source and opens a gap at the target in ONE undo. ' +
+      'Prefer after (a block id) over index: ids survive reordering. scrollId is ' +
+      'optional and defaults to the block\'s current scroll; when given it must be ' +
+      'on the same page. Exactly one of after or index. Diagram frames and their ' +
+      'members are refused by name — they do not participate in block reflow. ' +
+      'Returns the block plus displacedCount.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        blockId: { type: 'string', description: 'Content block to move (from read_page).' },
+        scrollId: {
+          type: 'string',
+          description:
+            'Destination scroll. Omit to stay in the current scroll. Must be on the same page.',
+        },
+        after: {
+          type: 'string',
+          description:
+            'Place after this block id in the destination scroll. Preferred. ' +
+            'Do not pass index at the same time.',
+        },
+        index: {
+          type: 'integer',
+          minimum: 0,
+          description:
+            '0-based index in the destination scroll\'s remaining content blocks. ' +
+            'Do not pass after at the same time.',
+        },
+      },
+      required: ['blockId'],
       additionalProperties: false,
     },
   },
@@ -862,14 +1055,48 @@ const TOOLS = [
     description:
       'Rename a scroll. The new title appears immediately at the top of that ' +
       'column on the canvas. Naming a previously untitled scroll is how its ' +
-      'header first appears.',
+      'header first appears. Pass an empty title to untitle it: the header ' +
+      'disappears and the page ceiling disarms — a plain page is one untitled ' +
+      'scroll, not zero scrolls.',
     inputSchema: {
       type: 'object',
       properties: {
         scrollId: { type: 'string', description: 'Scroll to rename (from list_scrolls).' },
-        title: { type: 'string', description: 'New title.' },
+        title: {
+          type: 'string',
+          description:
+            'New title. Empty string untitleds the scroll (header gone, ceiling off).',
+        },
       },
       required: ['scrollId', 'title'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'move_scroll',
+    description:
+      'Move a scroll (named column band) left or right, or to an absolute column. ' +
+      'Members, grouped ink and the band\'s own width travel with it; neighbouring ' +
+      'scrolls shift to make room and cumulative offsets are recomputed. A diagram ' +
+      'belongs to the band of its frame origin — the whole group moves, it is never ' +
+      'split. Refuses with NOT_FOUND on an unknown id and PRECONDITION when the ' +
+      'scroll is already at the named edge.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        scrollId: { type: 'string', description: 'Scroll to move (from list_scrolls).' },
+        direction: {
+          type: 'string',
+          enum: ['left', 'right'],
+          description: 'Step one band left or right. Refused at the corresponding edge.',
+        },
+        toColumn: {
+          type: 'integer',
+          description:
+            'Absolute 0-based column to move to. Refused when already there or past an edge.',
+        },
+      },
+      required: ['scrollId'],
       additionalProperties: false,
     },
   },
@@ -878,7 +1105,8 @@ const TOOLS = [
     description:
       'Replace the markdown of an existing block, found via read_page. Use this to ' +
       'revise content or tick a checkbox ("- [ ]" to "- [x]") rather than appending ' +
-      'a duplicate block.',
+      'a duplicate block. A diagram-member id is refused (UNSUPPORTED) naming the ' +
+      'owning diagram — redraw the source instead.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -997,17 +1225,34 @@ const TOOLS = [
   {
     name: 'delete_scroll',
     description:
-      'Delete a named scroll (a column). By default its blocks are KEPT and the ' +
-      'remaining scrolls close the gap — only the name and the band go. Pass ' +
-      'withBlocks:true to remove its content too. Refuses when it is the page\'s ' +
-      'only scroll.',
+      'Delete a named scroll (a column band). When the band holds ANY content — ' +
+      'nodes, group members, or ink — content is REQUIRED: "delete" removes them ' +
+      'with the band, "keep" closes the gap and leaves them where they are. There ' +
+      'is deliberately no default. The old default was keep (confirm:true used to ' +
+      'be a safe trim); a default flip would silently destroy callers that never ' +
+      'passed the flag. An empty band needs no content param. Membership is ' +
+      'group-aware: a diagram belongs to the band of its frame origin, and its ' +
+      'members and grouped ink follow that verdict. A page must keep at least one ' +
+      'scroll: a plain page is one untitled scroll — untitle it instead of deleting ' +
+      'the last one.',
     inputSchema: {
       type: 'object',
       properties: {
         scrollId: { type: 'string', description: 'Scroll to delete (from list_scrolls).' },
+        content: {
+          type: 'string',
+          enum: ['delete', 'keep'],
+          description:
+            'Required when the band is not empty. "delete" removes the band\'s ' +
+            'nodes, group members and ink with the scroll. "keep" closes the gap ' +
+            'and leaves them. There is no default — the old default was keep, and ' +
+            'a default flip is unrecoverable for callers who never passed the flag. ' +
+            'An empty band does not need this param.',
+        },
         withBlocks: {
           type: 'boolean',
-          description: 'Also delete the blocks sitting in that scroll. Default false.',
+          description:
+            'Deprecated alias for content. true = delete, false = keep. Ignored when content is set. The response includes a deprecation notice.',
         },
         confirm: {
           type: 'boolean',
@@ -1022,7 +1267,12 @@ const TOOLS = [
     name: 'delete_block',
     description:
       'Delete a single markdown block by id. Use read_page first to get block ids ' +
-      'and check you are removing the right one.',
+      'and check you are removing the right one. Passed a diagram FRAME id, this ' +
+      'cascades to the frame\'s members and grouped strokes — same primitive as ' +
+      'delete_diagram, which names the act and reports the counts. Passed a diagram ' +
+      'MEMBER id (a node whose groupId is owned by a diagram frame), the call is ' +
+      'refused (UNSUPPORTED) naming the owning diagram and pointing at delete_diagram ' +
+      'or the redraw path.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1033,6 +1283,34 @@ const TOOLS = [
         },
       },
       required: ['blockId', 'confirm'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'delete_diagram',
+    description:
+      'Delete a diagram frame and everything that belongs to it: every node whose ' +
+      'groupId is the frame id, and every stroke grouped with it. Use this when you ' +
+      'placed a diagram you no longer want — delete_block on the frame id does the ' +
+      'same cascade, but this tool names the act and reports how many members and ' +
+      'strokes went. An unknown id is NOT_FOUND. Passing a non-diagram node id is ' +
+      'refused (the message names the type and points at delete_block). The bridge ' +
+      'has no undo, so pass confirm:true once the user has agreed. Returns ' +
+      'deletedMembers and deletedStrokes.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        diagramId: {
+          type: 'string',
+          description:
+            'Id of the diagram frame (from read_page diagrams[].id or create_diagram).',
+        },
+        confirm: {
+          type: 'boolean',
+          description: 'Must be true. Confirms the user agreed to the deletion.',
+        },
+      },
+      required: ['diagramId', 'confirm'],
       additionalProperties: false,
     },
   },
@@ -1264,7 +1542,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // Stamp identity on every result: an agent that never learns who it is
     // cannot make sense of a LOCKED message naming someone else.
     payload._agent = { id: AGENT_ID, label: AGENT_LABEL, role: mode };
-    return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
+    return { content: [{ type: 'text', text: JSON.stringify(payload) }] };
   } catch (err) {
     const code = err instanceof Locked ? 'LOCKED: ' : '';
     return { isError: true, content: [{ type: 'text', text: code + err.message }] };

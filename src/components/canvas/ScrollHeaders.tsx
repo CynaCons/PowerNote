@@ -19,7 +19,7 @@ import {
   scrollTitleY,
 } from '../../utils/pageLayout';
 import { pageCeiling } from '../../utils/scrollCeiling';
-import { fitScrollToContent, renameScroll } from '../../utils/scrollOps';
+import { fitScrollToContent, moveScroll, renameScroll } from '../../utils/scrollOps';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
@@ -94,6 +94,11 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
   // Bands only exist in the two page-guide modes. In grid/none there is no
   // column to title, so the record stays but the header is not drawn.
   if (mode !== 'scroll' && mode !== 'pages') return null;
+
+  const orderedScrolls = [...scrolls].sort((a, b) => a.column - b.column);
+  const menuIndex = menu ? orderedScrolls.findIndex((s) => s.id === menu.scrollId) : -1;
+  const menuAtLeft = menuIndex <= 0;
+  const menuAtRight = menuIndex < 0 || menuIndex >= orderedScrolls.length - 1;
 
   const commit = (scroll: ScrollRecord) => {
     const value = inputRef.current?.value.trim();
@@ -268,6 +273,30 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
             data-testid="scroll-header-menu"
             style={{ position: 'fixed', left: menu.x, top: menu.y, zIndex: 100 }}
           >
+            <button
+              type="button"
+              className="context-menu__item"
+              data-testid="move-scroll-left"
+              disabled={menuAtLeft}
+              onClick={() => {
+                moveScroll(pageId, menu.scrollId, { direction: 'left' });
+                setMenu(null);
+              }}
+            >
+              Move left
+            </button>
+            <button
+              type="button"
+              className="context-menu__item"
+              data-testid="move-scroll-right"
+              disabled={menuAtRight}
+              onClick={() => {
+                moveScroll(pageId, menu.scrollId, { direction: 'right' });
+                setMenu(null);
+              }}
+            >
+              Move right
+            </button>
             <button
               type="button"
               className="context-menu__item"

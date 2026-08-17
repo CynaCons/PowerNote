@@ -22,26 +22,64 @@ export const DEFAULT_BRIDGE_URL = `ws://127.0.0.1:${DEFAULT_BRIDGE_PORT}`;
 export type BridgeCommandName =
   | 'list_pages'
   | 'read_page'
+  | 'read_diagram'
   | 'create_section'
   | 'create_page'
   | 'append_block'
+  | 'insert_block'
+  | 'move_block'
   | 'create_diagram'
+  | 'fit_diagram'
+  | 'get_block'
   | 'update_block'
   | 'rename_page'
   | 'move_page'
   | 'list_scrolls'
   | 'create_scroll'
   | 'rename_scroll'
+  | 'move_scroll'
   | 'delete_page'
   | 'delete_section'
   | 'delete_scroll'
   | 'delete_block'
+  | 'delete_diagram'
   | 'get_background'
   | 'set_background'
   | 'rename_notebook'
   | 'save_notebook'
   | 'check_update'
   | 'run_update';
+
+/**
+ * Hard cap on a serialized read payload, in characters.
+ *
+ * Applies to every read tool (`read_page`, `read_diagram`, `get_block`).
+ * Chosen so a typical agent context is not blown by one call. When the
+ * serialized response would exceed this, the tool trims at a documented
+ * boundary and sets a notice — it never fails the call for size. A
+ * response that still overflows after those steps is an INTERNAL bug.
+ */
+export const READ_PAGE_RESPONSE_BUDGET = 20_000;
+
+/**
+ * Representative `read_diagram` member on the wire (id, type, geometry, no
+ * label). Default `member_limit` is half the budget divided by this size,
+ * so a typical page (envelope + source + one page of members) sits well
+ * under the cap. Do not replace this with a second magic page-size number.
+ */
+const TYPICAL_DIAGRAM_MEMBER_WIRE = JSON.stringify({
+  id: 'member-0000',
+  type: 'shape',
+  x: 1234.56,
+  y: 1234.56,
+  w: 120,
+  h: 48,
+});
+
+export const READ_DIAGRAM_DEFAULT_MEMBER_LIMIT = Math.max(
+  1,
+  Math.floor(READ_PAGE_RESPONSE_BUDGET / 2 / TYPICAL_DIAGRAM_MEMBER_WIRE.length),
+);
 
 /** Sent by the app immediately after the socket opens. */
 export interface BridgeHello {
@@ -114,6 +152,12 @@ export interface PageSummary {
   isActive: boolean;
 }
 
+export interface MarkdownTruncation {
+  /** Length of the untruncated markdown. */
+  fullLength: number;
+  notice: string;
+}
+
 export interface BlockSummary {
   blockId: string;
   markdown: string;
@@ -121,6 +165,8 @@ export interface BlockSummary {
   column: number;
   /** Scroll the block sits in, derived from its position. */
   scrollId?: string;
+  /** Set when this block's markdown was cut to stay under the budget. */
+  markdownTruncated?: MarkdownTruncation;
 }
 
 /** A named column band. Blocks belong to it by position, not by a stored link. */
@@ -132,12 +178,123 @@ export interface ScrollSummary {
   blockCount: number;
 }
 
+export interface DiagramBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface SourceOmitted {
+  /** Length of the omitted source text. */
+  length: number;
+  notice: string;
+}
+
+/** Index entry for one diagram on a page. No members, no source by default. */
+export interface DiagramSummary {
+  id: string;
+  title: string;
+  format: DiagramSourceFormat;
+  memberCount: number;
+  bounds: DiagramBounds;
+  /** Present only when `include_diagram_source` is true. */
+  source?: string;
+  /**
+   * Replaces `source` when the source was dropped to stay under the budget.
+   * `notice` is the short pointer `'use read_diagram'`.
+   */
+  sourceOmitted?: SourceOmitted;
+}
+
+export interface DiagramMemberSummary {
+  id: string;
+  type: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Text of a label node, when the member is type `text`. */
+  label?: string;
+}
+
+export interface SourceTruncation {
+  /** Length of the untruncated source. */
+  fullLength: number;
+  notice: string;
+}
+
+/** Full detail for one diagram (`read_diagram`). */
+export interface DiagramDetail {
+  id: string;
+  title: string;
+  format: DiagramSourceFormat;
+  source: string;
+  bounds: DiagramBounds;
+  memberCount: number;
+  members: DiagramMemberSummary[];
+  /**
+   * Id of the last member in this page of results. Pass it back as
+   * `member_cursor` to continue. Omitted when this response already holds
+   * the rest of the (windowed) member list.
+   */
+  nextCursor?: string;
+  /** Set when the size cap dropped members; `at` is the last member kept. */
+  truncated?: PageTruncation;
+  /** Set when `source` was cut because it alone exceeded the budget. */
+  sourceTruncated?: SourceTruncation;
+}
+
+export interface StrokesSummary {
+  count: number;
+  grouped: number;
+}
+
+export interface PageTruncation {
+  /** Last item (block, member, or diagram) that made it into this response. */
+  at: string;
+  notice: string;
+}
+
 export interface PageContent {
   sectionId: string;
   pageId: string;
   title: string;
   blocks: BlockSummary[];
+  diagrams: DiagramSummary[];
   scrolls: ScrollSummary[];
+  strokesSummary?: StrokesSummary;
+  /**
+   * Id of the last block in this page of results. Pass it back as `cursor`
+   * to continue. Omitted when this response already holds the rest of the
+   * (filtered) block list.
+   */
+  nextCursor?: string;
+  /** Set when the size cap dropped blocks; `at` is the last block kept. */
+  truncated?: PageTruncation;
+  /** Set when the size cap dropped diagrams; `at` is the last diagram kept. */
+  diagramsTruncated?: PageTruncation;
+}
+
+export interface GetBlockResult extends BlockSummary {
+  sectionId: string;
+  pageId: string;
+  /** Echo of the requested markdown offset (0 when not paging). */
+  offset?: number;
+  /**
+   * Present when the returned markdown is a slice: pass this back as `offset`
+   * to continue. With it, a block of ANY size is fully readable in bounded
+   * calls — the budget truncates a call, never strands content.
+   */
+  nextOffset?: number;
+}
+
+export interface FitDiagramResult {
+  diagramId: string;
+  scale: number;
+  width: number;
+  height: number;
+  warning?: string;
 }
 
 export interface ListScrollsResult {
@@ -161,14 +318,29 @@ export interface RenameScrollResult {
   previousTitle: string;
 }
 
+export interface MoveScrollResult {
+  scrollId: string;
+  title: string;
+  fromColumn: number;
+  toColumn: number;
+}
+
 /** What a delete removed. Deletes are irreversible over the bridge — there is
  *  no agent-facing undo — so each result names exactly what went. */
 export interface DeleteResult {
   deleted: 'page' | 'section' | 'scroll' | 'block';
   id: string;
   title?: string;
-  /** Blocks removed alongside the target (delete_scroll with withBlocks). */
+  /** Nodes removed alongside the target (delete_scroll with content:delete). */
   blocksRemoved?: number;
+  /** Present when a deprecated alias (e.g. `withBlocks`) was used. */
+  notice?: string;
+}
+
+/** What `delete_diagram` removed. Counts exclude the frame itself. */
+export interface DeleteDiagramResult {
+  deletedMembers: number;
+  deletedStrokes: number;
 }
 
 /**
@@ -223,6 +395,14 @@ export interface AppendBlockResult {
   /** Scroll the block landed in, when the page has a record for that band. */
   scrollId?: string;
 }
+
+/** `insert_block` / `move_block`: the block as read_page would report it, plus how many siblings moved. */
+export interface InsertBlockResult extends BlockSummary {
+  /** Content blocks whose y changed (the inserted/moved block itself is not counted). */
+  displacedCount: number;
+}
+
+export type MoveBlockResult = InsertBlockResult;
 
 /**
  * Language a diagram source is written in.

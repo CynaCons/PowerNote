@@ -116,12 +116,13 @@ test.describe('109 - Agent deletes (REQ-AGENT-042..046)', () => {
 
   // ── delete_scroll ─────────────────────────────────────────
 
-  test('delete_scroll keeps blocks by default', async ({ page }) => {
+  test('delete_scroll with content keep preserves blocks', async ({ page }) => {
     const scroll = await runBridge(page, 'create_scroll', { title: 'Sidebar notes' });
     await runBridge(page, 'append_block', { markdown: 'survives', scrollId: scroll.scrollId });
 
     const result = await runBridge(page, 'delete_scroll', {
       scrollId: scroll.scrollId,
+      content: 'keep',
       confirm: true,
     });
     expect(result).toMatchObject({ deleted: 'scroll', blocksRemoved: 0 });
@@ -144,6 +145,8 @@ test.describe('109 - Agent deletes (REQ-AGENT-042..046)', () => {
       confirm: true,
     });
     expect(result.blocksRemoved).toBe(2);
+    expect(result.notice).toMatch(/deprecat/i);
+    expect(result.notice).toContain('content:"delete"');
 
     const content = await runBridge(page, 'read_page');
     const texts = content.blocks.map((b: any) => b.markdown);
