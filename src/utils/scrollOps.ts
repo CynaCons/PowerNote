@@ -15,6 +15,7 @@ import { useCanvasStore, undoBatchStartFull, undoBatchEnd } from '../stores/useC
 import { useDrawStore } from '../stores/useDrawStore';
 import type { CanvasNode, ScrollRecord, Stroke } from '../types/data';
 import { columnAt, columnLeft, columnWidth } from './pageLayout';
+import { countBandContent } from './scrolls';
 import { FIT_SCROLL_PAD } from '../diagram/fitToScroll';
 
 /** Push live canvas/draw state into the workspace. */
@@ -57,6 +58,23 @@ export function createScroll(pageId: string, title: string): ScrollRecord | null
 
 export function renameScroll(pageId: string, scrollId: string, title: string): void {
   useWorkspaceStore.getState().renameScroll(pageId, scrollId, title);
+}
+
+/** Live band occupancy for the delete UI. Uses the canvas if this page is open. */
+export function liveScrollDeleteInfo(
+  pageId: string,
+  scrollId: string,
+): { isLast: boolean; empty: boolean } | null {
+  const page = findPage(pageId);
+  const scroll = page?.scrolls?.find((s) => s.id === scrollId);
+  if (!page || !scroll) return null;
+  const isLast = (page.scrolls ?? []).length <= 1;
+  const ws = useWorkspaceStore.getState();
+  const live = ws.activePageId === pageId;
+  const nodes = live ? useCanvasStore.getState().nodes : page.nodes;
+  const strokes = live ? useDrawStore.getState().strokes : (page.strokes ?? []);
+  const counts = countBandContent(scroll, page.scrolls ?? [], nodes, strokes);
+  return { isLast, empty: counts.nodes === 0 && counts.strokes === 0 };
 }
 
 export function deleteScroll(pageId: string, scrollId: string, withBlocks: boolean): void {

@@ -7,6 +7,7 @@ import type { CanvasNode as CanvasNodeType, ImageNodeData } from '../types/data'
 import { sniffFormat, normalizeDrawioSource, type DiagramFormat } from '../diagram';
 import { placeDiagramOnCanvas } from '../diagram/canvasOps';
 import { showToast } from '../components/layout/Toast';
+import { useDiagramStore } from '../stores/useDiagramStore';
 
 function fileExt(name: string): string {
   const i = name.lastIndexOf('.');
@@ -28,7 +29,8 @@ function isSvgFile(file: File): boolean {
 }
 
 function isDrawioFile(file: File): boolean {
-  return fileExt(file.name) === 'drawio';
+  const n = file.name.toLowerCase();
+  return n.endsWith('.drawio') || n.endsWith('.drawio.xml') || n.endsWith('.dio');
 }
 
 function isXmlFile(file: File): boolean {
@@ -77,10 +79,21 @@ function editingTextField(): boolean {
  * has no dialog, so the existing toast is the user-facing channel. The bridge
  * path returns the same array on create_diagram; here we only toast `error`.
  */
-function toastErrors(diagnostics: { severity: string; message: string }[]): void {
-  const errors = diagnostics.filter((d) => d.severity === 'error');
-  if (errors.length === 0) return;
-  showToast(errors.map((d) => d.message).join(' '), 'error');
+function toastImport(
+  title: string,
+  result: { placed: boolean; elementCount: number; diagnostics: { severity: string; message: string }[]; warning?: string },
+): void {
+  const errors = result.diagnostics.filter((d) => d.severity === 'error');
+  const notes = result.diagnostics.filter((d) => d.severity !== 'error');
+  if (!result.placed) {
+    showToast(errors[0]?.message ?? `Nothing in “${title}” could be drawn.`, 'error');
+    return;
+  }
+  const bits = [`Imported “${title}”: ${result.elementCount} mark${result.elementCount === 1 ? '' : 's'}`];
+  if (notes.length) bits.push(`${notes.length} note${notes.length === 1 ? '' : 's'}`);
+  if (errors.length) bits.push(`${errors.length} skipped`);
+  showToast(bits.join(' · '), errors.length ? 'info' : 'success');
+  if (result.warning) showToast(result.warning, 'info');
 }
 
 async function ingestDiagramText(
@@ -95,8 +108,10 @@ async function ingestDiagramText(
     title: opts.title,
     format: opts.format,
   });
-  toastErrors(result.diagnostics);
-  if (result.warning) showToast(result.warning, 'info');
+  toastImport(opts.title, result);
+  if (result.placed && result.diagnostics.length > 0) {
+    useDiagramStore.getState().openSource(result.frameId);
+  }
 }
 
 /** Read a File (image) as a base64 data URI, then add it to the canvas */

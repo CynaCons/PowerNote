@@ -30,7 +30,7 @@ No install. No account. No server. Just open and write.
 - **Duplicate** — Ctrl+Alt+drag to clone nodes
 - **Links** — external URLs and internal page links
 - **Save to disk** — File System Access API (Chrome/Edge) or download fallback
-- **Auto-save** — every 30s to localStorage while editing
+- **Auto-save** — 1.5s after the last edit (forced by 5s), to the bound file and the notebook library. Not a localStorage snapshot.
 - **Auto-update** — detects new releases on GitHub, in-app update
 - **Self-contained** — every file is both the editor and the data
 - **Offline-first** — works without internet, no cloud dependency
@@ -62,7 +62,7 @@ npm install
 git submodule update --init --recursive   # powerplan MCP (PLAN.md tools)
 npm run dev          # Dev server at localhost:5173
 npm run build:template  # Build standalone HTML
-npx playwright test  # Run E2E tests (246 tests across 65 files)
+npx playwright test  # Run E2E tests (135 spec files)
 ```
 
 ### powerplan MCP

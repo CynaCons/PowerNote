@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDiagramStore } from '../../stores/useDiagramStore';
 import { applyDiagramScrollFit, diagramMembers, diagramSourceOf, rebuildDiagram } from '../../diagram/canvasOps';
-import { sniffFormat, type Diagnostic } from '../../diagram';
+import { sniffFormat, normalizeDrawioSource, type Diagnostic } from '../../diagram';
 import { FORMAT_LABEL } from '../../diagram/formatLabels';
 import type { DiagramNodeData } from '../../types/data';
+import { useDrawStore } from '../../stores/useDrawStore';
+import { livePageLike } from '../../utils/columnReflow';
+import { planHeightChange } from '../../bridge/reflow';
 import './DiagramNode.css';
 
 /**
@@ -24,6 +27,7 @@ export function DiagramSourceDialog() {
   const closeSource = useDiagramStore((s) => s.closeSource);
   const [draft, setDraft] = useState('');
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!editingId) return;
@@ -55,6 +59,7 @@ export function DiagramSourceDialog() {
     setDiagnostics(notes);
     if (result.contents.length === 0) return;
 
+    const oldHeight = frame.height;
     for (const member of diagramMembers(canvas.nodes, editingId)) canvas.deleteNode(member.id);
     for (const content of result.contents) useCanvasStore.getState().addNode(content);
     useCanvasStore.getState().updateNode(editingId, {
@@ -62,10 +67,41 @@ export function DiagramSourceDialog() {
       height: result.frame.height,
       data: { ...(frame.data as DiagramNodeData), source: draft },
     });
+    if (Math.abs(result.frame.height - oldHeight) >= 2) {
+      const page = livePageLike();
+      const planned = planHeightChange(
+        {
+          ...page,
+          nodes: page.nodes.map((n) => (n.id === editingId ? { ...n, height: oldHeight } : n)),
+        },
+        editingId,
+        result.frame.height,
+      );
+      if (planned.ok && planned.dy !== 0) {
+        useCanvasStore.setState({
+          nodes: planned.nextNodes.map((n) =>
+            n.id === editingId ? { ...n, height: result.frame.height, width: result.frame.width } : n,
+          ),
+        });
+        useDrawStore.setState({ strokes: planned.nextStrokes });
+      }
+    }
   };
 
   const errors = diagnostics.filter((d) => d.severity === 'error').length;
+  const notes = diagnostics.filter((d) => d.severity !== 'error').length;
   const draftFormat = sniffFormat(draft);
+  const shownDiags = diagnostics.slice(0, 8);
+  const hiddenDiags = diagnostics.length - shownDiags.length;
+
+  const openFile = async (file: File) => {
+    const raw = await file.text();
+    const next = draftFormat === 'drawio' || /\.drawio(\.xml)?$/i.test(file.name) || /\.dio$/i.test(file.name)
+      ? await normalizeDrawioSource(raw)
+      : raw;
+    setDraft(next);
+    setDiagnostics([]);
+  };
 
   return (
     <div className="diagram-modal-backdrop" onClick={closeSource}>
@@ -87,6 +123,13 @@ export function DiagramSourceDialog() {
           </button>
         </header>
 
+        {draftFormat === 'drawio' && (
+          <p className="diagram-hint" data-testid="diagram-drawio-hint">
+            Paste XML from diagrams.net, or open a .drawio file. Orthogonal arrows
+            and ports come through; AWS/cisco stencils are skipped by name.
+          </p>
+        )}
+
         <textarea
           value={draft}
           spellCheck={false}
@@ -96,12 +139,15 @@ export function DiagramSourceDialog() {
 
         {diagnostics.length > 0 && (
           <ul className="diagram-diags" data-testid="diagram-diagnostics">
-            {diagnostics.map((d, i) => (
+            {shownDiags.map((d, i) => (
               <li key={i} className={d.severity}>
                 <span>{d.line ? `line ${d.line}` : '—'}</span>
                 {d.message}
               </li>
             ))}
+            {hiddenDiags > 0 && (
+              <li className="more">+{hiddenDiags} more</li>
+            )}
           </ul>
         )}
 
@@ -109,11 +155,32 @@ export function DiagramSourceDialog() {
           <span className="diagram-count">
             {diagnostics.length === 0
               ? 'Every line understood.'
-              : `${diagnostics.length} note${diagnostics.length === 1 ? '' : 's'}, ${errors} error${errors === 1 ? '' : 's'}`}
+              : `${notes} note${notes === 1 ? '' : 's'}, ${errors} skipped`}
           </span>
-          <button type="button" className="primary" data-testid="diagram-apply" onClick={redraw}>
-            Redraw
-          </button>
+          <div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".drawio,.dio,.xml,.svg,.drawio.xml,application/xml,text/xml,text/plain"
+              hidden
+              data-testid="diagram-open-file"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (file) void openFile(file);
+              }}
+            />
+            <button
+              type="button"
+              data-testid="diagram-open-file-btn"
+              onClick={() => fileRef.current?.click()}
+            >
+              Open file
+            </button>
+            <button type="button" className="primary" data-testid="diagram-apply" onClick={redraw}>
+              Redraw
+            </button>
+          </div>
         </footer>
       </div>
     </div>

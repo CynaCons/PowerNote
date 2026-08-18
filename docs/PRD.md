@@ -149,7 +149,7 @@ The MVP is complete when all of the following are true. Each criterion is binary
 
 **Canvas:** Konva.js (react-konva) — MIT-licensed, chosen over tldraw to avoid a $6K/year commercial license
 
-**State:** 4 Zustand stores (workspace, canvas, draw, tool)
+**State:** 9 Zustand stores (workspace, canvas, draw, tool, group, bridge, diagram, editor, fileBinding)
 
 **Text:** `marked` for markdown, `KaTeX` for math rendering, raw editing via textarea overlay
 

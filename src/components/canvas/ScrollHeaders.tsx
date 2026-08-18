@@ -19,7 +19,8 @@ import {
   scrollTitleY,
 } from '../../utils/pageLayout';
 import { pageCeiling } from '../../utils/scrollCeiling';
-import { fitScrollToContent, moveScroll, renameScroll } from '../../utils/scrollOps';
+import { deleteScroll, fitScrollToContent, liveScrollDeleteInfo, moveScroll, renameScroll } from '../../utils/scrollOps';
+import { ScrollDeleteChoices } from './ScrollDeleteChoices';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
@@ -49,7 +50,12 @@ const TITLE_INSET = 16;
  */
 export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [menu, setMenu] = useState<{ scrollId: string; x: number; y: number } | null>(null);
+  const [menu, setMenu] = useState<{
+    scrollId: string;
+    x: number;
+    y: number;
+    confirm?: boolean;
+  } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const setActiveScroll = useWorkspaceStore((s) => s.setActiveScroll);
   // Pinning is a function of where the viewport is, so the header has to follow
@@ -99,6 +105,22 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
   const menuIndex = menu ? orderedScrolls.findIndex((s) => s.id === menu.scrollId) : -1;
   const menuAtLeft = menuIndex <= 0;
   const menuAtRight = menuIndex < 0 || menuIndex >= orderedScrolls.length - 1;
+  const menuDelete = menu ? liveScrollDeleteInfo(pageId, menu.scrollId) : null;
+
+  const runDelete = (scrollId: string, withBlocks: boolean) => {
+    deleteScroll(pageId, scrollId, withBlocks);
+    setMenu(null);
+  };
+
+  const requestDelete = (scrollId: string) => {
+    const info = liveScrollDeleteInfo(pageId, scrollId);
+    if (!info || info.isLast) return;
+    if (info.empty) {
+      runDelete(scrollId, false);
+      return;
+    }
+    setMenu((m) => (m ? { ...m, confirm: true } : m));
+  };
 
   const commit = (scroll: ScrollRecord) => {
     const value = inputRef.current?.value.trim();
@@ -273,6 +295,13 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
             data-testid="scroll-header-menu"
             style={{ position: 'fixed', left: menu.x, top: menu.y, zIndex: 100 }}
           >
+            {menu.confirm ? (
+              <ScrollDeleteChoices
+                onKeep={() => runDelete(menu.scrollId, false)}
+                onDelete={() => runDelete(menu.scrollId, true)}
+              />
+            ) : (
+              <>
             <button
               type="button"
               className="context-menu__item"
@@ -308,6 +337,22 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
             >
               Fit scroll to content
             </button>
+            <button
+              type="button"
+              className="context-menu__item context-menu__item--danger"
+              data-testid="delete-scroll"
+              disabled={menuDelete?.isLast}
+              title={
+                menuDelete?.isLast
+                  ? "Can't delete the last scroll — clear the name instead"
+                  : 'Delete this scroll'
+              }
+              onClick={() => requestDelete(menu.scrollId)}
+            >
+              Delete scroll
+            </button>
+              </>
+            )}
           </div>
         </Html>
       )}

@@ -342,7 +342,7 @@ test.describe('147 - draw.io edges and tool (REQ-DIAG-120..126)', () => {
     expect(diamond.nodes.some((n) => n.data.fill === '#00ff00')).toBe(true);
   });
 
-  test('curved, rounded-with-waypoints and router-without-waypoints are refused by name; rounded on a 2-point edge is a no-op', async ({
+  test('curved edges are refused; rounded fillets are ignored and still drawn; router-without-waypoints is routed', async ({
     page,
   }) => {
     const refused = await transpile(
@@ -370,11 +370,11 @@ test.describe('147 - draw.io edges and tool (REQ-DIAG-120..126)', () => {
     const all = messages(refused);
     expect(all).toContain('curved=1');
     expect(all).toMatch(/rounded/i);
-    expect(all).toMatch(/edgeStyle=orthogonalEdgeStyle/i);
-    expect(all).toMatch(/waypoint/i);
-    expect(refused.diagnostics.filter((d) => d.severity === 'error').length).toBeGreaterThanOrEqual(3);
+    expect(all).toMatch(/routed/i);
+    expect(refused.diagnostics.some((d) => d.severity === 'error' && /curved/i.test(d.message))).toBe(true);
+    // Fillet + router still produce segments; only the curve is dropped.
     expect(refused.nodes.some((n) => n.data.shapeType === 'arrow' || n.data.shapeType === 'line')).toBe(
-      false,
+      true,
     );
     // Refusing is not the same as giving up: the plain rect still lands.
     expect(refused.nodes.filter((n) => n.type === 'shape' && n.data.fill === '#00ff00')).toHaveLength(1);

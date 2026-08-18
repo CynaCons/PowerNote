@@ -21,6 +21,7 @@ import { multiDragStart, multiDragMove, multiDragEnd } from '../../utils/multiDr
 import { TextEditor } from './TextEditor';
 import { calculateSnap, calculateScrollSnap, type SnapLine } from './SnapGuides';
 import { markdownToHtml, markdownBoxStyle } from '../../utils/renderMarkdown';
+import { reflowAfterHeightChange } from '../../utils/columnReflow';
 
 // Handle powernote:// internal links
 function handleInternalLink(href: string) {
@@ -88,7 +89,11 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
       if (!htmlRef.current) return;
       const h = Math.max(MIN_TEXT_HEIGHT, htmlRef.current.offsetHeight);
       if (Math.abs(h - (node.height || 0)) > 2) {
-        updateNodeSilent(node.id, { height: h });
+        // Column pages pack the band when a block grows or shrinks.
+        // Freeform pages keep the silent height write and leave neighbours.
+        if (!reflowAfterHeightChange(node.id, h)) {
+          updateNodeSilent(node.id, { height: h });
+        }
       }
     }, 60);
     return () => clearTimeout(timer);

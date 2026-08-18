@@ -316,13 +316,13 @@ test.describe('146 - draw.io transpile (REQ-DIAG-110..119)', () => {
     expect(all).toMatch(/image=/i);
     expect(all).toContain('gradientColor');
     expect(all).toMatch(/rotation/i);
-    expect(all).toMatch(/HTML/i);
+    expect(all).toMatch(/HTML markup stripped/i);
     expect(r.diagnostics.filter((d) => d.severity === 'error').length).toBeGreaterThanOrEqual(5);
     // Refusing is not the same as giving up: the plain rect still lands.
     const ok = r.nodes.filter((n) => n.type === 'shape' && n.data.fill === '#00ff00');
     expect(ok).toHaveLength(1);
-    // The HTML cell is left unlabelled rather than interpreted.
-    expect(r.nodes.filter((n) => n.type === 'text')).toHaveLength(0);
+    // Simple HTML keeps the words.
+    expect(r.nodes.some((n) => n.type === 'text' && n.data.text === 'bold')).toBe(true);
   });
 
   test('a multi-page mxfile imports the first page and names the second in an ignored diagnostic', async ({

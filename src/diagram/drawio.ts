@@ -19,7 +19,10 @@
  * ShapeNode (signed direction vector, same as `materialize.ts`); `endArrow=none`
  * is a `line`. Connected terminals clip centre-to-centre at each cell's box.
  * Orthogonal edges with explicit `mxPoint` waypoints decompose into consecutive
- * 2-point segments. Edge labels land at the midpoint of the longest segment.
+ * 2-point segments. Orthogonal edges WITHOUT waypoints are routed from
+ * `exitX`/`entryX` (or the box edge) as an L/Z — the default draw.io
+ * connector, not a refusal. Edge labels land at the midpoint of the longest
+ * segment. Ports honour `relative=1` plus `<mxPoint as="offset">`.
  *
  * The caller must pass uncompressed XML — `normalizeDrawioSource` inflates a
  * base64+raw-deflate `<diagram>` payload with the browser-native
@@ -111,7 +114,8 @@ const REFUSED: Record<string, string> = {
     'is refused — the canvas has no double-headed primitive, and dropping one head would misstate the drawing.',
 };
 
-/** Built-in `shape=` values we map. Anything else is a named stencil refusal. */
+/** Built-in `shape=` values we map exactly. Box-like UML/basic stencils are
+ *  classified separately so a component is a rectangle, not a missing cell. */
 const ACCEPTED_SHAPES = new Set([
   '',
   'rectangle',
@@ -123,9 +127,14 @@ const ACCEPTED_SHAPES = new Set([
   'text',
   'swimlane',
   'group',
+  'module',
+  'port',
+  'folder',
+  'note',
+  'card',
 ]);
 
-type Kind = 'rect' | 'ellipse' | 'rhombus' | 'triangle' | 'text' | 'swimlane' | 'group';
+type Kind = 'rect' | 'ellipse' | 'rhombus' | 'triangle' | 'text' | 'swimlane' | 'group' | 'module' | 'port';
 
 interface Style {
   map: Map<string, string>;
@@ -146,6 +155,8 @@ interface Geo {
   targetPoint: Pt | null;
   /** Explicit waypoints from `<Array as="points">`. */
   points: Pt[];
+  /** Pixel nudge on a relative cell — ports use this to sit on a parent edge. */
+  offset: Pt | null;
 }
 
 interface Cell {
@@ -306,17 +317,36 @@ function dashes(style: Style): number[] {
   return parts.length > 0 ? parts : [8, 4];
 }
 
-function classify(style: Style): Kind | { stencil: string } {
+function classify(style: Style): Kind | { stencil: string } | { box: string } {
   const shape = (styleGet(style, 'shape') ?? '').trim();
   const low = shape.toLowerCase();
-  if (shape && !ACCEPTED_SHAPES.has(low)) return { stencil: shape };
   if (low === 'ellipse' || styleHas(style, 'ellipse')) return 'ellipse';
   if (low === 'rhombus' || styleHas(style, 'rhombus')) return 'rhombus';
   if (low === 'triangle' || styleHas(style, 'triangle')) return 'triangle';
   if (low === 'text' || styleHas(style, 'text')) return 'text';
   if (low === 'swimlane' || styleHas(style, 'swimlane')) return 'swimlane';
   if (low === 'group' || styleHas(style, 'group') || styleGet(style, 'container') === '1') return 'group';
+  if (low === 'module' || low.endsWith('.module') || low.endsWith('.component')) return 'module';
+  if (low === 'port' || low.endsWith('.port')) return 'port';
+  if (low === 'folder' || low === 'note' || low === 'card') return 'rect';
+  if (isBoxLikeStencil(low)) return { box: shape };
+  if (shape && !ACCEPTED_SHAPES.has(low)) return { stencil: shape };
   return 'rect';
+}
+
+/** UML/basic library shapes that are decorated boxes, not little renderers. */
+function isBoxLikeStencil(low: string): boolean {
+  if (!low.startsWith('mxgraph.')) return false;
+  if (low.startsWith('mxgraph.mscae') || low.startsWith('mxgraph.aws') || low.startsWith('mxgraph.cisco')) {
+    return false;
+  }
+  if (low.startsWith('mxgraph.basic.')) {
+    return /rect|rectangle|rounded|square|box/.test(low);
+  }
+  if (low.startsWith('mxgraph.uml')) {
+    return !/actor|usecase|lifeline|destruction|note|actor/.test(low);
+  }
+  return false;
 }
 
 function readPaint(style: Style, box: { w: number; h: number }): Paint {
@@ -377,15 +407,21 @@ function decodeEntities(raw: string): string {
     .replace(/&amp;/gi, '&');
 }
 
-function readLabel(raw: string): { text: string } | { html: true } {
+function readLabel(raw: string): { text: string; stripped?: boolean } | { html: true } {
   if (!raw) return { text: '' };
   let s = raw.replace(/<br\s*\/?>/gi, '\n');
   s = s.replace(/<\/(?:div|p)\s*>/gi, '\n');
   s = s.replace(/<(?:div|p)(?:\s[^>]*)?>/gi, '');
-  if (/<\/?[a-zA-Z]/.test(s)) return { html: true };
+  let stripped = false;
+  if (/<\/?[a-zA-Z]/.test(s)) {
+    const plain = s.replace(/<[^>]+>/g, '');
+    if (!plain.replace(/\s/g, '')) return { html: true };
+    s = plain;
+    stripped = true;
+  }
   s = decodeEntities(s);
   s = s.replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
-  return { text: s };
+  return stripped ? { text: s, stripped: true } : { text: s };
 }
 
 // ── Geometry ────────────────────────────────────────────────
@@ -404,6 +440,7 @@ function geometryOf(cellEl: Element): Geo {
     sourcePoint: null,
     targetPoint: null,
     points: [],
+    offset: null,
   };
   const list = Array.from(cellEl.getElementsByTagName('mxGeometry'));
   const geo = list.find((g) => (attr(g, 'as') ?? 'geometry') === 'geometry') ?? list[0];
@@ -411,6 +448,7 @@ function geometryOf(cellEl: Element): Geo {
 
   let sourcePoint: Pt | null = null;
   let targetPoint: Pt | null = null;
+  let offset: Pt | null = null;
   const points: Pt[] = [];
   for (const child of Array.from(geo.children)) {
     const t = tagOf(child);
@@ -418,6 +456,7 @@ function geometryOf(cellEl: Element): Geo {
     if (t === 'mxpoint') {
       if (as === 'sourcepoint') sourcePoint = readMxPoint(child);
       else if (as === 'targetpoint') targetPoint = readMxPoint(child);
+      else if (as === 'offset') offset = readMxPoint(child);
     } else if (t === 'array' && as === 'points') {
       for (const p of Array.from(child.children)) {
         if (tagOf(p) === 'mxpoint') points.push(readMxPoint(p));
@@ -434,6 +473,7 @@ function geometryOf(cellEl: Element): Geo {
     sourcePoint,
     targetPoint,
     points,
+    offset,
   };
 }
 
@@ -460,6 +500,10 @@ function resolveAbs(cell: Cell, byId: Map<string, Cell>): { x: number; y: number
     if (cur.geo.relative && parent) {
       x += cur.geo.x * parent.geo.w;
       y += cur.geo.y * parent.geo.h;
+      if (cur.geo.offset) {
+        x += cur.geo.offset.x;
+        y += cur.geo.offset.y;
+      }
     } else {
       x += cur.geo.x;
       y += cur.geo.y;
@@ -596,6 +640,14 @@ function labelText(ctx: Ctx, cell: Cell): string | null {
     report(ctx, cell.line, 'error', `Cell "${cell.id}": ${REFUSED.html}`);
     return null;
   }
+  if (parsed.stripped && parsed.text) {
+    report(
+      ctx,
+      cell.line,
+      'ignored',
+      `Cell "${cell.id}": HTML markup stripped from the label — the words were kept.`,
+    );
+  }
   return parsed.text;
 }
 
@@ -604,6 +656,16 @@ function labelText(ctx: Ctx, cell: Cell): string | null {
  * S/√2 placed at the cell's mid-x / min-side top, turned 45°, fills the
  * S×S box inscribed in the cell — the v0.35.1 decision-diamond trick.
  */
+/** UML component: a box with two small tabs on the left edge. */
+function emitModule(ctx: Ctx, absX: number, absY: number, w: number, h: number, paint: Paint): void {
+  emitShape(ctx, absX, absY, w, h, shapeData(paint, 'rect', { cornerRadius: paint.cornerRadius, rotation: paint.rotation }));
+  const tabW = Math.max(6, Math.min(12, w * 0.12));
+  const tabH = Math.max(5, Math.min(10, h * 0.14));
+  const inset = h / 4;
+  emitShape(ctx, absX - tabW / 2, absY + inset - tabH / 2, tabW, tabH, shapeData(paint, 'rect'));
+  emitShape(ctx, absX - tabW / 2, absY + 2 * inset - tabH / 2, tabW, tabH, shapeData(paint, 'rect'));
+}
+
 function emitRhombus(ctx: Ctx, absX: number, absY: number, w: number, h: number, paint: Paint): void {
   const S = Math.min(w, h);
   if (S <= 0) return;
@@ -628,9 +690,17 @@ function emitVertex(ctx: Ctx, cell: Cell, byId: Map<string, Cell>): void {
   // Stencil before gradient/sketch: real AWS/mscae styles carry both, and
   // naming the library shape is the refusal the user can act on.
   const kind = classify(cell.style);
-  if (typeof kind === 'object') {
+  if (typeof kind === 'object' && 'stencil' in kind) {
     report(ctx, cell.line, 'error', `Cell "${cell.id}": shape="${kind.stencil}" ${REFUSED.stencil}`);
     return;
+  }
+  if (typeof kind === 'object' && 'box' in kind) {
+    report(
+      ctx,
+      cell.line,
+      'ignored',
+      `Cell "${cell.id}": shape="${kind.box}" drawn as a rectangle — the library decoration is not run.`,
+    );
   }
 
   const gradient = styleGet(cell.style, 'gradientcolor');
@@ -653,7 +723,14 @@ function emitVertex(ctx: Ctx, cell: Cell, byId: Map<string, Cell>): void {
   const abs = resolveAbs(cell, byId);
   const paint = readPaint(cell.style, { w, h });
 
-  const isRectKind = kind === 'rect' || kind === 'rhombus' || kind === 'swimlane' || kind === 'group';
+  const isRectKind =
+    kind === 'rect' ||
+    kind === 'rhombus' ||
+    kind === 'swimlane' ||
+    kind === 'group' ||
+    kind === 'module' ||
+    kind === 'port' ||
+    typeof kind === 'object';
   if (!isRectKind && paint.rotation !== 0) {
     report(ctx, cell.line, 'error', `Cell "${cell.id}": ${REFUSED.rotation}`);
     return;
@@ -694,8 +771,14 @@ function emitVertex(ctx: Ctx, cell: Cell, byId: Map<string, Cell>): void {
     return;
   }
 
-  // group / swimlane / rect: one flat rect. Children are siblings sharing
-  // groupId; there is no parentId in the data model, by design.
+  if (kind === 'module') {
+    emitModule(ctx, abs.x, abs.y, w, h, paint);
+    const text = labelText(ctx, cell);
+    if (text) emitLabel(ctx, text, abs.x + w / 2, abs.y + h / 2, paint);
+    return;
+  }
+
+  // group / swimlane / rect / port / box-like stencil: one flat rect.
   if ((kind === 'group' || kind === 'swimlane') && paint.rotation !== 0) {
     report(
       ctx,
@@ -817,6 +900,46 @@ function clipEnd(term: Term, toward: Pt): Pt {
   return boxExit(centreOf(term), toward, term);
 }
 
+function styleFrac(style: Style, key: string): number | null {
+  const raw = styleGet(style, key);
+  if (raw == null || raw === '') return null;
+  const n = Number.parseFloat(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+function styledEnd(term: Term, style: Style, which: 'exit' | 'entry'): Pt | null {
+  if (term.kind !== 'box') return null;
+  const fx = styleFrac(style, which === 'exit' ? 'exitx' : 'entryx');
+  const fy = styleFrac(style, which === 'exit' ? 'exity' : 'entryy');
+  if (fx == null || fy == null) return null;
+  const dx = num(styleGet(style, which === 'exit' ? 'exitdx' : 'entrydx'), 0);
+  const dy = num(styleGet(style, which === 'exit' ? 'exitdy' : 'entrydy'), 0);
+  return { x: term.x + fx * term.w + dx, y: term.y + fy * term.h + dy };
+}
+
+/**
+ * Orthogonal path when draw.io left the bends in the router.
+ * Honour exitX/entryX when present (that's how ports are wired). Otherwise
+ * an L/Z from box edge to box edge.
+ */
+function orthogonalRoute(src: Term, tgt: Term, style: Style): Pt[] {
+  const styledStart = styledEnd(src, style, 'exit');
+  const styledEndPt = styledEnd(tgt, style, 'entry');
+  const start = styledStart ?? clipEnd(src, centreOf(tgt));
+  const end = styledEndPt ?? clipEnd(tgt, centreOf(src));
+  if (Math.abs(start.x - end.x) < 1 || Math.abs(start.y - end.y) < 1) {
+    return [start, end];
+  }
+  const exitX = styleFrac(style, 'exitx');
+  const horizontalFirst = exitX === 0 || exitX === 1 || exitX == null;
+  if (horizontalFirst) {
+    const mid = (start.x + end.x) / 2;
+    return [start, { x: mid, y: start.y }, { x: mid, y: end.y }, end];
+  }
+  const mid = (start.y + end.y) / 2;
+  return [start, { x: start.x, y: mid }, { x: end.x, y: mid }, end];
+}
+
 function isRouterStyle(style: Style): string | null {
   const raw = styleGet(style, 'edgestyle');
   if (raw == null || raw === '') return null;
@@ -829,7 +952,10 @@ function startArrowKind(raw: string | undefined): 'none' | 'classic' | 'other' {
   if (raw == null || raw === '') return 'none';
   const v = raw.trim().toLowerCase();
   if (!v || v === 'none' || v === '0') return 'none';
-  if (v === 'classic') return 'classic';
+  // block/open are the other common "filled/open triangle" heads — same job as classic.
+  if (v === 'classic' || v === 'block' || v === 'open' || v === 'openthin' || v === 'blockthin') {
+    return 'classic';
+  }
   return 'other';
 }
 
@@ -909,16 +1035,13 @@ function emitEdge(ctx: Ctx, cell: Cell, byId: Map<string, Cell>, cells: Cell[]):
 
   const router = isRouterStyle(cell.style);
   const hasWaypoints = cell.geo.points.length > 0;
-  if (router && !hasWaypoints) {
-    report(ctx, cell.line, 'error', `Cell "${cell.id}": edgeStyle=${router} ${REFUSED.router}`);
-    return;
-  }
-
-  // rounded=1 on a 2-point edge is a no-op; on a bent path it fillets corners
-  // we cannot draw, so a straightened polyline would misstate the drawing.
-  if (styleGet(cell.style, 'rounded') === '1' && hasWaypoints) {
-    report(ctx, cell.line, 'error', `Cell "${cell.id}": ${REFUSED.rounded}`);
-    return;
+  if (styleGet(cell.style, 'rounded') === '1' && (hasWaypoints || router)) {
+    report(
+      ctx,
+      cell.line,
+      'ignored',
+      `Cell "${cell.id}": rounded corners drawn square — the canvas has no fillet primitive.`,
+    );
   }
 
   const startRaw = styleGet(cell.style, 'startarrow');
@@ -952,6 +1075,14 @@ function emitEdge(ctx: Ctx, cell: Cell, byId: Map<string, Cell>, cells: Cell[]):
   let pts: Pt[];
   if (mids.length > 0) {
     pts = [clipEnd(src, mids[0]), ...mids, clipEnd(tgt, mids[mids.length - 1])];
+  } else if (router) {
+    pts = orthogonalRoute(src, tgt, cell.style);
+    report(
+      ctx,
+      cell.line,
+      'ignored',
+      `Cell "${cell.id}": orthogonal edge routed from ${router} (no waypoints in the file).`,
+    );
   } else {
     const a = centreOf(src);
     const b = centreOf(tgt);

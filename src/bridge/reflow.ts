@@ -1,20 +1,24 @@
 /**
- * Vertical within-column displacement for agent block insert/move (v0.55).
+ * Vertical within-column displacement for insert/move/height-change (v0.55,
+ * column-flow in v0.57).
  *
- * This is not a document-flow engine and it is not the descoped frame reflow
- * (PLAN v0.34.0 / SRS_DIAGRAM "Not built", 2026-08-13). Only free-standing
- * content blocks in the target column move. Diagram frames, their members,
- * shapes, images and strokes keep their y — an inserted block that lands on
- * a diagram overlaps it, the same as an append that happened to collide.
+ * Two page kinds:
  *
- * Addressing: prefer `after` (a block id). Ids survive reordering; a numeric
+ *  - Column-flow (`pageUsesColumnFlow`: scroll guide, or any titled scroll).
+ *    The band is a stack. Every top-level occupant moves — text, frames,
+ *    images, shapes, ungrouped ink. Frame members and group ink ride the
+ *    frame by the same dy. There is no "notes besides" inside a scroll.
+ *  - Freeform (pages / grid / none, only the default untitled scroll).
+ *    Only free-standing text blocks move. Diagrams and other marks keep
+ *    their y. That is the v0.55 contract, still what T161 asserts.
+ *
+ * Addressing: prefer `after` (an id). Ids survive reordering; a numeric
  * index is a snapshot of reading order and goes stale the moment anything
- * above it moves. That is the same reason `resolveColumn` prefers scrollId
- * over a raw column integer.
+ * above it moves.
  */
 
-import type { CanvasNode, ScrollRecord } from '../types/data';
-import { MIN_TEXT_HEIGHT } from '../utils/pageLayout';
+import type { CanvasNode, ScrollRecord, Stroke } from '../types/data';
+import { MIN_TEXT_HEIGHT, columnAt } from '../utils/pageLayout';
 import { clampCanvasY } from '../utils/scrollCeiling';
 import { scrollById } from '../utils/scrolls';
 import {
@@ -29,6 +33,9 @@ import {
 export type PageLike = {
   nodes: readonly CanvasNode[];
   scrolls?: readonly ScrollRecord[];
+  strokes?: readonly Stroke[];
+  /** When true, the band packs every occupant. Default false (freeform). */
+  columnFlow?: boolean;
 };
 
 export type Displacement = { id: string; dy: number };
@@ -66,6 +73,7 @@ export type MoveBlockPlan = {
   /** Net dy per content block other than the one being moved. */
   displaced: Displacement[];
   nextNodes: CanvasNode[];
+  nextStrokes: Stroke[];
 };
 
 function blockHeightOf(node: { height?: number }): number {
@@ -80,20 +88,63 @@ function openingDy(node: { height?: number }): number {
   return blockHeightOf(node) + BLOCK_GAP;
 }
 
+/** Top-level occupant: not a diagram label / mark. The frame itself is top-level. */
+export function isTopLevelOccupant(node: CanvasNode, diagramIds: Set<string>): boolean {
+  if (node.type === 'diagram') return true;
+  if (node.groupId && diagramIds.has(node.groupId)) return false;
+  return true;
+}
+
+/**
+ * What insert/move may address and what a height change shoves.
+ * Column-flow: every top-level occupant. Freeform: text blocks only.
+ */
+export function isFlowItem(
+  node: CanvasNode,
+  diagramIds: Set<string>,
+  columnFlow: boolean,
+): boolean {
+  if (columnFlow) return isTopLevelOccupant(node, diagramIds);
+  return isContentBlock(node, diagramIds);
+}
+
 function contentBlocksInColumn(
   nodes: readonly CanvasNode[],
   column: number,
-  scrolls?: readonly ScrollRecord[],
+  scrolls: readonly ScrollRecord[] | undefined,
+  columnFlow: boolean,
 ): CanvasNode[] {
   const diagrams = diagramFrameIds(nodes as CanvasNode[]);
   return nodes
-    .filter((n) => isContentBlock(n, diagrams) && columnOf(n, scrolls) === column)
+    .filter((n) => isFlowItem(n, diagrams, columnFlow) && columnOf(n, scrolls) === column)
     .sort((a, b) => {
       // Same 20px band as orderedTextNodes / compareReadingOrder so `index`
       // matches what read_page reports for the column.
       if (Math.abs(a.y - b.y) > 20) return a.y - b.y;
       return a.x - b.x;
     });
+}
+
+function strokeMinY(stroke: Stroke): number {
+  let min = Infinity;
+  for (let i = 1; i < stroke.points.length; i += 2) {
+    if (stroke.points[i] < min) min = stroke.points[i];
+  }
+  return min === Infinity ? 0 : min;
+}
+
+function accumulateDy(displaced: readonly Displacement[]): Map<string, number> {
+  const byId = new Map<string, number>();
+  for (const d of displaced) {
+    byId.set(d.id, (byId.get(d.id) ?? 0) + d.dy);
+  }
+  return byId;
+}
+
+function dyFor(id: string, groupId: string | null | undefined, byId: Map<string, number>): number {
+  // Frames store groupId === their own id. That must not count twice.
+  const viaGroup = groupId && groupId !== id && byId.has(groupId) ? (byId.get(groupId) ?? 0) : 0;
+  return (byId.get(id) ?? 0) + viaGroup;
 }
 
 function knownScrollsMessage(page: PageLike): string {
@@ -143,34 +194,55 @@ export function applyDisplacements(
   displaced: readonly Displacement[],
 ): CanvasNode[] {
   if (displaced.length === 0) return nodes.slice();
-  const byId = new Map<string, number>();
-  for (const d of displaced) {
-    byId.set(d.id, (byId.get(d.id) ?? 0) + d.dy);
-  }
+  const byId = accumulateDy(displaced);
   return nodes.map((n) => {
-    const dy = byId.get(n.id);
-    if (dy === undefined || dy === 0) return n;
+    const dy = dyFor(n.id, n.groupId, byId);
+    if (dy === 0) return n;
     return { ...n, y: n.y + dy };
   });
 }
 
+/** Shift ungrouped-stroke flow items and any ink whose frame moved. */
+export function applyStrokeDisplacements(
+  strokes: readonly Stroke[],
+  displaced: readonly Displacement[],
+): Stroke[] {
+  if (displaced.length === 0) return strokes.slice();
+  const byId = accumulateDy(displaced);
+  return strokes.map((s) => {
+    const dy = dyFor(s.id, s.groupId, byId);
+    if (dy === 0) return s;
+    const points = s.points.map((v, i) => (i % 2 === 1 ? v + dy : v));
+    return { ...s, points };
+  });
+}
+
 function displaceContentBelow(
-  nodes: readonly CanvasNode[],
+  page: PageLike,
   column: number,
-  scrolls: readonly ScrollRecord[] | undefined,
   fromY: number,
   dy: number,
   opts: { exceptId?: string; exclusive?: boolean } = {},
 ): Displacement[] {
   if (dy === 0) return [];
-  const diagrams = diagramFrameIds(nodes as CanvasNode[]);
+  const columnFlow = !!page.columnFlow;
+  const diagrams = diagramFrameIds(page.nodes as CanvasNode[]);
   const out: Displacement[] = [];
-  for (const n of nodes) {
+  for (const n of page.nodes) {
     if (opts.exceptId && n.id === opts.exceptId) continue;
-    if (!isContentBlock(n, diagrams)) continue;
-    if (columnOf(n, scrolls) !== column) continue;
+    if (!isFlowItem(n, diagrams, columnFlow)) continue;
+    if (columnOf(n, page.scrolls) !== column) continue;
     if (opts.exclusive ? n.y <= fromY : n.y < fromY) continue;
     out.push({ id: n.id, dy });
+  }
+  if (columnFlow) {
+    for (const s of page.strokes ?? []) {
+      if (s.groupId && diagrams.has(s.groupId)) continue;
+      if (columnAt(s.points[0] ?? 0, page.scrolls) !== column) continue;
+      const y = strokeMinY(s);
+      if (opts.exclusive ? y <= fromY : y < fromY) continue;
+      out.push({ id: s.id, dy });
+    }
   }
   return out;
 }
@@ -210,7 +282,8 @@ export function insertBlockAt(
   if (!resolved.ok) return resolved;
   const { scroll } = resolved;
   const column = scroll.column;
-  const columnBlocks = contentBlocksInColumn(page.nodes, column, page.scrolls);
+  const columnFlow = !!page.columnFlow;
+  const columnBlocks = contentBlocksInColumn(page.nodes, column, page.scrolls, columnFlow);
   const dy = openingDy(node);
 
   let y: number;
@@ -249,7 +322,7 @@ export function insertBlockAt(
       };
     }
     const diagrams = diagramFrameIds(page.nodes as CanvasNode[]);
-    if (!isContentBlock(anchor, diagrams) || columnOf(anchor, page.scrolls) !== column) {
+    if (!isFlowItem(anchor, diagrams, columnFlow) || columnOf(anchor, page.scrolls) !== column) {
       return {
         ok: false,
         code: 'BAD_PARAMS',
@@ -259,7 +332,7 @@ export function insertBlockAt(
     y = blockBottom(anchor) + BLOCK_GAP;
   }
 
-  const displaced = displaceContentBelow(page.nodes, column, page.scrolls, y, dy);
+  const displaced = displaceContentBelow(page, column, y, dy);
   return {
     ok: true,
     x: columnX(column, page.scrolls),
@@ -285,7 +358,7 @@ export function removeBlockGap(
     return { ok: false, code: 'NOT_FOUND', message: `No block with id "${blockId}"` };
   }
   const diagrams = diagramFrameIds(page.nodes as CanvasNode[]);
-  if (!isContentBlock(node, diagrams)) {
+  if (!isFlowItem(node, diagrams, !!page.columnFlow)) {
     return {
       ok: false,
       code: 'UNSUPPORTED',
@@ -294,7 +367,7 @@ export function removeBlockGap(
   }
   const column = columnOf(node, page.scrolls);
   const dy = -openingDy(node);
-  const displaced = displaceContentBelow(page.nodes, column, page.scrolls, node.y, dy, {
+  const displaced = displaceContentBelow(page, column, node.y, dy, {
     exceptId: blockId,
     exclusive: true,
   });
@@ -348,7 +421,7 @@ export function planMoveBlock(
     return { ok: false, code: 'NOT_FOUND', message: `No block with id "${blockId}"` };
   }
   const diagrams = diagramFrameIds(page.nodes as CanvasNode[]);
-  if (!isContentBlock(node, diagrams)) {
+  if (!isFlowItem(node, diagrams, !!page.columnFlow)) {
     return {
       ok: false,
       code: 'UNSUPPORTED',
@@ -383,9 +456,15 @@ export function planMoveBlock(
   if (!closed.ok) return closed;
 
   const afterClose = applyDisplacements(page.nodes, closed.displaced);
+  const strokesAfterClose = applyStrokeDisplacements(page.strokes ?? [], closed.displaced);
   const without = afterClose.filter((n) => n.id !== blockId);
   const insert = insertBlockAt(
-    { nodes: without, scrolls: page.scrolls },
+    {
+      nodes: without,
+      scrolls: page.scrolls,
+      strokes: strokesAfterClose,
+      columnFlow: page.columnFlow,
+    },
     targetScrollId,
     anchor.anchor,
     node,
@@ -394,9 +473,23 @@ export function planMoveBlock(
   if (!insert.ok) return insert;
 
   const afterOpen = applyDisplacements(afterClose, insert.displaced);
-  const nextNodes = afterOpen.map((n) =>
-    n.id === blockId ? { ...n, x: insert.x, y: insert.y } : n,
-  );
+  const strokesAfterOpen = applyStrokeDisplacements(strokesAfterClose, insert.displaced);
+  const dx = insert.x - node.x;
+  const frameDy = insert.y - node.y;
+  const nextNodes = afterOpen.map((n) => {
+    if (n.id === blockId) return { ...n, x: insert.x, y: insert.y };
+    if (node.type === 'diagram' && n.groupId === blockId) {
+      return { ...n, x: n.x + dx, y: n.y + frameDy };
+    }
+    return n;
+  });
+  const nextStrokes = strokesAfterOpen.map((s) => {
+    if (node.type === 'diagram' && s.groupId === blockId) {
+      const points = s.points.map((v, i) => v + (i % 2 === 0 ? dx : frameDy));
+      return { ...s, points };
+    }
+    return s;
+  });
 
   const net = new Map<string, number>();
   for (const d of closed.displaced) net.set(d.id, (net.get(d.id) ?? 0) + d.dy);
@@ -415,5 +508,51 @@ export function planMoveBlock(
     fromColumn,
     displaced,
     nextNodes,
+    nextStrokes,
+  };
+}
+
+export type HeightChangePlan = {
+  ok: true;
+  dy: number;
+  displaced: Displacement[];
+  nextNodes: CanvasNode[];
+  nextStrokes: Stroke[];
+};
+
+/** Open or close the gap below a flow item whose height just changed. */
+export function planHeightChange(
+  page: PageLike,
+  nodeId: string,
+  newHeight: number,
+): HeightChangePlan | ReflowError {
+  const node = page.nodes.find((n) => n.id === nodeId);
+  if (!node) {
+    return { ok: false, code: 'NOT_FOUND', message: `No block with id "${nodeId}"` };
+  }
+  const dy = newHeight - blockHeightOf(node);
+  if (Math.abs(dy) < 2) {
+    return {
+      ok: true,
+      dy: 0,
+      displaced: [],
+      nextNodes: page.nodes.slice() as CanvasNode[],
+      nextStrokes: (page.strokes ?? []).slice() as Stroke[],
+    };
+  }
+  const column = columnOf(node, page.scrolls);
+  const displaced = displaceContentBelow(page, column, node.y, dy, {
+    exceptId: nodeId,
+    exclusive: true,
+  });
+  const nextNodes = applyDisplacements(page.nodes, displaced).map((n) =>
+    n.id === nodeId ? { ...n, height: newHeight } : n,
+  );
+  return {
+    ok: true,
+    dy,
+    displaced,
+    nextNodes,
+    nextStrokes: applyStrokeDisplacements(page.strokes ?? [], displaced),
   };
 }

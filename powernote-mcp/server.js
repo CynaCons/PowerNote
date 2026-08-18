@@ -933,27 +933,30 @@ const TOOLS = [
       'fitted to the cell), triangles, labels, standalone text cells, and flattened groups / ' +
       'containers / swimlanes. Paint via fillColor, strokeColor, strokeWidth, dashed=1 and ' +
       'dashPattern. rotation on a rectangle is honoured. ' +
+      'Supported vertices also include UML module/component (rectangle with two left tabs), ' +
+      'ports (small rectangles, including relative geometry + mxPoint offset so they sit on ' +
+      'the parent edge), and box-like mxgraph.uml / mxgraph.basic library shapes (drawn as ' +
+      'rectangles; an ignored diagnostic names the original stencil). ' +
       'Supported edges: a straight edge with endArrow other than none becomes an arrow ' +
       '(signed direction vector); endArrow=none becomes a line. Connected terminals clip ' +
       'centre-to-centre at each cell\'s bounding box. Orthogonal edges WITH explicit mxPoint ' +
       'waypoints in <Array as="points"> are decomposed into consecutive 2-point segments ' +
-      '(all line, last one arrow if arrowheaded). An edge label (value on the edge, or a ' +
-      'child label cell) lands as text at the midpoint of the longest segment. ' +
+      '(all line, last one arrow if arrowheaded). Orthogonal edges WITHOUT waypoints are ' +
+      'ROUTED from exitX/entryX (or the box edge) as an L/Z — that is the default draw.io ' +
+      'connector, not a refusal. An edge label lands as text at the midpoint of the longest segment. ' +
       'Compressed files (base64+raw-deflate <diagram> payloads) are accepted and normalized ' +
       'to readable XML before transpile; the stored source is always uncompressed. ' +
       'REFUSED, each with a diagnostic naming it: ' +
       'curved=1 is refused — the canvas has no bezier primitive, and a straightened curve misstates the drawing; ' +
-      'rounded routing is refused — the canvas has no bezier primitive, and a straightened curve misstates the drawing; ' +
-      'router-style edges (edgeStyle=orthogonalEdgeStyle etc.) WITHOUT explicit waypoints is refused — the bends live in draw.io\'s router, not in the file. Right-click the edge in draw.io → Edit connection to make waypoints explicit, then import again; ' +
-      'startArrow other than none/classic is refused — PowerNote arrows have one head, at the end of the segment, and this start head has no canvas equivalent; ' +
+      'startArrow other than none/classic/block/open is refused — PowerNote arrows have one head, at the end of the segment, and this start head has no canvas equivalent; ' +
       'startArrow=classic with an end head is refused — the canvas has no double-headed primitive, and dropping one head would misstate the drawing; ' +
-      'custom stencils (mscae/aws/cisco/UML libraries) are little rendering programs this transpiler does not run. Redraw it with a rectangle, ellipse, rhombus, triangle or text; ' +
+      'custom stencils (mscae/aws/cisco image libraries) are little rendering programs this transpiler does not run; UML module/component/port and box-like mxgraph.uml/basic shapes ARE drawn (as rectangles / tabbed modules); ' +
       'image= is refused — an embedded raster is not a canvas node. Import the picture as an image block instead; ' +
       'gradientColor is refused — a shape node carries one flat fill, and picking a stop colour would misrepresent the drawing; ' +
       'rotation on a non-rectangle is refused — circle/triangle Konva components ignore rotation, and silently dropping it would misplace the drawing; ' +
       'sketch=1 is refused — rough/hand-drawn rendering has no canvas equivalent, and a clean shape would not be what was drawn; ' +
       'A nested <mxGraphModel> is refused — it opens a second graph with its own origin, and flattening it would move everything inside; ' +
-      'HTML-formatted labels beyond plain text are refused — <br>/<div> and entities are stripped, but remaining markup would have to be interpreted. The cell was left unlabelled. ' +
+      'HTML labels: simple <br>/<div>/<font>/<b> markup is stripped and the words are kept (ignored diagnostic); remaining empty markup is refused. ' +
       'Keep to the supported subset and nothing is silently lost. The response carries the ' +
       'diagnostics, so one call tells you what was dropped.',
     inputSchema: {

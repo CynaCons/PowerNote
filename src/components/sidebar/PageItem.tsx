@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { ScrollText, FileText, Pencil, X, Plus } from 'lucide-react';
+import { deleteScroll, liveScrollDeleteInfo } from '../../utils/scrollOps';
+import { ScrollDeleteChoices } from '../canvas/ScrollDeleteChoices';
+import '../canvas/ContextMenu.css';
 import type { Page } from '../../types/data';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import './HierarchyPanel.css';
@@ -167,6 +170,7 @@ function ScrollList({
   const activeScrollId = useWorkspaceStore((s) => s.activeScrollId);
   const createScroll = useWorkspaceStore((s) => s.createScroll);
   const [adding, setAdding] = useState(false);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const named = [...(page.scrolls ?? [])]
     .filter((s) => s.title)
@@ -195,18 +199,58 @@ function ScrollList({
         // Only the open page can have an active scroll — highlighting one under
         // a different page would claim a state that is not in effect.
         const isActiveScroll = isActive && activeScrollId === scroll.id;
+        const info = liveScrollDeleteInfo(page.id, scroll.id);
+        const canDelete = !!info && !info.isLast;
         return (
-          <button
+          <div
             key={scroll.id}
             className={`hierarchy-scroll${isActiveScroll ? ' hierarchy-scroll--active' : ''}`}
-            data-testid={`scroll-${scroll.id}`}
-            data-active={isActiveScroll ? 'true' : 'false'}
-            title={scroll.title}
-            onClick={() => onOpenScroll(sectionId, page.id, scroll.id, scroll.column)}
           >
-            <ScrollText size={12} />
-            <span className="hierarchy-scroll__title">{scroll.title}</span>
-          </button>
+            <button
+              type="button"
+              className="hierarchy-scroll__nav"
+              data-testid={`scroll-${scroll.id}`}
+              data-active={isActiveScroll ? 'true' : 'false'}
+              title={scroll.title}
+              onClick={() => onOpenScroll(sectionId, page.id, scroll.id, scroll.column)}
+            >
+              <ScrollText size={12} />
+              <span className="hierarchy-scroll__title">{scroll.title}</span>
+            </button>
+            {canDelete && (
+              <button
+                type="button"
+                className="hierarchy-page__action-btn hierarchy-page__action-btn--danger"
+                data-testid={`delete-scroll-${scroll.id}`}
+                title="Delete scroll"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (info.empty) {
+                    deleteScroll(page.id, scroll.id, false);
+                    setConfirmId(null);
+                    return;
+                  }
+                  setConfirmId((id) => (id === scroll.id ? null : scroll.id));
+                }}
+              >
+                <X size={12} />
+              </button>
+            )}
+            {confirmId === scroll.id && (
+              <div className="context-menu hierarchy-scroll__confirm" data-testid="scroll-delete-confirm">
+                <ScrollDeleteChoices
+                  onKeep={() => {
+                    deleteScroll(page.id, scroll.id, false);
+                    setConfirmId(null);
+                  }}
+                  onDelete={() => {
+                    deleteScroll(page.id, scroll.id, true);
+                    setConfirmId(null);
+                  }}
+                />
+              </div>
+            )}
+          </div>
         );
       })}
 

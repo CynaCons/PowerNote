@@ -352,22 +352,52 @@
 }
 
 .hierarchy-scroll {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
   min-width: 0;
   padding: 2px 4px;
-  border: none;
-  background: none;
-  text-align: left;
   color: var(--color-text-muted);
   font-size: 12px;
   font-weight: 400;
+}
+
+.hierarchy-scroll__nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  color: inherit;
+  font: inherit;
   cursor: pointer;
 }
 
-.hierarchy-scroll:hover {
+.hierarchy-scroll:hover,
+.hierarchy-scroll:hover .hierarchy-scroll__nav {
   color: var(--color-text);
+}
+
+.hierarchy-scroll .hierarchy-page__action-btn {
+  opacity: 0;
+  flex: none;
+}
+
+.hierarchy-scroll:hover .hierarchy-page__action-btn,
+.hierarchy-scroll:focus-within .hierarchy-page__action-btn {
+  opacity: 1;
+}
+
+.hierarchy-scroll__confirm {
+  position: absolute;
+  left: 16px;
+  top: 100%;
+  z-index: 8;
 }
 
 .hierarchy-scroll__title {

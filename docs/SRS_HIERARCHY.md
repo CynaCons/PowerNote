@@ -1,7 +1,7 @@
 # SRS: Hierarchy Panel
 
 **Project:** PowerNote
-**Version:** 0.54.0
+**Version:** 0.60.0
 **Date:** 2026-08-17
 
 ## Purpose
@@ -34,3 +34,4 @@ Organize the workspace into sections and pages, with a navigable hierarchy panel
 | REQ-HIER-020 | Renaming a scroll to an empty title shall untitled it: the header disappears (REQ-HIER-019) and the page ceiling disarms (REQ-HIER-017 titled gate). Re-titling shall restore both. Creating a scroll with an empty name still creates nothing (T122) | Must | T157 |
 | REQ-HIER-021 | The last scroll on a page shall remain undeletable (the append-target invariant). A plain page is one untitled scroll — untitle it instead of deleting the last one. `delete_scroll` shall say so when it refuses | Must | T157, T109 |
 | REQ-HIER-022 | Column operations that renumber bands (delete-keep, reorder, move) shall use one group-aware membership/shift path: a diagram or group belongs to the band of its FRAME origin and every member and grouped stroke follows that verdict, never split; ungrouped strokes belong to the band of their first point and shift with it. This closes the straddling-diagram tearing class for ALL column operations | Must | T158 |
+| REQ-HIER-023 | The user shall be able to delete a named scroll from the scroll-header context menu and from a hover control in the hierarchy sidebar. An empty band shall delete immediately. A band with content shall offer Keep notes (column goes, neighbours close) or Delete notes too (column and its content go). The last scroll on a page shall not be deletable (REQ-HIER-021). One undo shall restore the band, its nodes and its ink | Must | T167 |

@@ -1,7 +1,7 @@
 # SRS: Diagrams
 
 **Project:** PowerNote
-**Version:** 0.54.0
+**Version:** 0.60.0
 **Date:** 2026-08-17
 
 ## Purpose
@@ -31,7 +31,8 @@ implementation on purpose, but the difference matters when reading it:
 | Frame-deletion cascade + `delete_diagram` | Shipped — REQ-DIAG-140..141 |
 | Agent `read_page` diagrams index + label-leak closed | Shipped — REQ-DIAG-006 (v0.34.0 debt closed in v0.54.0; T159) |
 | On-demand fit to scroll (both directions) | Shipped — REQ-DIAG-142 |
-| Frame reflow and document flow (REQ-DIAG-002..005) | **Not built.** Diagrams sit on the canvas; blocks below a frame do not move when it resizes |
+| draw.io ports, orthogonal routing, UML module/component | Shipped v0.59 — REQ-DIAG-143..148 |
+| Frame reflow and document flow (REQ-DIAG-002..005) | **Shipped v0.57 on column pages** (scroll guide, or any titled scroll). Freeform pages (pages/grid/none + untitled scroll only) keep the v0.55 “frames hold y” contract (T161). |
 | Pin loop (REQ-DIAG-020..023) | **Not built, and descoped 2026-08-13.** Redrawing replaces every content node, so a manual nudge is lost on the next redraw |
 | Geometric warnings (REQ-DIAG-016) | **Partial.** Parse diagnostics ship; overlap, crossing and density checks do not |
 | Sequence and state layouts (REQ-DIAG-031..035) | Not built |
@@ -59,8 +60,8 @@ implementation on purpose, but the difference matters when reading it:
 | ID | Description | Priority | Test Ref |
 |----|-------------|----------|----------|
 | REQ-DIAG-001 | The app shall provide a diagram frame: a titled, bounded canvas region holding a diagram spec and its rendered elements | Must | T111 |
-| REQ-DIAG-002 | A diagram frame shall occupy a scroll like a text block, with an intrinsic height derived from its contents | Must | T110 |
-| REQ-DIAG-003 | When a block or frame's height changes, blocks below it in the same scroll shall move down; when it shrinks, they shall close the gap | Must | T110 |
+| REQ-DIAG-002 | On a column page (scroll guide style, or any titled scroll) a diagram frame shall occupy the band like a text block, with an intrinsic height derived from its contents. Members and group ink travel with the frame by the same dy. | Must | T110 |
+| REQ-DIAG-003 | On a column page, when a block or frame's height changes, occupants below it in the same band shall move down; when it shrinks, they shall close the gap | Must | T110 |
 | REQ-DIAG-004 | Reflow shall be scoped to the affected column, leaving other columns unchanged | Must | T110 |
 | REQ-DIAG-005 | A frame, its spec and its rendered elements shall survive a save/load round-trip | Must | T110 |
 | REQ-DIAG-006 | A frame shall appear in agent-facing reading order identified by its title, without expanding its children into the block list. Closed in v0.54.0: `read_page` returns `diagrams[]` `{id, title, format, memberCount, bounds}` and excludes every `groupId`-owned text node from `blocks[]` (the v0.34.0 label-leak / invisible-frame debt) | Must | T159 |
@@ -271,6 +272,21 @@ is lifted. Out-of-band frames are refused rather than silently left alone.
 |----|-------------|----------|----------|
 | REQ-DIAG-142 | An on-demand fit (`fit_diagram` over the bridge, and "Fit to scroll width" on the diagram frame context menu) shall scale the frame and its members about the frame origin to band-width minus padding. Scale may be greater than 1. Scale is floored at 0.45. A frame whose origin is outside every scroll record shall be refused (`PRECONDITION`) naming the diagram. Placement-time fit remains shrink-only (REQ-DIAG-136). One undo shall restore the previous geometry | Must | T160 |
 
+### draw.io component diagrams (v0.59)
+
+The notebook is the long-term record. The author prototypes in diagrams.net
+(component / composite structure: boxes, ports on their edges, orthogonal
+arrows) and drops the `.drawio` file here.
+
+| ID | Description | Priority | Test Ref |
+|----|-------------|----------|----------|
+| REQ-DIAG-143 | A vertex with `relative=1` geometry shall resolve against its parent cell, then apply `<mxPoint as="offset">`, so a port sits on the parent edge rather than at the parent's origin | Must | T166 |
+| REQ-DIAG-144 | An orthogonal / routed edge (`edgeStyle=orthogonalEdgeStyle` and kin) without stored waypoints shall be routed from `exitX`/`exitY`/`entryX`/`entryY` when present, otherwise from box-edge to box-edge, as an L or Z of straight segments. It shall not be refused. An `ignored` diagnostic shall name that it was routed | Must | T166, T147 |
+| REQ-DIAG-145 | `shape=module` / UML component shall draw as a rectangle with two tabs on the left edge. `shape=port` shall draw as a small rectangle. Box-like `mxgraph.uml.*` / `mxgraph.basic.*` shapes shall draw as rectangles with an `ignored` diagnostic naming the stencil. AWS/cisco/mscae image stencils remain refused | Must | T166 |
+| REQ-DIAG-146 | Simple HTML in a label (`<br>`, `<div>`, `<font>`, `<b>`, `<span>`) shall be stripped and the words kept, with an `ignored` diagnostic. Empty leftover markup is still refused | Must | T146 |
+| REQ-DIAG-147 | Drop/paste of `.drawio`, `.dio`, `.drawio.xml` shall import at the drop point (or viewport centre). A short toast shall report mark count and skip/note counts. If any diagnostic fired, the source dialog shall open on that frame | Must | T148 |
+| REQ-DIAG-148 | The diagram source dialog shall offer Open file (`.drawio` / `.xml` / `.svg`), show a draw.io-specific hint when the draft sniffs as draw.io, and list at most eight diagnostics with a "+N more" remainder | Should | T166 |
+
 ### Activity and swimlane diagrams (v0.35.1)
 
 PlantUML's activity syntax is a separate grammar from the component one, so it
@@ -376,10 +392,10 @@ Two additions to `ShapeNodeData` are required before the notation above can be r
 
 | Test | Covers |
 |------|--------|
-| T110 | REQ-DIAG-002..005 |
-| T111 | REQ-DIAG-001, 006, 010..018, 022, 030, 040 |
-| T112 | REQ-DIAG-007, 008, 014, 020, 021, 023 |
-| T113 | REQ-DIAG-031..033 |
+| T110 | REQ-DIAG-002..005 — `tests/diagram/110-column-reflow.spec.ts` |
+| T120 | REQ-DIAG-001, 010..014, 040.. — PlantUML native frames (`tests/diagram/120-diagram-plantuml.spec.ts`). There is no T111 file. |
+| T112 | REQ-DIAG-007, 008, 014, 020, 021, 023 — **no such spec.** Positional membership and the pin loop are Not built / descoped. |
+| T113 | REQ-DIAG-031..033 — not written; sequence/state layouts are Not built. |
 | T114 | REQ-DIAG-034, 035, 042, 043 |
 | T115 | REQ-DIAG-036, 041, 044, 045 |
 | T116 | REQ-DIAG-037, 046 |
@@ -391,6 +407,7 @@ Two additions to `ShapeNodeData` are required before the notation above can be r
 | T147 | REQ-DIAG-120..126 |
 | T148 | REQ-DIAG-127..129 |
 | T149 | REQ-DIAG-130..135 |
+| T166 | REQ-DIAG-143..148 |
 | T151 | REQ-DIAG-136..139 |
 | T125 | REQ-DIAG-070..076 |
 | T126 | REQ-DIAG-090..098 |

@@ -25,6 +25,18 @@ import { generateId } from './ids';
  * Distinct from fit-scroll's "own x OR frame x" rule: fit needs to measure
  * overhang; delete needs an all-or-nothing owner.
  */
+export function countBandContent(
+  scroll: ScrollRecord,
+  scrolls: ScrollRecord[],
+  nodes: CanvasNode[],
+  strokes: Stroke[],
+): { nodes: number; strokes: number } {
+  return {
+    nodes: nodes.filter((n) => contentBelongsToScroll(n, scroll, scrolls, nodes)).length,
+    strokes: strokes.filter((s) => strokeBelongsToScrollBand(s, scroll, scrolls, nodes)).length,
+  };
+}
+
 export function contentBelongsToScroll(
   node: CanvasNode,
   scroll: ScrollRecord,
@@ -68,6 +80,19 @@ export function columnsInUse(nodes: CanvasNode[], scrolls?: ScrollRecord[]): num
     columns.add(columnAt(node.x, scrolls));
   }
   return [...columns].sort((a, b) => a - b);
+}
+
+/**
+ * A page packs as columns when it is in scroll guide style, or when any
+ * scroll has a title. The default untitled scroll on a pages/grid/none
+ * sheet is not a column — notes can sit beside each other there.
+ */
+export function pageUsesColumnFlow(
+  backgroundMode: string | undefined,
+  scrolls?: readonly ScrollRecord[],
+): boolean {
+  if (backgroundMode === 'scroll') return true;
+  return (scrolls ?? []).some((s) => (s.title ?? '').trim() !== '');
 }
 
 /** The scroll a node sits in, or undefined if no record covers its band. */

@@ -7,8 +7,11 @@
  */
 
 import type { CanvasNode, DiagramNodeData } from '../types/data';
-import { undoBatchStart, undoBatchEnd, useCanvasStore } from '../stores/useCanvasStore';
+import { undoBatchStart, undoBatchEnd, undoBatchStartFull, useCanvasStore } from '../stores/useCanvasStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
+import { useDrawStore } from '../stores/useDrawStore';
+import { livePageLike } from '../utils/columnReflow';
+import { planHeightChange } from '../bridge/reflow';
 import { generateId } from '../utils/ids';
 import { buildDiagram } from './index';
 import type { DiagramFormat } from './index';
@@ -227,15 +230,31 @@ export function fitExistingDiagram(frameId: string): FitExistingOutcome {
   }
 
   const byId = new Map(fitted.members.map((m) => [m.id, m]));
-  undoBatchStart(nodes);
-  useCanvasStore.setState({
-    nodes: nodes.map((n) => {
-      if (n.id === frameId) {
-        return { ...n, width: fitted.frame.width, height: fitted.frame.height };
-      }
-      return byId.get(n.id) ?? n;
-    }),
+  const page = livePageLike();
+  const planned =
+    page.columnFlow && Math.abs(fitted.frame.height - frame.height) >= 2
+      ? planHeightChange(page, frameId, fitted.frame.height)
+      : null;
+  const shiftedNodes = planned && planned.ok ? planned.nextNodes : nodes;
+  const nextNodes = shiftedNodes.map((n) => {
+    if (n.id === frameId) {
+      return { ...n, width: fitted.frame.width, height: fitted.frame.height };
+    }
+    return byId.get(n.id) ?? n;
   });
+
+  if (planned && planned.ok && planned.dy !== 0) {
+    undoBatchStartFull({
+      nodes,
+      scrolls: useWorkspaceStore.getState().getActivePage()?.scrolls ?? [],
+      strokes: useDrawStore.getState().strokes,
+    });
+    useCanvasStore.setState({ nodes: nextNodes });
+    useDrawStore.setState({ strokes: planned.nextStrokes });
+  } else {
+    undoBatchStart(nodes);
+    useCanvasStore.setState({ nodes: nextNodes });
+  }
   useWorkspaceStore.getState().markDirty();
   undoBatchEnd();
 

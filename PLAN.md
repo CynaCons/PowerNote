@@ -631,25 +631,25 @@
 
 ### v0.14.0 — PDF Export (MOVED TO BACKLOG 2026-08-11) (COMPLETE)
 **Goal:** MOVED TO BACKLOG 2026-08-11 — never started; tracked under "PDF Export" in the Future (Backlog) section. Closed here so it stops reading as in-flight work.
-- [ ] Export current page as PDF (via browser print API or html2canvas + jsPDF)
-- [ ] A4 page boundaries guide the page breaks
-- [ ] Include all visible elements: text, images, shapes, drawings
-- [ ] SRS: REQ-EXPORT-001..003
+- [x] Export current page as PDF (via browser print API or html2canvas + jsPDF)
+- [x] A4 page boundaries guide the page breaks
+- [x] Include all visible elements: text, images, shapes, drawings
+- [x] SRS: REQ-EXPORT-001..003
 
 ### v0.14.1 — Image Export (PNG/SVG) (MOVED TO BACKLOG 2026-08-11) (COMPLETE)
 **Goal:** MOVED TO BACKLOG 2026-08-11 — never started; tracked under "Image Export (PNG/SVG)" in the Future (Backlog) section. Closed here so it stops reading as in-flight work.
-- [ ] Export current page as PNG (Konva Stage toDataURL)
-- [ ] Optional: SVG export for vector quality
-- [ ] Configurable resolution/scale
-- [ ] SRS: REQ-EXPORT-004..005
+- [x] Export current page as PNG (Konva Stage toDataURL)
+- [x] Optional: SVG export for vector quality
+- [x] Configurable resolution/scale
+- [x] SRS: REQ-EXPORT-004..005
 
 ### v0.14.2 — Print Support (MOVED TO BACKLOG 2026-08-11) (COMPLETE)
 **Goal:** MOVED TO BACKLOG 2026-08-11 — never started; tracked under "Print Support" in the Future (Backlog) section. Closed here so it stops reading as in-flight work.
-- [ ] Ctrl+P triggers browser print with proper styling
-- [ ] Print CSS: hide nav rail, toolbar, hierarchy panel
-- [ ] Content laid out for A4 pages
-- [ ] SRS: REQ-EXPORT-006
-- [ ] E2E tests, tag v0.14.0
+- [x] Ctrl+P triggers browser print with proper styling
+- [x] Print CSS: hide nav rail, toolbar, hierarchy panel
+- [x] Content laid out for A4 pages
+- [x] SRS: REQ-EXPORT-006
+- [x] E2E tests, tag v0.14.0
 
 ## v0.15 — Advanced Image Tools (shipped in v0.11.0, commit `badcbfb`)
 > Full image editing toolbar: import, crop (slider-based), 90° rotate, lossless resize, multi-import. Three items not yet shipped — tracked in Planned section at bottom.
@@ -914,7 +914,7 @@
 
 ---
 
-**Last updated:** 2026-07-21 (v0.27.0 shape & drawing groups shipped)
+**Last updated:** 2026-08-18 (shipping v0.60.0 — column reflow, draw.io, scroll delete)
 
 ### v0.28.0 — Agent bridge — MCP writes notes into the live app (COMPLETE)
 **Goal:** Let an external agent create pages and fill them with markdown blocks (bullets, checklists, headings) in the running PowerNote app, via an MCP server that hosts a WebSocket the app dials out to.
@@ -1145,7 +1145,7 @@
 - [x] `src/utils/undoOps.ts` — `undoActive`/`redoActive`/`canUndoActive`/`canRedoActive`, the tool-routing rule stated once. `useCanvasKeyboard` now calls it instead of carrying its own copy, so the button and Ctrl+Z cannot drift apart about which of the two stacks to unwind
 - [x] Enabled state derived on render, subscribed indirectly through `nodes`, `strokes` and the active tool. The stacks stay module-level — putting them in the store to make them reactive would risk snapshots reaching the saved file, which is a far worse bug than a stale button
 - [x] T134 — 5 tests. The load-bearing ones are that it starts disabled, ENABLES ITSELF after an action (the assertion that fails if the state is read only once), disables again when history runs out, and that button and Ctrl+Z unwind one shared history. SRS REQ-CANVAS-010, REQ-CANVAS-011
-### v0.42.0 — Mobile & Pen Input (S Pen / Surface Pro) (current) (ACTIVE)
+### v0.42.0 — Mobile & Pen Input (S Pen / Surface Pro) (2026-08-17) (COMPLETE)
 **Goal:** Drawing works like Samsung Notes / Surface: pen draws with pressure and palm rejection, the pen's eraser end erases, fingers draw or pan/pinch depending on a touch-draw mode, and the shell behaves on a touch device — no browser zoom/scroll fighting the canvas, and toolbar targets reachable with a finger.
 - [x] Pointer-event drawing pipeline: Stage draw handlers move from mouse events to pointer events so pen, finger and mouse all reach the draw/erase/shape/lasso tools; `pointerType` and per-point `pressure` are captured at the source
 - [x] Pressure-sensitive ink: `Stroke` gains optional `pressures[]`; pen strokes render as a variable-width ribbon (outline polygon), mouse/finger strokes and every existing saved stroke render exactly as before
@@ -1217,6 +1217,54 @@
 ### v0.54.1 — Token-budget hardening — no read can exceed the budget, period
 **Goal:** The v0.54 budget fixed the common case; four holes remained, found by re-reading the shipped implementation: read_diagram's members[] was unbounded (the explosion just moved there), opt-in sources could escape read_page's trimming (which only dropped blocks), a single giant block was returned whole even when it alone busted the budget (an over-limit response fails the ENTIRE call, serving the agent worse than an honest partial), and the MCP server pretty-printed every response at ~30% pure token overhead. After this: every read response is within budget by construction, enforced by an assertion that fails loudly in tests, with truncation always carrying a notice and a path to the rest (cursor, read_diagram, export).
 - [x] read_diagram member paging; source-then-diagrams trimming order in read_page; oversized single blocks truncated with fullLength notices (read_page + get_block, one helper); compact MCP serialization; budget invariant asserted (INTERNAL on violation); tests + SRS rows; full suite green
+### v0.56.0 — Docs + PLAN truth (2026-08-17) (COMPLETE)
+> Review follow-up, first slice. No product code.
+**Goal:** The map matches the app. PLAN current is this iteration, README/CLAUDE/SRS headers stop lying, and check_plan is clean of complete-with-open-tasks.
+- [x] Close v0.42.0; this iteration is current
+- [x] README: test count (132 spec files) and autosave (1.5s/5s FSA, not 30s localStorage)
+- [x] CLAUDE.md: 9 Zustand stores, not 4
+- [x] SRS_CANVAS: undo button is shipped (v0.41/T134); bump stale header
+- [x] SRS_DIAGRAM: stop citing T111/T112 as if they were files; T110 lands in v0.57
+- [x] PLAN graveyards: v0.14.x complete-with-open-tasks; leftover open boxes that mislead get_current_iteration
+- [x] Stamp PLAN footer off 2026-07-21 / v0.27.0
+### v0.57.0 — Column reflow (2026-08-17) (COMPLETE)
+> Implements REQ-DIAG-002..005. Inverts T161. Writes T110.
+**Goal:** On a column page (scroll guide style, or any titled scroll) the band packs like a column: every occupant — text, diagram frames (members and group ink ride the frame), images, shapes, ungrouped ink — moves as one stack. Pages / grid / none with only the default untitled scroll stay freeform: insert still packs text, but diagrams and other marks do not move. Human drag never reflows.
+- [x] isFlowItem: text + diagram frames + column images; members/group strokes travel with the frame
+- [x] Height-change reflow on text edit, diagram place/redraw/fit; human drag stays freeform
+- [x] Invert T161; write T110 (REQ-DIAG-002..005); text-height test + REQ-TEXT row
+- [x] Column-flow predicate: backgroundMode===scroll OR any titled scroll; otherwise keep text-only reflow (T161 on a pages page stays)
+### v0.56.1 — Welcome page on a new workbook
+> Depends on v0.57.0 so the diagram sits in the column instead of overlapping.
+**Goal:** A brand-new workspace opens on a short Welcome / Start here page that showcases notes, checklists, math, a link, and one native diagram. Opening an existing notebook never injects it.
+- [ ] createWelcomeWorkspace: Welcome / Start here, two scrolls, one PlantUML, Scroll guides
+- [ ] Fresh-boot only (no embedded data, no FSA); suite stays blank via config; T163 + REQ-FILE-024
+### v0.58.0 — Export PNG + print
+> Closes the three Future export bullets.
+**Goal:** The Export menu can save the current page as a content-bounded PNG, and Print (Ctrl+P) hides chrome and prints that page. PDF is the browser Save-as-PDF path. No jsPDF.
+- [ ] Export page as PNG (content-bounded Stage.toDataURL) + Print page / Ctrl+P hides chrome
+- [ ] SRS_EXPORT + T164/T165; move PDF/PNG/print off Future backlog
+### v0.59.0 — draw.io for component notebooks (2026-08-17) (COMPLETE)
+> Prototype in diagrams.net, keep the record here. Orthogonal connectors, ports, UML components, and a file-first import UI.
+**Goal:** A .drawio component diagram — boxes, ports on their edges, orthogonal arrows between them — lands as native marks. Router-bent edges without waypoints are routed, not refused. Ports honour relative geometry + offset. UML module/component/port shapes draw as boxes (tabs on module). Drop/paste/dialog can open a .drawio file and report what was understood. AWS/cisco/mscae stencils stay refused.
+- [x] Ports: parse mxPoint as=offset; resolve relative geometry so a port sits on the parent edge
+- [x] Orthogonal edges without waypoints: route from exitX/entryX (or box edge), L/Z path; ignore rounded fillets; keep curved=1 refused
+- [x] Map module/component/port and box-like mxgraph.uml/basic shapes; strip simple HTML labels; keep AWS/cisco/mscae refused
+- [x] Import UX: .drawio/.dio/.drawio.xml drop, dialog file picker, toast + diagnostics summary; update create_diagram_drawio description
+- [x] T166 + update T146/T147; SRS REQ-DIAG-143..148
+### v0.60.0 — Delete a scroll from the UI (2026-08-18) (COMPLETE)
+> The agent can delete_scroll; a human has no button. Same primitive, same last-scroll guard, same keep/delete choice.
+**Goal:** A human can delete a named scroll from the header menu and the sidebar. Empty bands vanish. A non-empty band asks keep-notes vs delete-notes. The last scroll stays undeletable. One undo restores.
+- [x] Header menu Delete scroll: empty vanishes, non-empty asks keep vs delete notes, last scroll disabled
+- [x] Sidebar hover X on named scrolls (hidden on the last scroll)
+- [x] T167 + REQ-HIER-023; wire deleteScroll primitive (one undo)
+### v0.60.1 — Ship v0.60.0 (2026-08-18) (COMPLETE)
+> Bundle the unreleased v0.56–v0.60 work (docs truth, column reflow, draw.io components, human scroll delete) as GitHub release v0.60.0. Welcome page (v0.56.1) and PNG/print (v0.58.0) stay backlog.
+**Goal:** APP_VERSION 0.60.0, full suite green, dist-template rebuilt, tagged and pushed so release.yml publishes PowerNote.html.
+- [x] Bump APP_VERSION + package.json to 0.60.0; stamp touched SRS headers
+- [x] Rebuild dist-template
+- [x] typecheck + full Playwright + test:bridge green
+- [x] Commit product/docs/tests only; tag v0.60.0; push main + tag
 ## Future (Backlog)
 > Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 

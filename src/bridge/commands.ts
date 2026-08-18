@@ -23,7 +23,7 @@ import type {
 } from '../types/data';
 import { notebookSettings, resolvePageSettings } from '../utils/pageSettings';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
-import { useCanvasStore, undoBatchStart, undoBatchEnd } from '../stores/useCanvasStore';
+import { useCanvasStore, undoBatchStart, undoBatchEnd, undoBatchStartFull } from '../stores/useCanvasStore';
 import { useDrawStore } from '../stores/useDrawStore';
 import { liveCeiling } from '../utils/scrollCeiling';
 import {
@@ -45,11 +45,14 @@ import {
 } from '../diagram/canvasOps';
 import { sniffFormat, normalizeDrawioSource } from '../diagram';
 import { A4_WIDTH } from '../utils/pageLayout';
-import { contentBelongsToScroll, scrollById, strokeBelongsToScrollBand } from '../utils/scrolls';
+import { contentBelongsToScroll, pageUsesColumnFlow, scrollById, strokeBelongsToScrollBand } from '../utils/scrolls';
 import {
   applyDisplacements,
+  applyStrokeDisplacements,
+  isFlowItem,
   insertBlockAt,
   planMoveBlock,
+  removeBlockGap,
   type PageLike,
 } from './reflow';
 import type {
@@ -724,9 +727,35 @@ function parseBlockAnchor(
   return { index: params.index };
 }
 
+function livePageLike(page: { scrolls?: ScrollRecord[]; settings?: Partial<WorkspaceSettings> }): PageLike {
+  const ws = useWorkspaceStore.getState();
+  const active = ws.getActivePage() ?? page;
+  const settings = resolvePageSettings(active as import('../types/data').Page, ws.workspace);
+  return {
+    nodes: useCanvasStore.getState().nodes,
+    scrolls: active.scrolls,
+    strokes: useDrawStore.getState().strokes,
+    columnFlow: pageUsesColumnFlow(settings.backgroundMode, active.scrolls),
+  };
+}
+
 function applyNodesInOneUndo(nextNodes: CanvasNode[]): void {
   undoBatchStart(useCanvasStore.getState().nodes);
   useCanvasStore.setState({ nodes: nextNodes });
+  useWorkspaceStore.getState().markDirty();
+  undoBatchEnd();
+}
+
+function applyFlowInOneUndo(nextNodes: CanvasNode[], nextStrokes: Stroke[]): void {
+  const canvas = useCanvasStore.getState();
+  const scrolls = useWorkspaceStore.getState().getActivePage()?.scrolls ?? [];
+  undoBatchStartFull({
+    nodes: canvas.nodes,
+    scrolls,
+    strokes: useDrawStore.getState().strokes,
+  });
+  useCanvasStore.setState({ nodes: nextNodes });
+  useDrawStore.setState({ strokes: nextStrokes });
   useWorkspaceStore.getState().markDirty();
   undoBatchEnd();
 }
@@ -922,9 +951,10 @@ async function insertBlock(params: Record<string, unknown>): Promise<InsertBlock
     if (!found) {
       throw new BridgeCommandError('NOT_FOUND', `No block with id "${anchor.after}"`);
     }
+    const liveCheck = livePageLike(page);
     if (
       found.page.id !== page.id ||
-      !isContentBlock(found.node, diagramFrameIds(found.page.nodes)) ||
+      !isFlowItem(found.node, diagramFrameIds(found.page.nodes), !!liveCheck.columnFlow) ||
       columnOf(found.node, found.page.scrolls) !== scroll.column
     ) {
       const col = columnOf(found.node, found.page.scrolls);
@@ -940,10 +970,7 @@ async function insertBlock(params: Record<string, unknown>): Promise<InsertBlock
 
   navigateToPage(section.id, page.id);
 
-  const live: PageLike = {
-    nodes: useCanvasStore.getState().nodes,
-    scrolls: useWorkspaceStore.getState().getActivePage()?.scrolls ?? page.scrolls,
-  };
+  const live = livePageLike(page);
   const node = createBlockNode(markdown, live.nodes as CanvasNode[], scroll.column, live.scrolls);
   const plan = insertBlockAt(
     live,
@@ -957,7 +984,11 @@ async function insertBlock(params: Record<string, unknown>): Promise<InsertBlock
   node.x = plan.x;
   node.y = plan.y;
   const nextNodes = [...applyDisplacements(live.nodes, plan.displaced), node];
-  applyNodesInOneUndo(nextNodes);
+  if (live.columnFlow) {
+    applyFlowInOneUndo(nextNodes, applyStrokeDisplacements(live.strokes ?? [], plan.displaced));
+  } else {
+    applyNodesInOneUndo(nextNodes);
+  }
   flush();
 
   return {
@@ -976,7 +1007,8 @@ async function moveBlock(params: Record<string, unknown>): Promise<MoveBlockResu
   if (!found) {
     throw new BridgeCommandError('NOT_FOUND', `No block with id "${blockId}"`);
   }
-  if (!isContentBlock(found.node, diagramFrameIds(found.page.nodes))) {
+  const preview = livePageLike(found.page);
+  if (!isFlowItem(found.node, diagramFrameIds(found.page.nodes), !!preview.columnFlow)) {
     refuseNonContentBlock(found.node, found.page.nodes, 'move');
   }
 
@@ -996,10 +1028,7 @@ async function moveBlock(params: Record<string, unknown>): Promise<MoveBlockResu
 
   navigateToPage(found.section.id, found.page.id);
 
-  const live: PageLike = {
-    nodes: useCanvasStore.getState().nodes,
-    scrolls: useWorkspaceStore.getState().getActivePage()?.scrolls ?? found.page.scrolls,
-  };
+  const live = livePageLike(found.page);
   const dest = {
     scrollId: destScrollId,
     ...('after' in anchor ? { after: anchor.after } : { index: anchor.index }),
@@ -1007,7 +1036,11 @@ async function moveBlock(params: Record<string, unknown>): Promise<MoveBlockResu
   const plan = planMoveBlock(live, blockId, dest, liveCeiling());
   if (!plan.ok) throwReflow(plan);
 
-  applyNodesInOneUndo(plan.nextNodes);
+  if (live.columnFlow) {
+    applyFlowInOneUndo(plan.nextNodes, plan.nextStrokes);
+  } else {
+    applyNodesInOneUndo(plan.nextNodes);
+  }
   flush();
 
   const moved = useCanvasStore.getState().nodes.find((n) => n.id === blockId)!;
@@ -1415,6 +1448,27 @@ function deleteBlockCmd(params: Record<string, unknown>): DeleteResult {
   if (owner) refuseDiagramMember(found.node, owner, 'delete');
 
   navigateToPage(found.section.id, found.page.id);
+  const live = livePageLike(found.page);
+  if (live.columnFlow && isFlowItem(found.node, diagramFrameIds(found.page.nodes), true)) {
+    const closed = removeBlockGap(live, blockId);
+    if (closed.ok) {
+      const canvas = useCanvasStore.getState();
+      undoBatchStartFull({
+        nodes: canvas.nodes,
+        scrolls: useWorkspaceStore.getState().getActivePage()?.scrolls ?? [],
+        strokes: useDrawStore.getState().strokes,
+      });
+      useCanvasStore.setState({ nodes: applyDisplacements(live.nodes, closed.displaced) });
+      useDrawStore.setState({
+        strokes: applyStrokeDisplacements(live.strokes ?? [], closed.displaced),
+      });
+      useWorkspaceStore.getState().markDirty();
+      useCanvasStore.getState().deleteNode(blockId);
+      undoBatchEnd();
+      flush();
+      return { deleted: 'block', id: blockId };
+    }
+  }
   useCanvasStore.getState().deleteNode(blockId);
   flush();
 

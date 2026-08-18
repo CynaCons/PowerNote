@@ -1,8 +1,8 @@
 # SRS: Infinite Canvas
 
 **Project:** PowerNote
-**Version:** 0.2.0
-**Date:** 2026-03-21
+**Version:** 0.56.0
+**Date:** 2026-08-17
 
 ## Purpose
 
@@ -36,13 +36,6 @@ Provide an infinite, pannable, zoomable canvas as the primary workspace for plac
 | REQ-CANVAS-028 | With the select tool active, a ~500ms still press on a node (touch) shall select it and open the same context menu right-click uses, at the press position; moving past ~10px or lifting early cancels it, and it shall not fire while draw/shape/lasso own touch for their own gestures | Should | T138 |
 | REQ-CANVAS-029 | The top bar's filename/section/page breadcrumb shall ellipsize each segment individually when the bar is too narrow to show them in full, rather than hard-clipping the trailing (active-page) segment invisibly with no truncation indicator | Should | T143 |
 | REQ-CANVAS-030 | On a page with at least one TITLED scroll (REQ-HIER-017) the camera shall not pan above the derived ceiling plus CEILING_HEADROOM (24 canvas px of breathing room, which is also what lets the outline's documented 24px scroll-navigation inset stay reachable — caught by T108) on any of the five camera paths — wheel pan, stage drag (live via dragBoundFunc), pinch translate, finger pan in draw mode, and programmatic setViewport (the backstop for zoom-to-fit and zoom presets). Placement (block drops, text, shape/lasso starts, pen strokes) aimed above the ceiling shall land at the ceiling itself — headroom is for looking, not placing; each stroke point is clamped as drawn. The clamp is zoom-aware (`stage.y <= (HEADROOM − ceiling) * scale`). Pages with no titled scroll are unaffected | Must | T150 |
-
-### Not implemented
-
-Recorded so the gap is visible rather than inferred from silence.
-
-| ID | Description | Priority | Status |
-|----|-------------|----------|--------|
-| REQ-CANVAS-010 | A visible undo control shall sit in the top bar, immediately left of zoom-to-fit, disabled when there is nothing to undo and titled to say so | Must | T134 |
-| REQ-CANVAS-011 | The button and Ctrl+Z shall unwind the SAME history, routed by the active tool from one shared definition (`src/utils/undoOps.ts`) — there are two independent stacks (nodes in the canvas store, strokes in the draw store) and a second copy of the routing rule would eventually disagree with the first | Must | T134 |
+| REQ-CANVAS-010 | A visible undo control shall sit in the top bar, immediately left of zoom-to-fit, disabled when there is nothing to undo and titled to say so. Shipped v0.41. | Must | T134 |
+| REQ-CANVAS-011 | The button and Ctrl+Z shall unwind the SAME history, routed by the active tool from one shared definition (`src/utils/undoOps.ts`) — there are two independent stacks (nodes in the canvas store, strokes in the draw store) and a second copy of the routing rule would eventually disagree with the first. Shipped v0.41. | Must | T134 |
 

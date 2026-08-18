@@ -3,7 +3,9 @@
  * Covers: REQ-AGENT-060, REQ-AGENT-061, REQ-AGENT-062
  *
  * Built from scratch: the suite assumed block y was write-once, and frame
- * reflow was descoped 2026-08-13. Only free-standing content blocks move.
+ * reflow was descoped 2026-08-13. On a freeform page (pages/grid/none with
+ * only the default untitled scroll) only free-standing content blocks move.
+ * Column pages pack frames too — that contract is T110.
  */
 import { test, expect } from '@playwright/test';
 import {
@@ -408,6 +410,11 @@ test.describe('161 - insert_block / move_block (REQ-AGENT-060..062)', () => {
       blockId: leftBlock.blockId,
     });
     expect(neitherMove.code).toBe('BAD_PARAMS');
+
+    // Untitled the extra scroll so this page is freeform again — diagram/shape
+    // refusals are the pages-guide contract (T161). Column pages pack those
+    // (T110).
+    await runBridge(page, 'rename_scroll', { scrollId: right.scrollId, title: '' });
 
     const drawn = await runBridge(page, 'create_diagram', {
       source: SIMPLE_DIAGRAM,
