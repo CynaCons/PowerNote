@@ -2,10 +2,9 @@
  * Test 161: insert_block + move_block (within-column content reflow)
  * Covers: REQ-AGENT-060, REQ-AGENT-061, REQ-AGENT-062
  *
- * Built from scratch: the suite assumed block y was write-once, and frame
- * reflow was descoped 2026-08-13. On a freeform page (pages/grid/none with
- * only the default untitled scroll) only free-standing content blocks move.
- * Column pages pack frames too — that contract is T110.
+ * A scroll is a stack. insert/move shove every top-level occupant of the
+ * target band, including diagram frames. Members stay with the frame and
+ * cannot be moved on their own. Guide style does not gate this.
  */
 import { test, expect } from '@playwright/test';
 import {
@@ -411,15 +410,14 @@ test.describe('161 - insert_block / move_block (REQ-AGENT-060..062)', () => {
     });
     expect(neitherMove.code).toBe('BAD_PARAMS');
 
-    // Untitled the extra scroll so this page is freeform again — diagram/shape
-    // refusals are the pages-guide contract (T161). Column pages pack those
-    // (T110).
     await runBridge(page, 'rename_scroll', { scrollId: right.scrollId, title: '' });
 
     const drawn = await runBridge(page, 'create_diagram', {
       source: SIMPLE_DIAGRAM,
       title: 'Pinned',
+      scrollId: leftId,
     });
+    await page.waitForTimeout(150);
     const memberId = await page.evaluate((frameId) => {
       const nodes = (window as any).__POWERNOTE_STORES__.canvas.getState().nodes;
       const member = nodes.find((n: any) => n.groupId === frameId && n.id !== frameId);
@@ -435,12 +433,14 @@ test.describe('161 - insert_block / move_block (REQ-AGENT-060..062)', () => {
     expect(moveMember.message).toContain('Pinned');
     expect(moveMember.message).toContain(drawn.diagramId);
 
-    const moveFrame = await runBridgeExpectingError(page, 'move_block', {
+    const beforeFrame = await nodeById(page, drawn.diagramId);
+    const moveFrame = await runBridge(page, 'move_block', {
       blockId: drawn.diagramId,
       index: 0,
     });
-    expect(moveFrame.code).toBe('UNSUPPORTED');
-    expect(moveFrame.message.toLowerCase()).toMatch(/diagram/);
+    expect(moveFrame.blockId).toBe(drawn.diagramId);
+    const afterFrame = await nodeById(page, drawn.diagramId);
+    expect(afterFrame!.y).not.toBe(beforeFrame!.y);
 
     const shapeId = await page.evaluate(() => {
       const canvas = (window as any).__POWERNOTE_STORES__.canvas;
@@ -470,7 +470,7 @@ test.describe('161 - insert_block / move_block (REQ-AGENT-060..062)', () => {
     expect(moveShape.message).toContain('shape');
   });
 
-  test('insert above a diagram does not move the frame or its members', async ({ page }) => {
+  test('insert above a diagram moves the frame, its members, and loose marks', async ({ page }) => {
     const scrollId = await defaultScrollId(page);
     const a = await runBridge(page, 'append_block', { markdown: 'Above', scrollId });
     const drawn = await runBridge(page, 'create_diagram', {
@@ -478,6 +478,7 @@ test.describe('161 - insert_block / move_block (REQ-AGENT-060..062)', () => {
       title: 'Stay',
       scrollId,
     });
+    await page.waitForTimeout(150);
     const below = await runBridge(page, 'append_block', { markdown: 'Below', scrollId });
 
     const planted = await page.evaluate(() => {
@@ -536,13 +537,15 @@ test.describe('161 - insert_block / move_block (REQ-AGENT-060..062)', () => {
       markdown: 'Between',
       after: a.blockId,
     });
+    await page.waitForTimeout(150);
     const neu = await nodeById(page, inserted.blockId);
     const afterBelow = await nodeById(page, below.blockId);
     const afterA = await nodeById(page, a.blockId);
 
+    const dy = neu!.height + BLOCK_GAP;
     expect(afterA!.y).toBe(beforeA!.y);
     expect(neu!.y).toBe(beforeA!.y + beforeA!.height + BLOCK_GAP);
-    expect(afterBelow!.y).toBe(beforeBelow!.y + neu!.height + BLOCK_GAP);
+    expect(afterBelow!.y).toBe(beforeBelow!.y + dy);
 
     const after = await page.evaluate((frameId) => {
       const nodes = (window as any).__POWERNOTE_STORES__.canvas.getState().nodes as any[];
@@ -562,10 +565,14 @@ test.describe('161 - insert_block / move_block (REQ-AGENT-060..062)', () => {
       };
     }, drawn.diagramId);
 
-    expect(after.frameY).toBe(before.frameY);
-    expect(after.members).toEqual(before.members);
-    expect(after.shapeY).toBe(planted.shapeY);
-    expect(after.strokeY).toBe(planted.strokeY);
+    expect(after.frameY).toBe(before.frameY + dy);
+    expect(after.members.length).toBe(before.members.length);
+    for (const m of before.members) {
+      const moved = after.members.find((x: { id: string }) => x.id === m.id);
+      expect(moved?.y).toBe(m.y + dy);
+    }
+    expect(after.shapeY).toBe(planted.shapeY + dy);
+    expect(after.strokeY).toBe(planted.strokeY + dy);
   });
 
   test('stress: 60-block insert at 0, then 20 random moves undo exactly', async ({ page }) => {

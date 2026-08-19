@@ -439,6 +439,8 @@ export interface CreateDiagramResult {
 
 export interface UpdateBlockResult {
   blockId: string;
+  /** Occupants shoved by the height delta. 0 when the height did not change. */
+  displacedCount: number;
 }
 
 export interface RenamePageResult {

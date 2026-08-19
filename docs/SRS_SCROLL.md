@@ -1,7 +1,7 @@
 # SRS: Scrolls
 
 **Project:** PowerNote  
-**Version:** 0.60.0  
+**Version:** 0.61.1  
 **Date:** 2026-08-13
 
 ## Purpose
@@ -58,7 +58,7 @@ is that sequential writes from different workstreams land in different columns.
 | REQ-SCROLL-010 | The legacy `column` parameter shall keep working for `append_block` and `create_page` | Should | T105 |
 | REQ-SCROLL-011 | Exactly one scroll on the active page shall be *active*, set by an explicit click (sidebar entry or canvas header) and defaulting to the leftmost; it shall be marked in both places, and shall reset when the page changes | Must | T108 |
 | REQ-SCROLL-012 | Clicking a scroll in the sidebar shall open its page, make it active, and move the viewport to the top of that scroll | Must | T108 |
-| REQ-SCROLL-030 | A page is a column page when its guide style is `scroll`, or when any scroll on it has a title. Column pages pack the band as a stack (REQ-DIAG-002..004, REQ-AGENT-067). A pages/grid/none sheet with only the default untitled scroll stays freeform. | Must | T110 |
+| REQ-SCROLL-030 | Every scroll packs as a column for insert/move/height-change (REQ-DIAG-002..004, REQ-AGENT-067). Guide style (pages / grid / scroll / none) is visual only. Human drag does not reflow. | Must | T110 |
 
 ## Traceability
 

@@ -50,9 +50,9 @@ socket on their machine.
 | `create_section` | New section (sidebar tab), with an initial empty page. |
 | `create_page` | New titled page, opened. Also writes an `# Title` block unless `withHeading: false`. |
 | `append_block` | Append a markdown block to the bottom of a page. The main way to write. |
-| `insert_block` | Insert a block after an id (preferred) or at an index, shifting content below. |
-| `move_block` | Move a block within or across scrolls. Id-relative `after`. One undo. |
-| `update_block` | Replace an existing block's markdown, by id. |
+| `insert_block` | Insert a block after an id (preferred) or at an index, shifting occupants below (including diagrams). |
+| `move_block` | Move a block or diagram frame within or across scrolls. Id-relative `after`. One undo. |
+| `update_block` | Replace an existing block's markdown, by id. Occupants below reflow. |
 | `create_diagram_plantuml` | Draw a UML diagram from PlantUML source, as native canvas shapes. See [Diagrams](#diagrams). |
 | `create_diagram_mermaid` | Draw a flowchart or sequence from Mermaid source, as native canvas shapes. See [Diagrams](#diagrams). |
 | `rename_page` | Retitle a page, and its `# Title` block if that still matches. |

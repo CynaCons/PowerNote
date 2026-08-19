@@ -30,8 +30,8 @@ export function livePageLike(): PageLike {
 }
 
 /**
- * If this page packs as a column, shove everything below `nodeId` by the
- * height delta. Returns false when the page is freeform or the delta is a no-op.
+ * Shove everything below `nodeId` by the height delta. Returns false when
+ * the delta is a no-op (or the planner refuses).
  */
 export function reflowAfterHeightChange(nodeId: string, newHeight: number, opts?: { undo?: boolean }): boolean {
   const page = livePageLike();

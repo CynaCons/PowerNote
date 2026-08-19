@@ -1,16 +1,11 @@
 /**
- * Vertical within-column displacement for insert/move/height-change (v0.55,
- * column-flow in v0.57).
+ * Vertical within-column displacement for insert/move/height-change.
  *
- * Two page kinds:
- *
- *  - Column-flow (`pageUsesColumnFlow`: scroll guide, or any titled scroll).
- *    The band is a stack. Every top-level occupant moves — text, frames,
- *    images, shapes, ungrouped ink. Frame members and group ink ride the
- *    frame by the same dy. There is no "notes besides" inside a scroll.
- *  - Freeform (pages / grid / none, only the default untitled scroll).
- *    Only free-standing text blocks move. Diagrams and other marks keep
- *    their y. That is the v0.55 contract, still what T161 asserts.
+ * A scroll is a stack. Every top-level occupant of the target band moves —
+ * text, frames, images, shapes, ungrouped ink. Frame members and group ink
+ * ride the frame by the same dy. Guide style is visual; it does not gate
+ * reflow (v0.61, field: insert/move were overlapping diagrams on default
+ * pages notebooks). Human drag never reflows.
  *
  * Addressing: prefer `after` (an id). Ids survive reordering; a numeric
  * index is a snapshot of reading order and goes stale the moment anything
@@ -34,7 +29,7 @@ export type PageLike = {
   nodes: readonly CanvasNode[];
   scrolls?: readonly ScrollRecord[];
   strokes?: readonly Stroke[];
-  /** When true, the band packs every occupant. Default false (freeform). */
+  /** When true, the band packs every occupant. Always set by livePageLike. */
   columnFlow?: boolean;
 };
 
@@ -97,7 +92,8 @@ export function isTopLevelOccupant(node: CanvasNode, diagramIds: Set<string>): b
 
 /**
  * What insert/move may address and what a height change shoves.
- * Column-flow: every top-level occupant. Freeform: text blocks only.
+ * Column-flow (the live path): every top-level occupant. The text-only
+ * branch is kept for tests that pass `columnFlow: false` into the planner.
  */
 export function isFlowItem(
   node: CanvasNode,
@@ -457,12 +453,23 @@ export function planMoveBlock(
 
   const afterClose = applyDisplacements(page.nodes, closed.displaced);
   const strokesAfterClose = applyStrokeDisplacements(page.strokes ?? [], closed.displaced);
-  const without = afterClose.filter((n) => n.id !== blockId);
+  // Drop the moving node AND its frame members. If the frame leaves the
+  // list, members look like free-standing marks and get the opening
+  // displacement — then the ride below applies frameDy again.
+  const without = afterClose.filter((n) => {
+    if (n.id === blockId) return false;
+    if (node.type === 'diagram' && n.groupId === blockId) return false;
+    return true;
+  });
+  const strokesWithout = strokesAfterClose.filter((s) => {
+    if (node.type === 'diagram' && s.groupId === blockId) return false;
+    return true;
+  });
   const insert = insertBlockAt(
     {
       nodes: without,
       scrolls: page.scrolls,
-      strokes: strokesAfterClose,
+      strokes: strokesWithout,
       columnFlow: page.columnFlow,
     },
     targetScrollId,

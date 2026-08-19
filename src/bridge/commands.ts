@@ -23,7 +23,7 @@ import type {
 } from '../types/data';
 import { notebookSettings, resolvePageSettings } from '../utils/pageSettings';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
-import { useCanvasStore, undoBatchStart, undoBatchEnd, undoBatchStartFull } from '../stores/useCanvasStore';
+import { useCanvasStore, undoBatchEnd, undoBatchStartFull } from '../stores/useCanvasStore';
 import { useDrawStore } from '../stores/useDrawStore';
 import { liveCeiling } from '../utils/scrollCeiling';
 import {
@@ -51,6 +51,7 @@ import {
   applyStrokeDisplacements,
   isFlowItem,
   insertBlockAt,
+  planHeightChange,
   planMoveBlock,
   removeBlockGap,
   type PageLike,
@@ -280,14 +281,16 @@ function refuseNonContentBlock(node: CanvasNode, nodes: CanvasNode[], verb: 'ins
   if (node.type === 'diagram') {
     throw new BridgeCommandError(
       'UNSUPPORTED',
-      `"${node.id}" is a diagram frame, not a content block. ` +
-        'Diagrams do not participate in block reflow — they hold position when blocks around them move.',
+      `"${node.id}" is a diagram frame, not a markdown block. ` +
+        (verb === 'move'
+          ? 'Use move_block on the frame id to reorder it in the scroll.'
+          : 'Pass the frame id as after to insert below the diagram.'),
     );
   }
   throw new BridgeCommandError(
     'UNSUPPORTED',
     `"${node.id}" is a ${node.type} node, not a content block. ` +
-      `Only free-standing text blocks can be ${verb === 'move' ? 'moved' : 'used as an insert anchor'} over the bridge.`,
+      `Only free-standing text blocks and diagram frames can be ${verb === 'move' ? 'moved' : 'used as an insert anchor'} over the bridge.`,
   );
 }
 
@@ -739,13 +742,6 @@ function livePageLike(page: { scrolls?: ScrollRecord[]; settings?: Partial<Works
   };
 }
 
-function applyNodesInOneUndo(nextNodes: CanvasNode[]): void {
-  undoBatchStart(useCanvasStore.getState().nodes);
-  useCanvasStore.setState({ nodes: nextNodes });
-  useWorkspaceStore.getState().markDirty();
-  undoBatchEnd();
-}
-
 function applyFlowInOneUndo(nextNodes: CanvasNode[], nextStrokes: Stroke[]): void {
   const canvas = useCanvasStore.getState();
   const scrolls = useWorkspaceStore.getState().getActivePage()?.scrolls ?? [];
@@ -984,11 +980,7 @@ async function insertBlock(params: Record<string, unknown>): Promise<InsertBlock
   node.x = plan.x;
   node.y = plan.y;
   const nextNodes = [...applyDisplacements(live.nodes, plan.displaced), node];
-  if (live.columnFlow) {
-    applyFlowInOneUndo(nextNodes, applyStrokeDisplacements(live.strokes ?? [], plan.displaced));
-  } else {
-    applyNodesInOneUndo(nextNodes);
-  }
+  applyFlowInOneUndo(nextNodes, applyStrokeDisplacements(live.strokes ?? [], plan.displaced));
   flush();
 
   return {
@@ -1008,6 +1000,11 @@ async function moveBlock(params: Record<string, unknown>): Promise<MoveBlockResu
     throw new BridgeCommandError('NOT_FOUND', `No block with id "${blockId}"`);
   }
   const preview = livePageLike(found.page);
+  const owner = owningDiagramFrame(found.page.nodes, found.node);
+  if (owner) refuseDiagramMember(found.node, owner, 'move');
+  if (found.node.type !== 'text' && found.node.type !== 'diagram') {
+    refuseNonContentBlock(found.node, found.page.nodes, 'move');
+  }
   if (!isFlowItem(found.node, diagramFrameIds(found.page.nodes), !!preview.columnFlow)) {
     refuseNonContentBlock(found.node, found.page.nodes, 'move');
   }
@@ -1036,11 +1033,7 @@ async function moveBlock(params: Record<string, unknown>): Promise<MoveBlockResu
   const plan = planMoveBlock(live, blockId, dest, liveCeiling());
   if (!plan.ok) throwReflow(plan);
 
-  if (live.columnFlow) {
-    applyFlowInOneUndo(plan.nextNodes, plan.nextStrokes);
-  } else {
-    applyNodesInOneUndo(plan.nextNodes);
-  }
+  applyFlowInOneUndo(plan.nextNodes, plan.nextStrokes);
   flush();
 
   const moved = useCanvasStore.getState().nodes.find((n) => n.id === blockId)!;
@@ -1195,13 +1188,18 @@ async function updateBlock(params: Record<string, unknown>): Promise<UpdateBlock
 
   const previous = found.node.data as TextNodeData;
   const updated: TextNodeData = { ...previous, text: markdown };
-  useCanvasStore.getState().updateNode(blockId, {
-    data: updated,
-    height: blockHeight(markdown, found.node.width || A4_WIDTH, updated),
-  });
+  const newHeight = blockHeight(markdown, found.node.width || A4_WIDTH, updated);
+  const live = livePageLike(found.page);
+  const plan = planHeightChange(live, blockId, newHeight);
+  if (!plan.ok) throwReflow(plan);
+
+  const nextNodes = plan.nextNodes.map((n) =>
+    n.id === blockId ? { ...n, data: updated, height: newHeight } : n,
+  );
+  applyFlowInOneUndo(nextNodes, plan.nextStrokes);
   flush();
 
-  return { blockId };
+  return { blockId, displacedCount: plan.displaced.length };
 }
 
 // ── Deletes ─────────────────────────────────────────────────
@@ -1423,9 +1421,25 @@ function deleteDiagramCmd(params: Record<string, unknown>): DeleteDiagramResult 
       }
 
       navigateToPage(section.id, page.id);
+      const live = livePageLike(page);
       const members = diagramMembers(useCanvasStore.getState().nodes, diagramId);
       const groupStrokes = useDrawStore.getState().strokes.filter((s) => s.groupId === diagramId);
+      const closed = removeBlockGap(live, diagramId);
+      const canvas = useCanvasStore.getState();
+      undoBatchStartFull({
+        nodes: canvas.nodes,
+        scrolls: useWorkspaceStore.getState().getActivePage()?.scrolls ?? [],
+        strokes: useDrawStore.getState().strokes,
+      });
+      if (closed.ok) {
+        useCanvasStore.setState({ nodes: applyDisplacements(live.nodes, closed.displaced) });
+        useDrawStore.setState({
+          strokes: applyStrokeDisplacements(live.strokes ?? [], closed.displaced),
+        });
+        useWorkspaceStore.getState().markDirty();
+      }
       useCanvasStore.getState().deleteNode(diagramId);
+      undoBatchEnd();
       flush();
 
       return { deletedMembers: members.length, deletedStrokes: groupStrokes.length };

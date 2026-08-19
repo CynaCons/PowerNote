@@ -83,16 +83,18 @@ export function columnsInUse(nodes: CanvasNode[], scrolls?: ScrollRecord[]): num
 }
 
 /**
- * A page packs as columns when it is in scroll guide style, or when any
- * scroll has a title. The default untitled scroll on a pages/grid/none
- * sheet is not a column — notes can sit beside each other there.
+ * Every scroll packs as a column for insert/move/height-change.
+ *
+ * Guide style (pages / grid / scroll / none) is visual only. v0.57 gated
+ * this on `backgroundMode === 'scroll'` or a titled scroll; default notebooks
+ * are pages + untitled, so field agents overlapped headings onto diagrams.
+ * Human drag still never reflows.
  */
 export function pageUsesColumnFlow(
-  backgroundMode: string | undefined,
-  scrolls?: readonly ScrollRecord[],
+  _backgroundMode?: string,
+  _scrolls?: readonly ScrollRecord[],
 ): boolean {
-  if (backgroundMode === 'scroll') return true;
-  return (scrolls ?? []).some((s) => (s.title ?? '').trim() !== '');
+  return true;
 }
 
 /** The scroll a node sits in, or undefined if no record covers its band. */

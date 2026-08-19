@@ -665,13 +665,13 @@ const TOOLS = [
     name: 'insert_block',
     description:
       'Insert a markdown block into a scroll at a chosen position, shifting ' +
-      'content blocks below it down by the new block\'s height + 12px. Prefer ' +
-      'after (a block id): ids survive reordering, indices do not — the same ' +
-      'reason scrollId is preferred over a raw column. Exactly one of after or ' +
-      'index. index 0 is the top of the column (ceiling-clamped when a titled ' +
-      'scroll arms the page ceiling). Only free-standing content blocks move; ' +
-      'diagrams, shapes and strokes hold position (an insert that lands on a ' +
-      'diagram overlaps it). Returns the new block plus displacedCount.',
+      'every occupant below it (text, diagram frames, images, shapes, ungrouped ' +
+      'ink) down by the new block\'s height + 12px. Frame members ride the frame. ' +
+      'Prefer after (a block or diagram-frame id): ids survive reordering, indices ' +
+      'do not. Exactly one of after or index. index 0 is the top of the column ' +
+      '(ceiling-clamped when a titled scroll arms the page ceiling). index counts ' +
+      'packed occupants of the scroll, not read_page blocks[] — prefer after. ' +
+      'Returns the new block plus displacedCount.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -683,15 +683,15 @@ const TOOLS = [
         after: {
           type: 'string',
           description:
-            'Insert after this block id (must be a content block in the same scroll). ' +
+            'Insert after this occupant id (a markdown block or diagram frame in the same scroll). ' +
             'Preferred. Do not pass index at the same time.',
         },
         index: {
           type: 'integer',
           minimum: 0,
           description:
-            '0-based index in the scroll\'s content-block reading order. 0 = column top. ' +
-            'Do not pass after at the same time.',
+            '0-based index in the scroll\'s packed-occupant reading order (text and diagrams). 0 = column top. ' +
+            'Do not pass after at the same time. Prefer after: index is not read_page blocks[] order.',
         },
       },
       required: ['scrollId', 'markdown'],
@@ -701,17 +701,18 @@ const TOOLS = [
   {
     name: 'move_block',
     description:
-      'Move a content block inside a scroll or across scrolls on the same page. ' +
-      'Closes the gap at the source and opens a gap at the target in ONE undo. ' +
-      'Prefer after (a block id) over index: ids survive reordering. scrollId is ' +
-      'optional and defaults to the block\'s current scroll; when given it must be ' +
-      'on the same page. Exactly one of after or index. Diagram frames and their ' +
-      'members are refused by name — they do not participate in block reflow. ' +
-      'Returns the block plus displacedCount.',
+      'Move a markdown block or diagram frame inside a scroll or across scrolls ' +
+      'on the same page. Occupants below the source close up; occupants at the ' +
+      'target open a gap. Diagram members ride the frame. ONE undo. Prefer after ' +
+      '(a block or diagram-frame id) over index: ids survive reordering. scrollId ' +
+      'is optional and defaults to the block\'s current scroll; when given it must ' +
+      'be on the same page. Exactly one of after or index. Diagram members, shapes ' +
+      'and images as the move target are refused by name. Returns the block plus ' +
+      'displacedCount.',
     inputSchema: {
       type: 'object',
       properties: {
-        blockId: { type: 'string', description: 'Content block to move (from read_page).' },
+        blockId: { type: 'string', description: 'Markdown block or diagram frame to move (from read_page / diagrams[].id).' },
         scrollId: {
           type: 'string',
           description:
@@ -1108,8 +1109,11 @@ const TOOLS = [
     description:
       'Replace the markdown of an existing block, found via read_page. Use this to ' +
       'revise content or tick a checkbox ("- [ ]" to "- [x]") rather than appending ' +
-      'a duplicate block. A diagram-member id is refused (UNSUPPORTED) naming the ' +
-      'owning diagram — redraw the source instead.',
+      'a duplicate block. If the block grows or shrinks, every occupant below it in ' +
+      'the scroll (text, diagram frames, images, shapes, ungrouped ink) shifts by the ' +
+      'height delta; frame members ride the frame. One undo. Returns displacedCount. ' +
+      'A diagram-member id is refused (UNSUPPORTED) naming the owning diagram — redraw ' +
+      'the source instead.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1296,10 +1300,11 @@ const TOOLS = [
       'groupId is the frame id, and every stroke grouped with it. Use this when you ' +
       'placed a diagram you no longer want — delete_block on the frame id does the ' +
       'same cascade, but this tool names the act and reports how many members and ' +
-      'strokes went. An unknown id is NOT_FOUND. Passing a non-diagram node id is ' +
-      'refused (the message names the type and points at delete_block). The bridge ' +
-      'has no undo, so pass confirm:true once the user has agreed. Returns ' +
-      'deletedMembers and deletedStrokes.',
+      'strokes went. Occupants below the frame in the same scroll close the gap. ' +
+      'An unknown id is NOT_FOUND. Passing a non-diagram node id is refused (the ' +
+      'message names the type and points at delete_block). The bridge has no undo, ' +
+      'so pass confirm:true once the user has agreed. Returns deletedMembers and ' +
+      'deletedStrokes.',
     inputSchema: {
       type: 'object',
       properties: {

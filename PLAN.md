@@ -914,7 +914,7 @@
 
 ---
 
-**Last updated:** 2026-08-18 (shipping v0.60.0 — column reflow, draw.io, scroll delete)
+**Last updated:** 2026-08-19 (shipping v0.61.1 — insert/move/update reflow diagrams)
 
 ### v0.28.0 — Agent bridge — MCP writes notes into the live app (COMPLETE)
 **Goal:** Let an external agent create pages and fill them with markdown blocks (bullets, checklists, headings) in the running PowerNote app, via an MCP server that hosts a WebSocket the app dials out to.
@@ -1265,6 +1265,23 @@
 - [x] Rebuild dist-template
 - [x] typecheck + full Playwright + test:bridge green
 - [x] Commit product/docs/tests only; tag v0.60.0; push main + tag
+### v0.61.0 — insert/move pack diagrams on every scroll (2026-08-19) (COMPLETE)
+> Field report: insert_block/move_block do not reflow diagrams. Default notebooks are pages + untitled scroll, which v0.57 left freeform. The MCP description even warned that an insert landing on a diagram overlaps it. insert/move already take a scrollId — they are column verbs.
+**Goal:** insert_block and move_block shove every top-level occupant of the target scroll — including diagram frames (members and group ink ride). Guide style is visual; it no longer gates reflow. Default pages notebooks stop overlapping a heading onto a diagram. Human drag still never reflows.
+- [x] insert/move/height-change/delete-gap always pack top-level occupants of the target scroll (diagrams included); guide style is visual only
+- [x] MCP descriptions: occupants move, after may be a diagram id, move_block can move a frame; members stay refused
+- [x] Invert T161/T110 freeform hold-y; cover move_block of a frame; REQ-AGENT-060/061/062/067 + REQ-DIAG-002 + REQ-SCROLL-030
+### v0.61.1 — update_block packs the band (2026-08-19) (COMPLETE)
+> Field follow-up to v0.61.0. update_block currently writes height via updateNode and never calls planHeightChange; diagrams stay put until a 60ms TextNode remeasure, which is too late for a chained agent call.
+**Goal:** update_block that grows or shrinks a note shoves every occupant below it in the scroll — including diagram frames. Same planner as insert/move. One undo.
+- [x] update_block: planHeightChange + applyFlowInOneUndo (text+height+displacements, one undo); return displacedCount
+- [x] T110: grow/shrink a note above a diagram; MCP description; REQ-AGENT-010/067
+### v0.61.2 — Harden reflow and ship v0.61.1 (2026-08-19) (COMPLETE)
+> Robustness pass on v0.61.0/0.61.1 before release. Field agents chain tools; a 60ms TextNode wait is not a contract.
+**Goal:** Agent reflow is solid under chained calls: update then insert with no wait, insert after a frame id, delete_diagram closes the gap. Then APP_VERSION 0.61.1 is tagged and GitHub publishes PowerNote.html.
+- [x] delete_diagram closes the gap below the frame (same planner as delete_block)
+- [x] T110: chained update+insert with no wait; insert after frame id; delete_diagram packs
+- [x] Bump APP_VERSION 0.61.1, rebuild dist-template, full suite, commit, tag, push
 ## Future (Backlog)
 > Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 

@@ -89,8 +89,8 @@ export function TextNode({ node, isSelected, onSelect, stageScale, autoEdit, onS
       if (!htmlRef.current) return;
       const h = Math.max(MIN_TEXT_HEIGHT, htmlRef.current.offsetHeight);
       if (Math.abs(h - (node.height || 0)) > 2) {
-        // Column pages pack the band when a block grows or shrinks.
-        // Freeform pages keep the silent height write and leave neighbours.
+        // Pack the band when a block grows or shrinks. Neighbours (including
+        // diagrams) move; a silent height write would overlap them.
         if (!reflowAfterHeightChange(node.id, h)) {
           updateNodeSilent(node.id, { height: h });
         }

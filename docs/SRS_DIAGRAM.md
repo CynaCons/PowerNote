@@ -1,7 +1,7 @@
 # SRS: Diagrams
 
 **Project:** PowerNote
-**Version:** 0.60.0
+**Version:** 0.61.1
 **Date:** 2026-08-17
 
 ## Purpose
@@ -32,7 +32,7 @@ implementation on purpose, but the difference matters when reading it:
 | Agent `read_page` diagrams index + label-leak closed | Shipped — REQ-DIAG-006 (v0.34.0 debt closed in v0.54.0; T159) |
 | On-demand fit to scroll (both directions) | Shipped — REQ-DIAG-142 |
 | draw.io ports, orthogonal routing, UML module/component | Shipped v0.59 — REQ-DIAG-143..148 |
-| Frame reflow and document flow (REQ-DIAG-002..005) | **Shipped v0.57 on column pages** (scroll guide, or any titled scroll). Freeform pages (pages/grid/none + untitled scroll only) keep the v0.55 “frames hold y” contract (T161). |
+| Frame reflow and document flow (REQ-DIAG-002..005) | **Shipped v0.61 on every scroll.** Guide style is visual. insert/move/height-change pack the band, including default pages notebooks. Human drag never reflows. |
 | Pin loop (REQ-DIAG-020..023) | **Not built, and descoped 2026-08-13.** Redrawing replaces every content node, so a manual nudge is lost on the next redraw |
 | Geometric warnings (REQ-DIAG-016) | **Partial.** Parse diagnostics ship; overlap, crossing and density checks do not |
 | Sequence and state layouts (REQ-DIAG-031..035) | Not built |
@@ -60,8 +60,8 @@ implementation on purpose, but the difference matters when reading it:
 | ID | Description | Priority | Test Ref |
 |----|-------------|----------|----------|
 | REQ-DIAG-001 | The app shall provide a diagram frame: a titled, bounded canvas region holding a diagram spec and its rendered elements | Must | T111 |
-| REQ-DIAG-002 | On a column page (scroll guide style, or any titled scroll) a diagram frame shall occupy the band like a text block, with an intrinsic height derived from its contents. Members and group ink travel with the frame by the same dy. | Must | T110 |
-| REQ-DIAG-003 | On a column page, when a block or frame's height changes, occupants below it in the same band shall move down; when it shrinks, they shall close the gap | Must | T110 |
+| REQ-DIAG-002 | A diagram frame shall occupy its scroll like a text block, with an intrinsic height derived from its contents. Members and group ink travel with the frame by the same dy. Guide style does not gate this. | Must | T110 |
+| REQ-DIAG-003 | When a block or frame's height changes, occupants below it in the same band shall move down; when it shrinks, they shall close the gap | Must | T110 |
 | REQ-DIAG-004 | Reflow shall be scoped to the affected column, leaving other columns unchanged | Must | T110 |
 | REQ-DIAG-005 | A frame, its spec and its rendered elements shall survive a save/load round-trip | Must | T110 |
 | REQ-DIAG-006 | A frame shall appear in agent-facing reading order identified by its title, without expanding its children into the block list. Closed in v0.54.0: `read_page` returns `diagrams[]` `{id, title, format, memberCount, bounds}` and excludes every `groupId`-owned text node from `blocks[]` (the v0.34.0 label-leak / invisible-frame debt) | Must | T159 |
@@ -258,7 +258,7 @@ drift apart.
 | ID | Description | Priority | Test Ref |
 |----|-------------|----------|----------|
 | REQ-DIAG-140 | Deleting a `type:'diagram'` node shall also delete every node whose `groupId` is the frame id and every stroke with that `groupId`, as one undo entry that restores nodes and strokes together. The cascade shall live in the canvas-store deletion primitive so every caller inherits it | Must | T155 |
-| REQ-DIAG-141 | `delete_diagram` shall take `diagramId` (and `confirm: true`). It shall return `{ deletedMembers, deletedStrokes }`. An unknown id shall be `NOT_FOUND`. A non-diagram node id shall be refused (`UNSUPPORTED`) naming the node's type and pointing at `delete_block`. `delete_block` on a frame id shall use the same cascade | Must | T155 |
+| REQ-DIAG-141 | `delete_diagram` shall take `diagramId` (and `confirm: true`). It shall return `{ deletedMembers, deletedStrokes }`. Occupants below the frame in the same scroll shall close the gap. An unknown id shall be `NOT_FOUND`. A non-diagram node id shall be refused (`UNSUPPORTED`) naming the node's type and pointing at `delete_block`. `delete_block` on a frame id shall use the same cascade | Must | T155, T110 |
 
 ### On-demand fit to the landing scroll (v0.54)
 
