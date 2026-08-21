@@ -407,10 +407,13 @@ test.describe('147 - draw.io edges and tool (REQ-DIAG-120..126)', () => {
       TWO_BOXES + edge('e1', 'endArrow=classic;html=1;', { source: 'a', target: 'b' }),
     );
 
+    // render:'nodes' — this test asserts the transpiled MEMBER contract
+    // (REQ-DIAG-124 as amended in v0.64; the default is a snapshot).
     const result = await runBridge(page, 'create_diagram', {
       source,
       title: 'Two boxes',
       format: 'drawio',
+      render: 'nodes',
     });
 
     expect(result.format).toBe('drawio');
@@ -470,6 +473,7 @@ test.describe('147 - draw.io edges and tool (REQ-DIAG-120..126)', () => {
       source: compressed,
       title: 'Packed',
       format: 'drawio',
+      render: 'nodes',
     });
 
     expect(result.elementCount).toBe(3);

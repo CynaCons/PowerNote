@@ -76,8 +76,23 @@ function exportDrawioInner(frameOrGroupId: string, nodes: CanvasNode[]): ExportD
 
   if (frame) {
     const source = diagramSourceOf(frame);
-    if (source && looksLikeDrawio(source) && matchesStoredSource(frame, members, source)) {
-      return { xml: source, report: [] };
+    if (source && looksLikeDrawio(source)) {
+      // Snapshot frame (v0.64): the stored source IS the diagram — there are
+      // no members to compare, and falling through would export an empty
+      // mxfile. Verbatim, always.
+      if ((frame.data as DiagramNodeData | undefined)?.render != null) {
+        const report =
+          members.length > 0
+            ? [
+                `${members.length} loose node${members.length === 1 ? '' : 's'} inside the frame group ` +
+                  'were not exported — the stored draw.io source is the diagram.',
+              ]
+            : [];
+        return { xml: source, report };
+      }
+      if (matchesStoredSource(frame, members, source)) {
+        return { xml: source, report: [] };
+      }
     }
   }
 

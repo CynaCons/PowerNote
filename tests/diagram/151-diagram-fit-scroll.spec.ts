@@ -77,10 +77,13 @@ test.describe('151 - Diagrams fit the scroll they land in (REQ-DIAG-136..139, RE
   test('create_diagram in a band scales members to the band x-range and warns', async ({ page }) => {
     await nameDefaultScroll(page, 'Backend');
 
+    // render:'nodes' — the member-scaling contract under test predates the
+    // v0.64 snapshot default (snapshot fit is covered by T179).
     const result = await runBridge(page, 'create_diagram', {
       source: WIDE,
       title: 'Wide pipeline',
       format: 'drawio',
+      render: 'nodes',
     });
 
     expect(result.warnings?.length).toBeGreaterThan(0);
@@ -114,6 +117,7 @@ test.describe('151 - Diagrams fit the scroll they land in (REQ-DIAG-136..139, RE
       source: ABSURD,
       title: 'Too wide',
       format: 'drawio',
+      render: 'nodes',
     });
 
     expect(result.warnings?.length).toBeGreaterThan(0);

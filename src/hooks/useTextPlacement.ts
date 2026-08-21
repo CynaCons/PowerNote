@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import type Konva from 'konva';
-import { useCanvasStore, undoBatchStart } from '../stores/useCanvasStore';
+import { useCanvasStore, undoBatchStart, undoBatchEnd } from '../stores/useCanvasStore';
 import { useToolStore } from '../stores/useToolStore';
 import { generateId } from '../utils/ids';
 import { DEFAULT_TEXT_WIDTH } from '../utils/pageLayout';
@@ -119,6 +119,9 @@ export function useTextPlacement(
         useToolStore.getState().setTool('select');
         addNode(newNode);
         selectNode(newNode.id, false);
+        // The batch MUST close here — an open batch swallows every later undo
+        // snapshot, so one gantt placement used to break Ctrl+Z for the session.
+        undoBatchEnd();
       } else if (currentTool === 'diagram') {
         const pointer = stage.getPointerPosition();
         if (!pointer) return;
@@ -156,6 +159,8 @@ export function useTextPlacement(
           });
         }
         selectNode(frameId, false);
+        // Same as the gantt branch: an unclosed batch silently disables undo.
+        undoBatchEnd();
       } else {
         clearSelection();
       }

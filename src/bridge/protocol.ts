@@ -205,6 +205,12 @@ export interface DiagramSummary {
   id: string;
   title: string;
   format: DiagramSourceFormat;
+  /**
+   * 'snapshot': an exact image rendered by the draw.io viewer extension —
+   * memberCount is 0 by design, the source remains the editable truth.
+   * 'nodes' (or absent): transpiled native member nodes.
+   */
+  renderMode?: 'snapshot' | 'nodes';
   memberCount: number;
   bounds: DiagramBounds;
   /** Present only when `include_diagram_source` is true. */
@@ -240,6 +246,8 @@ export interface DiagramDetail {
   format: DiagramSourceFormat;
   source: string;
   bounds: DiagramBounds;
+  /** See DiagramSummary.renderMode — snapshot diagrams return members: []. */
+  renderMode?: 'snapshot' | 'nodes';
   memberCount: number;
   members: DiagramMemberSummary[];
   /**
@@ -493,7 +501,13 @@ export interface CreateDiagramResult {
   /** Grammar that read the source, so the agent can see which tool ran. */
   format: DiagramSourceFormat;
   column: number;
-  /** Native shape and text nodes drawn inside the frame. */
+  /**
+   * 'snapshot': the source was rendered by the draw.io viewer extension into
+   * an exact image — elementCount is 0 by design, not a failure. 'nodes':
+   * transpiled native members (the pre-v0.64 behaviour, and the fallback).
+   */
+  renderMode?: 'snapshot' | 'nodes';
+  /** Native shape and text nodes drawn inside the frame. 0 for snapshots. */
   elementCount: number;
   width: number;
   height: number;

@@ -40,6 +40,21 @@ export function SearchPanel({ isOpen, isNotebookWide, onClose, onNavigateToResul
     }
   }, [isOpen]);
 
+  /**
+   * What a node contributes to search. Text nodes: their text. Diagram
+   * frames: title + source — a snapshot-rendered draw.io diagram (v0.64) has
+   * no text member nodes, but its labels all live in the stored XML, so this
+   * keeps its words findable.
+   */
+  const searchableTextOf = (node: { type: string; data: unknown }): string => {
+    if (node.type === 'text') return ((node.data as any).text as string) || '';
+    if (node.type === 'diagram') {
+      const d = node.data as { title?: string; source?: string };
+      return [d.title ?? '', d.source ?? ''].filter(Boolean).join('\n');
+    }
+    return '';
+  };
+
   const getResults = useCallback((): SearchResult[] => {
     if (!query.trim()) return [];
     const q = query.toLowerCase();
@@ -48,12 +63,11 @@ export function SearchPanel({ isOpen, isNotebookWide, onClose, onNavigateToResul
       // Page search: only current page's nodes
       return nodes
         .filter((n) => {
-          if (n.type !== 'text') return false;
-          const text = (n.data as any).text || '';
+          const text = searchableTextOf(n);
           return text.toLowerCase().includes(q);
         })
         .map((n) => {
-          const text = (n.data as any).text || '';
+          const text = searchableTextOf(n);
           const idx = text.toLowerCase().indexOf(q);
           const start = Math.max(0, idx - 20);
           const end = Math.min(text.length, idx + query.length + 20);
@@ -80,8 +94,7 @@ export function SearchPanel({ isOpen, isNotebookWide, onClose, onNavigateToResul
         const isActivePage = section.id === activeSectionId && page.id === activePageId;
         const pageNodes = isActivePage ? nodes : page.nodes;
         for (const node of pageNodes) {
-          if (node.type !== 'text') continue;
-          const text = (node.data as any).text || '';
+          const text = searchableTextOf(node);
           if (!text.toLowerCase().includes(q)) continue;
           const idx = text.toLowerCase().indexOf(q);
           const start = Math.max(0, idx - 20);

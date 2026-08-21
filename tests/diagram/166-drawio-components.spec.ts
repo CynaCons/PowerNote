@@ -137,6 +137,7 @@ test.describe('166 - draw.io components (REQ-DIAG-143..148)', () => {
       format: 'drawio',
       title: 'From file',
       source,
+      render: 'nodes',
     });
     expect(drawn.diagramId).toBeTruthy();
     await page.getByTestId(`diagram-source-btn-${drawn.diagramId}`).click();

@@ -525,7 +525,10 @@ const TOOLS = [
       '(truncated {at, notice}). Source counts toward the budget; if source alone blows ' +
       'it, source is cut (sourceTruncated {fullLength, notice}) and the notice names the ' +
       'full length and suggests exporting as .drawio. Discover ids from read_page ' +
-      'diagrams[]. An unknown id is NOT_FOUND. A non-diagram id is UNSUPPORTED naming the type.',
+      'diagrams[]. An unknown id is NOT_FOUND. A non-diagram id is UNSUPPORTED naming the type. ' +
+      "A draw.io diagram rendered as an exact snapshot (renderMode 'snapshot', v0.64+) " +
+      'returns members: [] and memberCount 0 BY DESIGN — its structure lives entirely in ' +
+      'the source XML, which is what you read and edit.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -607,7 +610,9 @@ const TOOLS = [
       'Refit an existing diagram to the scroll band its frame sits in. Unlike ' +
       'placement-time fit (shrink-only), this scales BOTH directions: up to fill ' +
       'band-width minus padding when the diagram is under-width, down with the same ' +
-      '0.45 floor when over. Out-of-band frames are refused (PRECONDITION, naming the ' +
+      '0.45 floor when over. Works on member diagrams (members rescale) and on ' +
+      "renderMode 'snapshot' diagrams (the frame rescales; the image follows). " +
+      'Out-of-band frames are refused (PRECONDITION, naming the ' +
       'diagram). Discover ids from read_page diagrams[]. One undo in the app.',
     inputSchema: {
       type: 'object',
@@ -1021,9 +1026,20 @@ const TOOLS = [
   {
     name: 'create_diagram_drawio',
     description:
-      'Draw a draw.io / mxGraph diagram onto the page as native PowerNote shapes. Every ' +
-      'vertex and edge becomes an ordinary rectangle, circle, line, arrow or text run that ' +
-      'the user can select and drag afterwards -- it is transpiled, NOT embedded as an image. ' +
+      'Draw a draw.io / mxGraph diagram onto the page. BY DEFAULT (v0.64+) the source is ' +
+      'rendered by the embedded draw.io viewer into an exact vector snapshot — colours, ' +
+      'gradients, curved edges, double-headed arrows, HTML labels, shadows and every ' +
+      'built-in shape render exactly as diagrams.net shows them. The response then carries ' +
+      "renderMode 'snapshot' and elementCount 0: a snapshot diagram has NO member nodes BY " +
+      'DESIGN — the stored XML remains the editable source, read_diagram returns it, and ' +
+      '"Export as .drawio" emits it verbatim. Library stencil ICONS (mxgraph.aws4/mscae/' +
+      'cisco) are the one gap: they render as their styled box + label, since stencil packs ' +
+      'are not bundled. If the viewer extension is unavailable (e.g. offline before it was ' +
+      'installed), the tool FALLS BACK to transpiling the source into native PowerNote ' +
+      "shapes and says so in warnings. Pass render:'nodes' to force that transpile path " +
+      'deliberately, when you WANT individually-selectable member nodes instead of exact ' +
+      'paint. Everything below documents the transpiled subset — it applies to ' +
+      "render:'nodes' and to the fallback, NOT to snapshots. " +
       'THIS TOOL IS A SIBLING OF create_diagram_svg: YOU have already done the layout and the ' +
       'coordinates are the payload. Use create_diagram_plantuml or create_diagram_mermaid when ' +
       'you want a diagram laid out well without doing the geometry yourself. ' +
@@ -1056,7 +1072,8 @@ const TOOLS = [
       'A nested <mxGraphModel> is refused — it opens a second graph with its own origin, and flattening it would move everything inside; ' +
       'HTML labels: simple <br>/<div>/<font>/<b> markup is stripped and the words are kept (ignored diagnostic); remaining empty markup is refused. ' +
       'Keep to the supported subset and nothing is silently lost. The response carries the ' +
-      'diagnostics, so one call tells you what was dropped.',
+      'diagnostics, so one call tells you what was dropped. (Snapshot renders have none of ' +
+      'these restrictions.)',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1064,7 +1081,15 @@ const TOOLS = [
           type: 'string',
           description:
             'draw.io / mxGraph XML. An <mxfile> or a bare <mxGraphModel>. Compressed ' +
-            '(base64+deflate) pages are accepted — they are inflated before transpile.',
+            '(base64+deflate) pages are accepted — they are inflated before use.',
+        },
+        render: {
+          type: 'string',
+          enum: ['snapshot', 'nodes'],
+          description:
+            "How to draw it. 'snapshot' (default): exact image via the draw.io viewer. " +
+            "'nodes': transpile into native, individually-editable shapes (lossy — see the " +
+            'subset above).',
         },
         title: {
           type: 'string',
@@ -1105,6 +1130,13 @@ const TOOLS = [
         pageId: { type: 'string', description: 'Page to draw on. Defaults to the open page.' },
         scrollId: { type: 'string', description: 'Scroll to draw into. Defaults to the leftmost.' },
         column: { type: 'integer', minimum: 0, description: 'Legacy fallback - prefer scrollId.' },
+        render: {
+          type: 'string',
+          enum: ['snapshot', 'nodes'],
+          description:
+            "draw.io sources only: 'snapshot' (default) renders an exact image; 'nodes' " +
+            'transpiles to native shapes.',
+        },
       },
       required: ['source'],
       additionalProperties: false,

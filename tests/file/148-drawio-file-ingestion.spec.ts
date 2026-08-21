@@ -1,6 +1,8 @@
 /**
  * Test 148: draw.io / SVG file ingestion (drop + paste)
- * Covers: REQ-DIAG-127..129
+ * Covers: REQ-DIAG-127..129 (as amended v0.64: a dropped/pasted drawio source
+ * lands as a viewer SNAPSHOT — `data.render` set, zero member nodes; the dev
+ * server serves the real extension asset, so the snapshot path is live here)
  *
  * The drop/paste gate sits ahead of the image/* path. Playwright synthesises a
  * DragEvent with a DataTransfer File inside page.evaluate — Konva never sees
@@ -106,9 +108,14 @@ test.describe('148 - draw.io / SVG file ingestion (REQ-DIAG-127..129)', () => {
     expect(frame.x).toBeCloseTo(dropX, 0);
     expect(frame.y).toBeCloseTo(dropY, 0);
 
+    // v0.64: a drawio drop is a snapshot — the exact render travels in
+    // data.render, and the frame owns no member nodes.
+    expect(frame.data.render).toBeTruthy();
+    expect(frame.data.render.src).toMatch(/^data:image\/(svg\+xml|png);base64,/);
+    expect(frame.data.render.naturalWidth).toBeGreaterThan(0);
+    expect(frame.data.render.naturalHeight).toBeGreaterThan(0);
     const members = store.nodes.filter((n: any) => n.groupId === frame.id && n.id !== frame.id);
-    expect(members.length).toBeGreaterThan(0);
-    expect(members.every((n: any) => n.type === 'shape' || n.type === 'text')).toBe(true);
+    expect(members).toHaveLength(0);
     expect(store.nodes.some((n: any) => n.type === 'image')).toBe(false);
   });
 
@@ -146,8 +153,9 @@ test.describe('148 - draw.io / SVG file ingestion (REQ-DIAG-127..129)', () => {
     expect(stored).toContain('fillColor=#aaaaaa');
     expect(stored).not.toBe(compressed);
 
+    expect(frame.data.render).toBeTruthy();
     const members = store.nodes.filter((n: any) => n.groupId === frame.id && n.id !== frame.id);
-    expect(members.length).toBeGreaterThan(0);
+    expect(members).toHaveLength(0);
   });
 
   test('dropping an .svg file becomes native nodes, not an image', async ({ page }) => {
@@ -206,8 +214,9 @@ test.describe('148 - draw.io / SVG file ingestion (REQ-DIAG-127..129)', () => {
     expect(frame.data.source).toMatch(/<mxfile[\s>]/i);
     expect(frame.x).toBeCloseTo(expected.x, 0);
     expect(frame.y).toBeCloseTo(expected.y, 0);
+    expect(frame.data.render).toBeTruthy();
     const members = store.nodes.filter((n: any) => n.groupId === frame.id && n.id !== frame.id);
-    expect(members.length).toBeGreaterThan(0);
+    expect(members).toHaveLength(0);
   });
 
   test("a frame created from drawio source shows the 'draw.io' badge", async ({ page }) => {

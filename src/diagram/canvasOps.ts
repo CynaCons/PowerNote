@@ -6,7 +6,7 @@
  * reusable rather than tangled in render code.
  */
 
-import type { CanvasNode, DiagramNodeData } from '../types/data';
+import type { CanvasNode, DiagramNodeData, DiagramRenderSnapshot } from '../types/data';
 import { undoBatchStart, undoBatchEnd, undoBatchStartFull, useCanvasStore } from '../stores/useCanvasStore';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useDrawStore } from '../stores/useDrawStore';
@@ -16,7 +16,7 @@ import { generateId } from '../utils/ids';
 import { buildDiagram } from './index';
 import type { DiagramFormat } from './index';
 import type { Diagnostic } from './types';
-import { fitDiagramToScroll } from './fitToScroll';
+import { fitDiagramToScroll, fitFrameToScroll } from './fitToScroll';
 import { columnAt } from '../utils/pageLayout';
 
 /** Space between the frame edge and its contents. */
@@ -33,6 +33,17 @@ export const FRAME_MIN_H = 120;
  */
 export function diagramMembers(nodes: CanvasNode[], frameId: string): CanvasNode[] {
   return nodes.filter((n) => n.groupId === frameId && n.id !== frameId);
+}
+
+/**
+ * A snapshot diagram displays a rendered image and owns no member nodes
+ * (v0.64 invariant: `render` present ⇔ zero members). Everything that walks
+ * members — fit, isolation, export tiers — branches on this.
+ */
+export function isSnapshotDiagram(node: CanvasNode): boolean {
+  if (node.type !== 'diagram') return false;
+  const data = node.data as DiagramNodeData;
+  return data?.render != null;
 }
 
 export interface RebuildResult {
@@ -126,6 +137,8 @@ export interface PlaceDiagramResult {
   diagnostics: Diagnostic[];
   /** Placement-time fit warning, when the diagram was scaled to a scroll. */
   warning?: string;
+  /** How the diagram displays: an exact rendered image, or native member nodes. */
+  renderMode?: 'snapshot' | 'nodes';
 }
 
 /**
@@ -159,13 +172,17 @@ export function placeDiagramOnCanvas(opts: PlaceDiagramOptions): PlaceDiagramRes
       warning: built.warning,
     };
   }
+  // One undo removes the whole diagram — frame plus members — not one node
+  // per keypress of Ctrl+Z.
   const canvas = useCanvasStore.getState();
+  undoBatchStart(canvas.nodes);
   canvas.addNode(frame);
   for (const content of built.contents) canvas.addNode(content);
   canvas.updateNode(frameId, {
     width: built.frame.width,
     height: built.frame.height,
   });
+  undoBatchEnd();
   return {
     frameId,
     placed: true,
@@ -174,6 +191,56 @@ export function placeDiagramOnCanvas(opts: PlaceDiagramOptions): PlaceDiagramRes
     elementCount: built.contents.length,
     diagnostics: built.diagnostics,
     warning: built.warning,
+    renderMode: 'nodes',
+  };
+}
+
+export interface PlaceDiagramSnapshotOptions {
+  x: number;
+  y: number;
+  source: string;
+  title: string;
+  snapshot: DiagramRenderSnapshot;
+}
+
+/**
+ * Creates a snapshot diagram: one frame, zero members, the rendered image in
+ * `data.render`. Placement-time fit is shrink-only on the frame box — the
+ * image follows the frame, so nothing else needs rescaling.
+ */
+export function placeDiagramSnapshotOnCanvas(opts: PlaceDiagramSnapshotOptions): PlaceDiagramResult {
+  const frameId = generateId();
+  const width = Math.max(FRAME_MIN_W, Math.round(opts.snapshot.naturalWidth + FRAME_PAD * 2));
+  const height = Math.max(
+    FRAME_MIN_H,
+    Math.round(opts.snapshot.naturalHeight + FRAME_TITLE_H + FRAME_PAD * 2),
+  );
+  const scrolls = useWorkspaceStore.getState().getActivePage()?.scrolls;
+  const fitted = fitFrameToScroll({ x: opts.x, y: opts.y, width, height }, scrolls);
+  const frame: CanvasNode = {
+    id: frameId,
+    type: 'diagram',
+    x: opts.x,
+    y: opts.y,
+    width: Math.round(fitted.width),
+    height: Math.round(fitted.height),
+    layer: 2,
+    groupId: frameId,
+    data: { source: opts.source, title: opts.title, render: opts.snapshot },
+  };
+  const canvas = useCanvasStore.getState();
+  undoBatchStart(canvas.nodes);
+  canvas.addNode(frame);
+  undoBatchEnd();
+  return {
+    frameId,
+    placed: true,
+    width: frame.width,
+    height: frame.height,
+    elementCount: 0,
+    diagnostics: [],
+    warning: fitted.warning,
+    renderMode: 'snapshot',
   };
 }
 
@@ -220,7 +287,21 @@ export function fitExistingDiagram(frameId: string): FitExistingOutcome {
   }
 
   const members = diagramMembers(nodes, frameId);
-  const fitted = fitDiagramToScroll(frame, members, scrolls, { allowGrow: true });
+  // A snapshot frame has no members to rescale — the image tracks the frame
+  // box, so its fit is the frame fit. Without this branch the member path
+  // identity-returns on an empty list and "Fit to scroll width" does nothing.
+  let fitted;
+  if (isSnapshotDiagram(frame) && members.length === 0) {
+    const frameFit = fitFrameToScroll(frame, scrolls, { allowGrow: true });
+    fitted = {
+      members: [] as CanvasNode[],
+      frame: { width: frameFit.width, height: frameFit.height },
+      scale: frameFit.scale,
+      warning: frameFit.warning,
+    };
+  } else {
+    fitted = fitDiagramToScroll(frame, members, scrolls, { allowGrow: true });
+  }
   if (
     fitted.scale === 1 &&
     fitted.frame.width === frame.width &&

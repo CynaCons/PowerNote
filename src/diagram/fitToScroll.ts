@@ -58,24 +58,26 @@ export interface FitToScrollOptions {
   allowGrow?: boolean;
 }
 
+export interface FitFrameResult {
+  width: number;
+  height: number;
+  scale: number;
+  warning?: string;
+}
+
 /**
- * Scale `members` and the frame size about the frame origin so the diagram
- * fits in the band under `frame.x`. Stroke weight is left alone (legibility,
- * not geometry). Returns the input unchanged when the origin is outside
- * every scroll record.
+ * The band-fit itself, on the frame box alone: how a rectangle anchored at
+ * `frame.x` scales to the scroll band it sits in. Snapshot diagrams (v0.64)
+ * use this directly — their artwork is one image that follows the frame, so
+ * there are no members to rescale.
  */
-export function fitDiagramToScroll(
+export function fitFrameToScroll(
   frame: { x: number; y: number; width: number; height: number },
-  members: CanvasNode[],
   scrolls: ScrollRecord[] | undefined,
   opts?: FitToScrollOptions,
-): FitToScrollResult {
-  const identity: FitToScrollResult = {
-    members,
-    frame: { width: frame.width, height: frame.height },
-    scale: 1,
-  };
-  if (!scrolls || scrolls.length === 0 || members.length === 0) return identity;
+): FitFrameResult {
+  const identity: FitFrameResult = { width: frame.width, height: frame.height, scale: 1 };
+  if (!scrolls || scrolls.length === 0) return identity;
   if (!(frame.width > 0)) return identity;
 
   const column = columnAt(frame.x, scrolls);
@@ -88,10 +90,7 @@ export function fitDiagramToScroll(
   // unscaled (we cannot invent a fit) but name the scroll — silent identity
   // looked like the diagram was happy in a 10px column.
   if (!(available > 0)) {
-    return {
-      ...identity,
-      warning: `scroll '${name}' is too narrow to fit a diagram`,
-    };
+    return { ...identity, warning: `scroll '${name}' is too narrow to fit a diagram` };
   }
 
   const allowGrow = opts?.allowGrow === true;
@@ -112,10 +111,37 @@ export function fitDiagramToScroll(
         ? `scaled to ${formatScale(scale)}× to fit scroll '${name}'`
         : `scaled to ${formatScale(scale)}× to fill scroll '${name}'`;
 
+  return { width: frame.width * scale, height: frame.height * scale, scale, warning };
+}
+
+/**
+ * Scale `members` and the frame size about the frame origin so the diagram
+ * fits in the band under `frame.x`. Stroke weight is left alone (legibility,
+ * not geometry). Returns the input unchanged when the origin is outside
+ * every scroll record.
+ */
+export function fitDiagramToScroll(
+  frame: { x: number; y: number; width: number; height: number },
+  members: CanvasNode[],
+  scrolls: ScrollRecord[] | undefined,
+  opts?: FitToScrollOptions,
+): FitToScrollResult {
+  const identity: FitToScrollResult = {
+    members,
+    frame: { width: frame.width, height: frame.height },
+    scale: 1,
+  };
+  if (members.length === 0) return identity;
+
+  const fitted = fitFrameToScroll(frame, scrolls, opts);
+  if (fitted.scale === 1) {
+    return fitted.warning ? { ...identity, warning: fitted.warning } : identity;
+  }
+
   return {
-    members: members.map((m) => scaleNode(m, frame.x, frame.y, scale)),
-    frame: { width: frame.width * scale, height: frame.height * scale },
-    scale,
-    warning,
+    members: members.map((m) => scaleNode(m, frame.x, frame.y, fitted.scale)),
+    frame: { width: fitted.width, height: fitted.height },
+    scale: fitted.scale,
+    warning: fitted.warning,
   };
 }

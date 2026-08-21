@@ -1,14 +1,49 @@
 import { useEffect, useRef, useState } from 'react';
-import { useCanvasStore } from '../../stores/useCanvasStore';
+import { undoBatchEnd, undoBatchStart, useCanvasStore } from '../../stores/useCanvasStore';
 import { useDiagramStore } from '../../stores/useDiagramStore';
-import { applyDiagramScrollFit, diagramMembers, diagramSourceOf, rebuildDiagram } from '../../diagram/canvasOps';
+import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
+import {
+  FRAME_MIN_H,
+  FRAME_MIN_W,
+  FRAME_PAD,
+  FRAME_TITLE_H,
+  applyDiagramScrollFit,
+  diagramMembers,
+  diagramSourceOf,
+  rebuildDiagram,
+} from '../../diagram/canvasOps';
+import { fitFrameToScroll } from '../../diagram/fitToScroll';
+import { renderDrawioSnapshot } from '../../diagram/drawioRender';
 import { sniffFormat, normalizeDrawioSource, type Diagnostic } from '../../diagram';
 import { FORMAT_LABEL } from '../../diagram/formatLabels';
-import type { DiagramNodeData } from '../../types/data';
+import type { CanvasNode, DiagramNodeData } from '../../types/data';
 import { useDrawStore } from '../../stores/useDrawStore';
 import { livePageLike } from '../../utils/columnReflow';
 import { planHeightChange } from '../../bridge/reflow';
 import './DiagramNode.css';
+
+/**
+ * Column reflow after the frame's height changed under the dialog. Shared by
+ * the member and snapshot commit paths so they cannot drift.
+ */
+function reflowFrameHeight(frameId: string, oldHeight: number, width: number, height: number): void {
+  if (Math.abs(height - oldHeight) < 2) return;
+  const page = livePageLike();
+  const planned = planHeightChange(
+    {
+      ...page,
+      nodes: page.nodes.map((n) => (n.id === frameId ? { ...n, height: oldHeight } : n)),
+    },
+    frameId,
+    height,
+  );
+  if (planned.ok && planned.dy !== 0) {
+    useCanvasStore.setState({
+      nodes: planned.nextNodes.map((n) => (n.id === frameId ? { ...n, height, width } : n)),
+    });
+    useDrawStore.setState({ strokes: planned.nextStrokes });
+  }
+}
 
 /**
  * The source behind a diagram, shown over the canvas.
@@ -27,6 +62,7 @@ export function DiagramSourceDialog() {
   const closeSource = useDiagramStore((s) => s.closeSource);
   const [draft, setDraft] = useState('');
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
+  const [pending, setPending] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -47,45 +83,91 @@ export function DiagramSourceDialog() {
 
   if (!editingId) return null;
 
-  const redraw = () => {
+  /** Member (transpile) commit — the pre-v0.64 path, now also clearing any
+   *  snapshot: pasting PlantUML over a drawio render must not leave the old
+   *  image behind the new members. One undo restores everything. */
+  const commitMembers = (frame: CanvasNode, extraNotes: Diagnostic[]) => {
     const canvas = useCanvasStore.getState();
-    const frame = canvas.nodes.find((n) => n.id === editingId);
-    if (!frame) return;
-
     const result = applyDiagramScrollFit(frame, rebuildDiagram(frame, draft));
     const notes = result.warning
       ? [...result.diagnostics, { line: 0, severity: 'ignored' as const, message: result.warning }]
       : result.diagnostics;
-    setDiagnostics(notes);
+    setDiagnostics([...extraNotes, ...notes]);
     if (result.contents.length === 0) return;
 
     const oldHeight = frame.height;
-    for (const member of diagramMembers(canvas.nodes, editingId)) canvas.deleteNode(member.id);
+    undoBatchStart(canvas.nodes);
+    for (const member of diagramMembers(canvas.nodes, editingId!)) canvas.deleteNode(member.id);
     for (const content of result.contents) useCanvasStore.getState().addNode(content);
-    useCanvasStore.getState().updateNode(editingId, {
+    const { render: _render, ...dataRest } = frame.data as DiagramNodeData;
+    useCanvasStore.getState().updateNode(editingId!, {
       width: result.frame.width,
       height: result.frame.height,
-      data: { ...(frame.data as DiagramNodeData), source: draft },
+      data: { ...dataRest, source: draft },
     });
-    if (Math.abs(result.frame.height - oldHeight) >= 2) {
-      const page = livePageLike();
-      const planned = planHeightChange(
-        {
-          ...page,
-          nodes: page.nodes.map((n) => (n.id === editingId ? { ...n, height: oldHeight } : n)),
-        },
-        editingId,
-        result.frame.height,
-      );
-      if (planned.ok && planned.dy !== 0) {
-        useCanvasStore.setState({
-          nodes: planned.nextNodes.map((n) =>
-            n.id === editingId ? { ...n, height: result.frame.height, width: result.frame.width } : n,
-          ),
-        });
-        useDrawStore.setState({ strokes: planned.nextStrokes });
-      }
+    reflowFrameHeight(editingId!, oldHeight, result.frame.width, result.frame.height);
+    undoBatchEnd();
+  };
+
+  const redraw = async () => {
+    if (pending) return;
+    const frame0 = useCanvasStore.getState().nodes.find((n) => n.id === editingId);
+    if (!frame0) return;
+
+    if (sniffFormat(draft) !== 'drawio') {
+      commitMembers(frame0, []);
+      return;
     }
+
+    // drawio: exact snapshot by default, transpile as the fallback.
+    setPending(true);
+    let rendered: Awaited<ReturnType<typeof renderDrawioSnapshot>>;
+    try {
+      rendered = await renderDrawioSnapshot(draft);
+    } finally {
+      setPending(false);
+    }
+    // The render awaited the viewer — the frame may be gone by now (deleted,
+    // page switched). Re-fetch by id and abort rather than resurrect it.
+    const canvas = useCanvasStore.getState();
+    const frame = canvas.nodes.find((n) => n.id === editingId);
+    if (!frame) return;
+
+    if (!rendered.ok) {
+      commitMembers(frame, [
+        {
+          line: 0,
+          severity: 'ignored',
+          message: `draw.io renderer unavailable (${rendered.reason}) — drawn with the built-in converter.`,
+        },
+      ]);
+      return;
+    }
+
+    const snapshot = rendered.snapshot;
+    const width = Math.max(FRAME_MIN_W, Math.round(snapshot.naturalWidth + FRAME_PAD * 2));
+    const height = Math.max(
+      FRAME_MIN_H,
+      Math.round(snapshot.naturalHeight + FRAME_TITLE_H + FRAME_PAD * 2),
+    );
+    const scrolls = useWorkspaceStore.getState().getActivePage()?.scrolls;
+    const fitted = fitFrameToScroll({ x: frame.x, y: frame.y, width, height }, scrolls);
+    setDiagnostics(
+      fitted.warning ? [{ line: 0, severity: 'ignored', message: fitted.warning }] : [],
+    );
+
+    const oldHeight = frame.height;
+    undoBatchStart(canvas.nodes);
+    for (const member of diagramMembers(canvas.nodes, editingId!)) canvas.deleteNode(member.id);
+    const nextW = Math.round(fitted.width);
+    const nextH = Math.round(fitted.height);
+    useCanvasStore.getState().updateNode(editingId!, {
+      width: nextW,
+      height: nextH,
+      data: { ...(frame.data as DiagramNodeData), source: draft, render: snapshot },
+    });
+    reflowFrameHeight(editingId!, oldHeight, nextW, nextH);
+    undoBatchEnd();
   };
 
   const errors = diagnostics.filter((d) => d.severity === 'error').length;
@@ -125,8 +207,9 @@ export function DiagramSourceDialog() {
 
         {draftFormat === 'drawio' && (
           <p className="diagram-hint" data-testid="diagram-drawio-hint">
-            Paste XML from diagrams.net, or open a .drawio file. Orthogonal arrows
-            and ports come through; AWS/cisco stencils are skipped by name.
+            Paste XML from diagrams.net, or open a .drawio file. Redraw renders it
+            exactly with the draw.io viewer; without the viewer it falls back to
+            the built-in converter.
           </p>
         )}
 
@@ -177,8 +260,15 @@ export function DiagramSourceDialog() {
             >
               Open file
             </button>
-            <button type="button" className="primary" data-testid="diagram-apply" onClick={redraw}>
-              Redraw
+            <button
+              type="button"
+              className="primary"
+              data-testid="diagram-apply"
+              data-pending={pending ? 'true' : undefined}
+              disabled={pending}
+              onClick={() => void redraw()}
+            >
+              {pending ? 'Rendering…' : 'Redraw'}
             </button>
           </div>
         </footer>

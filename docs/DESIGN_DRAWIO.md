@@ -152,3 +152,53 @@ showcase artifact appended with real screenshots.
 4. **Multi-page: first page + named skip diagnostic** vs one frame per page.
 5. **HTML labels**: strip simple formatting to plain text (proposed) vs refuse
    any HTML-valued label.
+
+---
+
+# Addendum (v0.64): viewer snapshot rendering — spike findings
+
+**Date:** 2026-08-21. The transpile-first approach above remains as fallback and
+explicit escape (`render:'nodes'`), but the default draw.io display becomes an
+exact SVG snapshot rendered by the official viewer (`viewer-static.min.js`,
+4,151,471 bytes raw → 1,161,704 bytes deflate-raw+base64), shipped as an
+extension asset, never part of the base bundle. Full plan: v0.64/v0.65 in
+PLAN.md.
+
+## Spike results (verified on http AND file://, headless Chromium)
+
+| Question | Answer |
+|---|---|
+| Offline execution | **Zero follow-up network requests** once three knobs are set (below). Verified via request listener on both origins. |
+| Render API | `GraphViewer.createViewerForElement(el)` with `data-mxgraph` attr = JSON `{xml, nav:false, resize:false, toolbar:null, 'auto-fit':false}`. Container: imperative `document.body` child, `position:fixed; left:-10000px`, explicit size. First `<svg>` inside is the artwork; set width/height (getBBox fallback), serialize, base64 data URI. |
+| foreignObject | draw.io HTML labels land as `<foreignObject>`; the SVG data URI **loads in `new Image()`, draws to canvas untainted, and re-rasterizes crisply at 3×** in Chromium. No `mxClient.NO_FO`, no PNG fallback needed. |
+| Perf | inflate ≈30 ms + eval ≈150 ms, once per session. Render ≈12 ms warm and cold. Torture SVG ≈10 KB. |
+| Compression | `atob` → `DecompressionStream('deflate-raw')` round-trips the viewer byte-exact (the spike itself ran through it). |
+
+## The three network knobs (all load-bearing)
+
+1. **Before eval:** `window.DRAW_MATH_URL = 'data:text/javascript,//'` — the
+   build tail calls `Editor.initMath()` unconditionally and resolves
+   `DRAW_MATH_URL + '/startup.js'` at call time; the data: comment makes that a
+   no-op. (Math typesetting in labels is therefore off — accepted limitation.)
+2. **Before eval:** define `window.onDrawioViewerLoad = () => {}` — official
+   hook; the bootstrap then skips `GraphViewer.processElements()`, so the
+   viewer never scans the document on its own.
+3. **After eval:** `mxStencilRegistry.dynamicLoading = false` — stencil XMLs
+   (aws4 etc.) are otherwise fetched by **synchronous XHR at render time**
+   (~800 ms stall online, failure offline). Disabled, a library shape renders
+   as its styled box + label: deterministic on- and offline. A vendored
+   stencil-pack extension is a backlog item.
+
+Also observed: `mxStencilRegistry.allowEval = false` is already set by the
+build tail, and HTML labels pass through the bundled DOMPurify
+(`window.DOM_PURIFY_CONFIG`).
+
+## Decision
+
+Store the **SVG data URI as-is** in `DiagramNodeData.render.src`
+(`DiagramRenderSnapshot`). `mxLoadResources/mxLoadStylesheets/mxForceIncludes`
+are additionally set false before eval (standard mxGraph flags). The loader
+executes the inflated source via an injected classic `<script>` element —
+removed synchronously after execution so 4 MB of JS never lands in
+`outerHTML`-based saves — because top-level `var`s must become window globals
+(`new Function` would scope them away).

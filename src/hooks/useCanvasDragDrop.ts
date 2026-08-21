@@ -3,7 +3,8 @@ import type Konva from 'konva';
 import { useCanvasStore } from '../stores/useCanvasStore';
 import { clampCanvasY, liveCeiling } from '../utils/scrollCeiling';
 import { sniffFormat, normalizeDrawioSource, type DiagramFormat } from '../diagram';
-import { placeDiagramOnCanvas } from '../diagram/canvasOps';
+import { placeDiagramOnCanvas, placeDiagramSnapshotOnCanvas } from '../diagram/canvasOps';
+import { renderDrawioSnapshot } from '../diagram/drawioRender';
 import { showToast } from '../components/layout/Toast';
 import { useDiagramStore } from '../stores/useDiagramStore';
 import { embedImage, imageNodeFromEmbed } from '../utils/imageEmbed';
@@ -123,6 +124,29 @@ async function ingestDiagramText(
   opts: { x: number; y: number; title: string; format: Extract<DiagramFormat, 'drawio' | 'svg'> },
 ): Promise<void> {
   const source = opts.format === 'drawio' ? await normalizeDrawioSource(raw) : raw;
+
+  // drawio default (v0.64): exact snapshot via the viewer extension. The
+  // transpiler below stays as the fallback so a drop never dead-ends.
+  if (opts.format === 'drawio') {
+    const rendered = await renderDrawioSnapshot(source);
+    if (rendered.ok) {
+      const result = placeDiagramSnapshotOnCanvas({
+        x: opts.x,
+        y: opts.y,
+        source,
+        title: opts.title,
+        snapshot: rendered.snapshot,
+      });
+      showToast(`Imported “${opts.title}” as a draw.io render`, 'success');
+      if (result.warning) showToast(result.warning, 'info');
+      return;
+    }
+    showToast(
+      `draw.io renderer unavailable (${rendered.reason}) — rendered with the built-in converter.`,
+      'info',
+    );
+  }
+
   const result = placeDiagramOnCanvas({
     x: opts.x,
     y: opts.y,

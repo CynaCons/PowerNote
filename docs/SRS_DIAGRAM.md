@@ -198,7 +198,7 @@ dialog never shows a base64 blob.
 | REQ-DIAG-121 | An orthogonal edge carrying explicit `mxPoint` waypoints shall decompose into consecutive 2-point `line`/`arrow` segments. Only the final segment shall carry the arrowhead. An edge label — the edge's own `value`, or a child label cell when the edge has none — shall land as a TextNode at the midpoint of the longest segment | Must | T147 |
 | REQ-DIAG-122 | A `startArrow` of `classic` is accepted only when `endArrow` is `none`: the point list shall be reversed so the single available head sits at the source. `startArrow=classic` together with any end head shall be refused (the canvas has no double-headed primitive). Any other start head (`diamond`, and the rest by name) shall be refused | Must | T147 |
 | REQ-DIAG-123 | `curved=1` shall be refused. `rounded=1` on a waypointed edge shall be refused (filleted corners have no canvas equivalent). A router `edgeStyle` without explicit waypoints shall be refused, and the diagnostic shall say to make the waypoints explicit. Each refusal shall name the construct; the transpiler shall never throw; cells that were not refused shall still be emitted. `rounded=1` on a 2-point edge shall be accepted as a no-op | Must | T147 |
-| REQ-DIAG-124 | `create_diagram` with `format: 'drawio'` shall draw a diagram frame whose members are the transpiled native nodes, whose `elementCount` matches the member count, and whose `data.source` is the supplied XML. The agent-facing tool is `create_diagram_drawio`, routed onto that one command | Must | T147 |
+| REQ-DIAG-124 | `create_diagram` with `format: 'drawio'` and `render: 'nodes'` (or under viewer-extension fallback) shall draw a diagram frame whose members are the transpiled native nodes, whose `elementCount` matches the member count, and whose `data.source` is the supplied XML. The agent-facing tool is `create_diagram_drawio`, routed onto that one command. *(Amended v0.64: the default render mode is `snapshot` — see REQ-DIAG-149/150; this member contract applies to the explicit `render:'nodes'` escape and the fallback.)* | Must | T147 |
 | REQ-DIAG-125 | A compressed (base64+raw-deflate) source passed to `create_diagram` shall succeed, and the stored `data.source` shall be the readable uncompressed XML (opening with `<mxfile` or `<mxGraphModel`), never the base64 payload. Normalization shall run before the source is stored | Must | T147 |
 | REQ-DIAG-126 | A declared `format: 'drawio'` contradicted by a source that sniffs as Mermaid shall be refused with the mismatch error, naming the language the source is actually in — the same contract as the other named tools | Must | T147 |
 
@@ -211,7 +211,7 @@ real `.svg` files (`image/svg+xml`) and rasterising them.
 
 | ID | Description | Priority | Test Ref |
 |----|-------------|----------|----------|
-| REQ-DIAG-127 | Dropping a `.drawio` file, or an `.xml` file whose text sniffs as mxGraph, shall create a diagram frame at the drop point (canvas coordinates). Pasting mxGraph XML text shall create a frame at the viewport centre. The stored `data.source` shall be the readable uncompressed XML — `normalizeDrawioSource` runs before the source is stored, same contract as REQ-DIAG-125. The frame title is the filename without its extension (paste uses `Diagram`) | Must | T148 |
+| REQ-DIAG-127 | Dropping a `.drawio` file, or an `.xml` file whose text sniffs as mxGraph, shall create a diagram frame at the drop point (canvas coordinates). Pasting mxGraph XML text shall create a frame at the viewport centre. The stored `data.source` shall be the readable uncompressed XML — `normalizeDrawioSource` runs before the source is stored, same contract as REQ-DIAG-125. The frame title is the filename without its extension (paste uses `Diagram`). *(Amended v0.64: the frame is a snapshot render by default — REQ-DIAG-149/150; transpiled members only on fallback.)* | Must | T148, T175 |
 | REQ-DIAG-128 | Dropping a `.svg` file (or a file whose MIME is `image/svg+xml`) shall create a diagram frame of native shape/text members via the existing SVG pipeline (`format: 'svg'`), not an image node. This is a deliberate behaviour change: those files previously matched `image/*` and landed as an opaque raster. Pasted SVG *text* follows the same native-node path; a pasted `image/*` item, including a rasterised SVG, is unchanged | Must | T148 |
 | REQ-DIAG-129 | Non-diagram files (a `.png` among them) shall still follow the existing image drop/paste path. The on-frame format badge shall show the human label from `FORMAT_LABEL` (`draw.io`, not the raw id `drawio`), and that label shall agree with the selection-toolbar source button | Must | T148 |
 
@@ -226,7 +226,7 @@ not a dirty flag.
 
 | ID | Description | Priority | Test Ref |
 |----|-------------|----------|----------|
-| REQ-DIAG-130 | A diagram frame whose stored source sniffs as draw.io, and whose current members match a re-transpile of that source (same count, geometry within 0.5 px, same fills and strokes), shall export the stored XML unchanged. The match is a comparison, not a dirty flag — moving a member and moving it back shall restore the verbatim path | Must | T149 |
+| REQ-DIAG-130 | A diagram frame whose stored source sniffs as draw.io, and whose current members match a re-transpile of that source (same count, geometry within 0.5 px, same fills and strokes), shall export the stored XML unchanged. The match is a comparison, not a dirty flag — moving a member and moving it back shall restore the verbatim path. *(Amended v0.64: a snapshot frame — `data.render` present — always exports its stored source verbatim; there are no members to compare. See REQ-DIAG-153.)* | Must | T149, T180 |
 | REQ-DIAG-131 | Any other diagram frame or flat group shall export by reverse-mapping its members to a well-formed `<mxfile><diagram><mxGraphModel>` document. Geometry shall be translated so the export origin is (0, 0). Lines and arrows shall become floating edges (explicit endpoint `mxPoint`s; no source/target resolution). Re-transpiling the exported XML shall recover the same node set (count, geometry ±0.5 px, fills) | Must | T149 |
 | REQ-DIAG-132 | Style shall survive the mapped path: `cornerRadius` shall become `rounded=1` plus `arcSize`; a non-empty `strokeDash` shall become `dashed=1` plus `dashPattern`; `rotation` on a rectangle shall be preserved through export then import | Must | T149 |
 | REQ-DIAG-133 | An `arc` (the UML socket) has no portable draw.io built-in (`shape=arc` / `mxgraph.basic.arc` only render when the matching stencil library is loaded). It shall be exported as an `ellipse` with `fillColor=none` and named in the export report. The exporter shall never throw | Must | T149 |
@@ -284,8 +284,21 @@ arrows) and drops the `.drawio` file here.
 | REQ-DIAG-144 | An orthogonal / routed edge (`edgeStyle=orthogonalEdgeStyle` and kin) without stored waypoints shall be routed from `exitX`/`exitY`/`entryX`/`entryY` when present, otherwise from box-edge to box-edge, as an L or Z of straight segments. It shall not be refused. An `ignored` diagnostic shall name that it was routed | Must | T166, T147 |
 | REQ-DIAG-145 | `shape=module` / UML component shall draw as a rectangle with two tabs on the left edge. `shape=port` shall draw as a small rectangle. Box-like `mxgraph.uml.*` / `mxgraph.basic.*` shapes shall draw as rectangles with an `ignored` diagnostic naming the stencil. AWS/cisco/mscae image stencils remain refused | Must | T166 |
 | REQ-DIAG-146 | Simple HTML in a label (`<br>`, `<div>`, `<font>`, `<b>`, `<span>`) shall be stripped and the words kept, with an `ignored` diagnostic. Empty leftover markup is still refused | Must | T146 |
-| REQ-DIAG-147 | Drop/paste of `.drawio`, `.dio`, `.drawio.xml` shall import at the drop point (or viewport centre). A short toast shall report mark count and skip/note counts. If any diagnostic fired, the source dialog shall open on that frame | Must | T148 |
+| REQ-DIAG-147 | Drop/paste of `.drawio`, `.dio`, `.drawio.xml` shall import at the drop point (or viewport centre). A short toast shall report the outcome — for a snapshot render, that it was imported as a draw.io render; for the transpile fallback, mark count and skip/note counts. If any transpile diagnostic fired, the source dialog shall open on that frame. *(Amended v0.64: snapshot is the default; the toast never reads "0 marks" for a successful snapshot.)* | Must | T148, T175 |
 | REQ-DIAG-148 | The diagram source dialog shall offer Open file (`.drawio` / `.xml` / `.svg`), show a draw.io-specific hint when the draft sniffs as draw.io, and list at most eight diagnostics with a "+N more" remainder | Should | T166 |
+
+### draw.io viewer snapshot rendering (v0.64)
+
+| ID | Description | Priority | Test Ref |
+|----|-------------|----------|----------|
+| REQ-DIAG-149 | A draw.io source shall by default be rendered by the embedded draw.io viewer (extension asset, offline, zero follow-up network requests) into an exact SVG snapshot stored on `DiagramNodeData.render` (`{src: data URI, naturalWidth, naturalHeight, renderer, rendererVersion, at}`). The snapshot data URI shall load as an image and draw to canvas untainted | Must | T174 |
+| REQ-DIAG-150 | Snapshot placement shall succeed with zero member nodes on every entry point — drop/paste, bridge `create_diagram(_drawio)`, and the source-dialog Redraw — reporting `renderMode: 'snapshot'` and `elementCount: 0` without error. Bridge results shall never serialize `render` (summaries/details stay within the read budget) | Must | T175, T176, T177 |
+| REQ-DIAG-151 | When the viewer extension is unavailable, every draw.io entry point shall fall back to the native-node transpiler and say so (toast / `warnings` / diagnostic) — a drop or agent call never dead-ends. `render:'nodes'` on the bridge forces the transpile path deliberately | Must | T178 |
+| REQ-DIAG-152 | `fit_diagram` / "Fit to scroll width" on a snapshot frame shall scale the frame box to the band (grow and shrink, 0.45 floor, same rules as member fit) with the image following the frame | Must | T179 |
+| REQ-DIAG-153 | Exporting a snapshot frame as `.drawio` shall emit the stored source verbatim — never an empty mxfile. Loose nodes inside the frame group are reported, not exported | Must | T180 |
+| REQ-DIAG-154 | Double-clicking a snapshot frame shall open the source dialog (not group isolation). The dialog's Redraw shall be async with a visible pending state, shall re-resolve the frame after the render and abort if it was deleted, and shall clear `render` when a non-draw.io source is drawn over a snapshot | Must | T177 |
+| REQ-DIAG-155 | *(v0.65)* A context-menu "Convert to editable nodes" on a snapshot frame shall transpile the stored source into member nodes, delete `render`, and be one undo | Must | T185 |
+| REQ-DIAG-156 | Page and notebook search shall match diagram frames on their title and stored source text, so a snapshot diagram's labels (which live in the XML) remain findable | Should | T177 |
 
 ### Activity and swimlane diagrams (v0.35.1)
 
@@ -409,6 +422,13 @@ Two additions to `ShapeNodeData` are required before the notation above can be r
 | T149 | REQ-DIAG-130..135 |
 | T166 | REQ-DIAG-143..148 |
 | T151 | REQ-DIAG-136..139 |
+| T174 | REQ-DIAG-149 |
+| T175 | REQ-DIAG-127, 147, 149, 150 |
+| T176 | REQ-DIAG-124, 150 |
+| T177 | REQ-DIAG-154, 156 |
+| T178 | REQ-DIAG-151 |
+| T179 | REQ-DIAG-152 |
+| T180 | REQ-DIAG-130, 153 |
 | T125 | REQ-DIAG-070..076 |
 | T126 | REQ-DIAG-090..098 |
 | test:bridge | REQ-DIAG-099 |

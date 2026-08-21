@@ -43,8 +43,11 @@ import {
   diagramMembers,
   diagramSourceOf,
   fitExistingDiagram,
+  isSnapshotDiagram,
   placeDiagramOnCanvas,
+  placeDiagramSnapshotOnCanvas,
 } from '../diagram/canvasOps';
+import { renderDrawioSnapshot } from '../diagram/drawioRender';
 import { sniffFormat, normalizeDrawioSource } from '../diagram';
 import { A4_WIDTH } from '../utils/pageLayout';
 import { contentBelongsToScroll, pageUsesColumnFlow, scrollById, strokeBelongsToScrollBand } from '../utils/scrolls';
@@ -317,6 +320,7 @@ function summariseDiagram(
     id: frame.id,
     title: diagramTitleOf(frame),
     format: sniffFormat(source),
+    ...(isSnapshotDiagram(frame) ? { renderMode: 'snapshot' as const } : {}),
     memberCount: diagramMembers(nodes, frame.id).length,
     bounds: { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
     ...(withSource ? { source } : {}),
@@ -1880,6 +1884,7 @@ function readDiagramCmd(params: Record<string, unknown>): DiagramDetail {
       width: found.node.width,
       height: found.node.height,
     },
+    ...(isSnapshotDiagram(found.node) ? { renderMode: 'snapshot' as const } : {}),
     memberCount: allMembers.length,
     members: windowed.items,
   };
@@ -2327,6 +2332,13 @@ async function createDiagram(params: Record<string, unknown>): Promise<CreateDia
     );
   }
   const format = declared as DiagramSourceFormat | undefined;
+  const renderParam = optionalString(params, 'render');
+  if (renderParam !== undefined && renderParam !== 'snapshot' && renderParam !== 'nodes') {
+    throw new BridgeCommandError(
+      'BAD_PARAMS',
+      `"${renderParam}" is not a render mode. Valid values: snapshot, nodes.`,
+    );
+  }
   const sniffed = sniffFormat(source);
   // Stored source is always readable XML: inflate before build and before
   // writing data.source, so the redraw dialog never shows a base64 blob.
@@ -2335,17 +2347,32 @@ async function createDiagram(params: Record<string, unknown>): Promise<CreateDia
   const { section, page } = resolvePage(optionalString(params, 'pageId'));
   const column = resolveColumn(params, page);
 
+  // Snapshot is the drawio default (v0.64); `render:'nodes'` is the explicit
+  // escape back to transpiled members. The render happens BEFORE the placement
+  // coordinates are read — it awaits the viewer, and a Y computed ahead of
+  // that await could go stale against a concurrent edit.
+  const wantsSnapshot =
+    sniffFormat(text) === 'drawio' &&
+    (format === undefined || format === 'drawio') &&
+    renderParam !== 'nodes';
+  let snapshotFailure: string | null = null;
+  let snapshot = null as Awaited<ReturnType<typeof renderDrawioSnapshot>> | null;
+  if (wantsSnapshot) {
+    snapshot = await renderDrawioSnapshot(text);
+    if (!snapshot.ok) snapshotFailure = snapshot.reason;
+  }
+
   navigateToPage(section.id, page.id);
 
   // Placed below whatever is already in that column, like an appended block.
   const nodes = useCanvasStore.getState().nodes;
-  const placed = placeDiagramOnCanvas({
-    x: columnX(column, page.scrolls),
-    y: nextBlockY(nodes, column, page.scrolls),
-    source: text,
-    title,
-    format,
-  });
+  const x = columnX(column, page.scrolls);
+  const y = nextBlockY(nodes, column, page.scrolls);
+
+  const placed =
+    snapshot?.ok === true
+      ? placeDiagramSnapshotOnCanvas({ x, y, source: text, title, snapshot: snapshot.snapshot })
+      : placeDiagramOnCanvas({ x, y, source: text, title, format });
   if (!placed.placed) {
     throw new BridgeCommandError(
       'PRECONDITION',
@@ -2354,6 +2381,13 @@ async function createDiagram(params: Record<string, unknown>): Promise<CreateDia
   }
   flush();
 
+  const warnings = placed.warning ? [placed.warning] : [];
+  if (snapshotFailure) {
+    warnings.push(
+      `draw.io renderer unavailable (${snapshotFailure}) — rendered with the built-in transpiler instead (renderMode 'nodes').`,
+    );
+  }
+
   return {
     sectionId: section.id,
     pageId: page.id,
@@ -2361,11 +2395,12 @@ async function createDiagram(params: Record<string, unknown>): Promise<CreateDia
     title,
     format: format ?? sniffFormat(text),
     column,
+    renderMode: placed.renderMode,
     elementCount: placed.elementCount,
     width: placed.width,
     height: placed.height,
     diagnostics: placed.diagnostics,
-    warnings: placed.warning ? [placed.warning] : [],
+    warnings,
   };
 }
 

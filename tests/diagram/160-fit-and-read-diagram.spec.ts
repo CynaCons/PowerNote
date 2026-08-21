@@ -129,10 +129,12 @@ test.describe('160 - read_diagram + fit_diagram (REQ-AGENT-056, REQ-DIAG-142)', 
   });
 
   test('fit_diagram scales DOWN with the 0.45 floor on a narrow band', async ({ page }) => {
+    // render:'nodes' — member fit under test; snapshot fit is T179's subject.
     const drawn = await runBridge(page, 'create_diagram', {
       source: WIDE,
       title: 'Shrink me',
       format: 'drawio',
+      render: 'nodes',
     });
     const placed = (await getCanvasStore(page)).nodes.find((n: any) => n.id === drawn.diagramId);
     const placedWidth = placed.width;

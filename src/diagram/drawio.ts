@@ -1259,11 +1259,12 @@ export function transpileDrawio(source: string, options: TranspileDrawioOptions)
 // ── Compression ─────────────────────────────────────────────
 
 /**
- * draw.io stores a page as URI-encoded XML, raw-deflated, then base64. The
- * inflated bytes are a mix of `%XX` for reserved ASCII and raw UTF-8 for
- * everything else, which is why `decodeURIComponent` runs after inflate.
+ * base64 → deflate-raw → UTF-8 text, and nothing else. Exported since v0.64:
+ * the extension loader inflates the vendored viewer JS through this, and JS
+ * must NOT go through decodeURIComponent — a `%` there is an operator, not an
+ * escape. Never throws; null means "not inflatable here".
  */
-async function inflateRawBase64(payload: string): Promise<string | null> {
+export async function inflateRawBase64(payload: string): Promise<string | null> {
   try {
     const compact = payload.replace(/\s+/g, '');
     if (!compact) return null;
@@ -1272,14 +1273,24 @@ async function inflateRawBase64(payload: string): Promise<string | null> {
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
     const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-    const inflated = await new Response(stream).text();
-    try {
-      return decodeURIComponent(inflated);
-    } catch {
-      return inflated;
-    }
+    return await new Response(stream).text();
   } catch {
     return null;
+  }
+}
+
+/**
+ * draw.io stores a page as URI-encoded XML, raw-deflated, then base64. The
+ * inflated bytes are a mix of `%XX` for reserved ASCII and raw UTF-8 for
+ * everything else, which is why `decodeURIComponent` runs after inflate.
+ */
+async function inflateDrawioPayload(payload: string): Promise<string | null> {
+  const inflated = await inflateRawBase64(payload);
+  if (inflated == null) return null;
+  try {
+    return decodeURIComponent(inflated);
+  } catch {
+    return inflated;
   }
 }
 
@@ -1317,7 +1328,7 @@ export async function normalizeDrawioSource(source: string): Promise<string> {
     for (const diagram of diagrams) {
       if (!looksCompressed(diagram)) continue;
       const payload = (diagram.textContent ?? '').trim();
-      const xml = await inflateRawBase64(payload);
+      const xml = await inflateDrawioPayload(payload);
       if (xml == null) continue;
       replaceDiagramPayload(doc, diagram, xml);
       changed = true;

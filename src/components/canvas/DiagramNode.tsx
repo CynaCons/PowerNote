@@ -1,8 +1,8 @@
-import { useRef } from 'react';
-import { Group, Rect, Text } from 'react-konva';
+import { useEffect, useRef, useState } from 'react';
+import { Group, Image as KonvaImage, Rect, Text } from 'react-konva';
 import { Html } from 'react-konva-utils';
 import type Konva from 'konva';
-import type { CanvasNode, DiagramNodeData } from '../../types/data';
+import type { CanvasNode, DiagramNodeData, DiagramRenderSnapshot } from '../../types/data';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useToolStore } from '../../stores/useToolStore';
 import { useGroupStore } from '../../stores/useGroupStore';
@@ -10,7 +10,7 @@ import { useDrawStore } from '../../stores/useDrawStore';
 import { useDiagramStore } from '../../stores/useDiagramStore';
 import { isNodeInteractive } from '../../utils/toolConfig';
 import { multiDragStart, multiDragMove, multiDragEnd } from '../../utils/multiDrag';
-import { FRAME_TITLE_H } from '../../diagram/canvasOps';
+import { FRAME_PAD, FRAME_TITLE_H } from '../../diagram/canvasOps';
 import { sniffFormat } from '../../diagram';
 import { FORMAT_LABEL } from '../../diagram/formatLabels';
 import type { SnapLine } from './SnapGuides';
@@ -22,6 +22,60 @@ interface DiagramNodeProps {
   onSelect: (id: string, additive: boolean) => void;
   stageScale: number;
   onSnapChange: (lines: SnapLine[]) => void;
+}
+
+/**
+ * Snapshot artwork inside the frame's content box, aspect-fitted and centred.
+ * Sized from the FRAME, not the snapshot — "Fit to scroll width" resizes the
+ * frame and the image must follow. Same hand-rolled loader as ImageNode: the
+ * SVG data URI re-rasterizes crisply at any zoom (spike-verified).
+ */
+function SnapshotImage({
+  render,
+  frameWidth,
+  frameHeight,
+}: {
+  render: DiagramRenderSnapshot;
+  frameWidth: number;
+  frameHeight: number;
+}) {
+  const [image, setImage] = useState<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    const img = new window.Image();
+    img.onload = () => setImage(img);
+    img.onerror = () => setImage(null);
+    img.src = render.src;
+    return () => {
+      img.onload = null;
+      img.onerror = null;
+    };
+  }, [render.src]);
+
+  const boxW = Math.max(0, frameWidth - FRAME_PAD * 2);
+  const boxH = Math.max(0, frameHeight - FRAME_TITLE_H - FRAME_PAD * 2);
+  if (boxW <= 0 || boxH <= 0) return null;
+  const scale = Math.min(boxW / Math.max(1, render.naturalWidth), boxH / Math.max(1, render.naturalHeight));
+  const w = render.naturalWidth * scale;
+  const h = render.naturalHeight * scale;
+  const x = FRAME_PAD + (boxW - w) / 2;
+  const y = FRAME_TITLE_H + FRAME_PAD + (boxH - h) / 2;
+
+  if (!image) {
+    return (
+      <Rect
+        x={x}
+        y={y}
+        width={w}
+        height={h}
+        stroke="#C3CBC9"
+        strokeWidth={1}
+        dash={[6, 4]}
+        listening={false}
+      />
+    );
+  }
+  return <KonvaImage image={image} x={x} y={y} width={w} height={h} listening={false} />;
 }
 
 /**
@@ -56,6 +110,12 @@ export function DiagramNode({ node, isSelected, onSelect, stageScale, onSnapChan
 
   const handleDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
+    // A snapshot frame has no members — isolation would dim the page around
+    // nothing editable. The source dialog is what "open this diagram" means.
+    if (data.render) {
+      useDiagramStore.getState().openSource(node.id);
+      return;
+    }
     useGroupStore.getState().enterIsolation(node.id);
     useCanvasStore.setState({ selectedNodeIds: [node.id] });
     useDrawStore.getState().selectStrokes([]);
@@ -98,6 +158,9 @@ export function DiagramNode({ node, isSelected, onSelect, stageScale, onSnapChan
         {/* Title band */}
         <Rect width={node.width} height={FRAME_TITLE_H} fill="#F3F5F4" cornerRadius={[8, 8, 0, 0]} />
         <Rect y={FRAME_TITLE_H} width={node.width} height={1} fill="#DCE1E0" />
+        {data.render && (
+          <SnapshotImage render={data.render} frameWidth={node.width} frameHeight={node.height} />
+        )}
         <Text
           x={14}
           y={FRAME_TITLE_H / 2 - 7}

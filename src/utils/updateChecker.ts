@@ -2,7 +2,7 @@ import type { WorkspaceData } from '../types/data';
 import { isFSASupported, writeToHandle, verifyPermission } from './fileSystemAccess';
 import { getCurrentHandle } from './fileHandleStore';
 
-const GITHUB_REPO = 'CynaCons/PowerNote';
+export const GITHUB_REPO = 'CynaCons/PowerNote';
 const ASSET_NAME = 'PowerNote.html';
 
 /**

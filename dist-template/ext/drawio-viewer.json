@@ -1,0 +1,10 @@
+{
+  "name": "drawio-viewer",
+  "drawioVersion": "31.3.1",
+  "tag": "v31.3.1",
+  "rawBytes": 4151471,
+  "b64Bytes": 1161704,
+  "sha256": "fd1b4159cb3a462aee97eabda803fdec09bcdd460a9f1a9280776ee708f1c2ac",
+  "source": "https://raw.githubusercontent.com/jgraph/drawio/v31.3.1/src/main/webapp/js/viewer-static.min.js",
+  "license": "Apache-2.0 (see drawio-viewer.LICENSE.txt)"
+}

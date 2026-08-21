@@ -6,7 +6,7 @@ import { useDiagramStore } from '../../stores/useDiagramStore';
 import { getGroupMembers } from '../../utils/groups';
 import { sniffFormat } from '../../diagram';
 import { FORMAT_LABEL } from '../../diagram/formatLabels';
-import { diagramSourceOf } from '../../diagram/canvasOps';
+import { diagramSourceOf, isSnapshotDiagram } from '../../diagram/canvasOps';
 import type { CanvasNode } from '../../types/data';
 
 /**
@@ -20,6 +20,7 @@ import type { CanvasNode } from '../../types/data';
 export type GroupControls =
   | { mode: 'editing'; groupId: string; frame: CanvasNode | null }
   | { mode: 'enter'; groupId: string; node: CanvasNode }
+  | { mode: 'snapshot'; node: CanvasNode }
   | null;
 
 export function useGroupControls(): GroupControls {
@@ -46,6 +47,10 @@ export function useGroupControls(): GroupControls {
   const node = nodes.find((n) => n.id === selectedNodeIds[0]);
   const groupId = node?.groupId;
   if (!node || !groupId) return null;
+
+  // A snapshot diagram is a group of one BY DESIGN (v0.64) — there is nothing
+  // to step into, but the source button must stay reachable from the toolbar.
+  if (isSnapshotDiagram(node)) return { mode: 'snapshot', node };
 
   // A group of one is the frame by itself — nothing to step into.
   const members = getGroupMembers(groupId, nodes, strokes);
@@ -101,6 +106,14 @@ export function GroupToolbar() {
           <Check size={15} />
           <span>Done</span>
         </button>
+      </div>
+    );
+  }
+
+  if (controls.mode === 'snapshot') {
+    return (
+      <div className="group-toolbar" data-testid="toolbar-group-segment" data-mode="snapshot">
+        <SourceButton frame={controls.node} />
       </div>
     );
   }

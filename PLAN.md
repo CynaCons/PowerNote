@@ -1282,7 +1282,7 @@
 - [x] delete_diagram closes the gap below the frame (same planner as delete_block)
 - [x] T110: chained update+insert with no wait; insert after frame id; delete_diagram packs
 - [x] Bump APP_VERSION 0.61.1, rebuild dist-template, full suite, commit, tag, push
-### v0.62.0 — Scroll title chrome (current) (ACTIVE)
+### v0.62.0 — Scroll title chrome
 > Visual prototype of the scroll header, rendered in the real canvas (not a mock).
 **Goal:** One TINT bar for rest and pin: 16px INK, RULE hairline, opaque strip tall enough that body text cannot collide. Rename uses INK/RULE. Active scroll is a left tick, not ACCENT.
 - [x] One TINT bar rest+pin, 16px INK, RULE hairline, 32px strip, left tick for active
@@ -1304,6 +1304,23 @@
 ### v0.63.1 — Fix the reload-broadcast test flake behind the failed v0.63.0 release
 **Goal:** Two v0.63.0 release attempts failed on different tests (T151, then T82) with one signature: "Execution context was destroyed by a navigation". Reproduced with a cold vite cache: tests write notebook .html fixtures into tests/ mid-run, vite's watcher full-reloads EVERY connected page on any .html change, and whichever unrelated test is mid-evaluate dies. server.watch.ignored now excludes tests/, test-results/ and playwright-report/. Verified cold-cache: 705/705 with zero reload broadcasts (six before the fix). This flake was invisible since v0.55 because v0.56-v0.61 CI runs hung in playwright install (now fenced by the 25-minute job timeout) and never reached the tests.
 - [x] vite.config.ts server.watch.ignored for tests/, test-results/, playwright-report/ — cold-cache full suite 705/705 with zero page-reload broadcasts
+### v0.64.0 — draw.io exact rendering — viewer snapshot pipeline (2026-08-21 · 721/721 green · showcase: https://claude.ai/code/artifact/4c2ad40c-746e-4cf2-9e2d-765e61c6429b) (COMPLETE)
+**Goal:** Replace transpile-as-default for draw.io with an exact vector snapshot rendered by the bundled draw.io viewer; transpiler remains fallback + explicit escape (render:'nodes'). Full plan: ~/.claude/plans/idempotent-bubbling-newt.md
+- [x] Spike: viewer-static.min.js headless offline render (http + file://), foreignObject/taint decision, findings appended to docs/DESIGN_DRAWIO.md
+- [x] Vendor asset: scripts/vendor-drawio-viewer.mjs → public/ext/drawio-viewer.b64 + manifest + LICENSE
+- [x] Loader + renderer: src/extensions/{types,drawioViewer}.ts, src/diagram/drawioRender.ts
+- [x] Snapshot data model + display + placement/fit: types/data.ts render field, DiagramNode image, placeDiagramSnapshotOnCanvas, fitFrameToScroll, fitExistingDiagram snapshot branch, undo batching
+- [x] Entry points async snapshot: drop/paste funnel, bridge create_diagram (+render param, stale-Y guard), source dialog async redraw (pending + stale-frame guard), protocol renderMode
+- [x] Export short-circuit, search title+source, bridge renderMode summaries, MCP descriptions, useTextPlacement undo-batch drive-by fix
+- [x] SRS amendments (REQ-DIAG-124/127/130/147) + new REQ-DIAG-149..156; update existing tests T147/148/151/160/162/166
+- [x] New tests 174-180 (render, ingest, bridge, dialog, fallback, fit, export); full suite green; smoke test; showcase artifact
+### v0.65.0 — draw.io extension — install, embed, carry-through
+**Goal:** Make the viewer a per-notebook extension like the user proposed: IndexedDB cache + Settings install flow, embed as a text/plain base64 block in the notebook HTML, re-inject on every save (dev refetches the template!) and carry through app updates (buildUpdatedHtml currently strips everything but powernote-data). Plus Convert-to-editable-nodes. Full plan: ~/.claude/plans/idempotent-bubbling-newt.md
+- [ ] extensionStore.ts (IndexedDB powernote-extensions), installDrawioViewer, useExtensionStore; loader tiers memory → DOM block → opened-file HTML → IDB → network; harvest powernote-ext-* blocks on notebook open (extractDataFromHtml callers)
+- [ ] embed.ts injectExtensionBlocks (idempotent replace-by-id, text/plain base64); buildExportHtml re-injects from accessor; buildUpdatedHtml(templateHtml, workspace, extensions?) + performUpdate collectExtensions dep + SettingsPanel update call carries (REQ-UPDATE-031)
+- [ ] SettingsPanel Extensions section (install/installed/failed states, size + license note); update v0.64 fallback copy to point at Settings → Extensions
+- [ ] ContextMenu "Convert to editable nodes" (transpile, delete render, one undo) — REQ-DIAG-155
+- [ ] Tests 181-185 (install flow, embed-save exactly-once, update carry, standalone offline boot, convert) + REQ-SETTINGS-018/019, REQ-UPDATE-031; full suite green; smoke; showcase artifact
 ## Future (Backlog)
 > Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 
@@ -1320,3 +1337,5 @@ See `docs/VISION.md` for deferred post-MVP items (cloud sync, collaboration, pai
 - **Image Export (PNG/SVG)** — Export the current page as PNG via Konva `Stage.toDataURL`, with configurable resolution/scale; optional SVG export for vector quality. Moved from PLAN v0.14.1 on 2026-08-11, unstarted — no `toDataURL`/`toBlob` call exists anywhere in `src/`
 - **Print Support** — Ctrl+P triggering browser print with print CSS that hides the nav rail, toolbar and hierarchy panel, and lays content out for A4. Moved from PLAN v0.14.2 on 2026-08-11, unstarted — no `@media print` block and no `window.print` call exist
 - update_diagram bridge tool (redraw an existing diagram's source without the UI dialog) — scoped in v0.34.0, never built, implied by the field-feedback pattern (create-only diagrams); pairs with read_diagram from v0.54
+- draw.io rendering rework: replace transpile-to-native-nodes as the default display with a bundled draw.io viewer render (offline, self-hosted viewer-static.min.js → SVG snapshot in the diagram frame); keep transpiler as optional "convert to editable nodes". Evaluation done 2026-08-21, direction awaiting user decision.
+- Stencil-pack extension: vendor common drawio stencil XMLs (aws4, azure, cisco) so mxStencilRegistry can resolve library icons offline (v0.64 renders them as styled box + label, dynamicLoading=false). Also: math typesetting in drawio labels is disabled offline (DRAW_MATH_URL no-op) — could ship MathJax as an extension later.

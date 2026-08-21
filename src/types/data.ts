@@ -74,11 +74,31 @@ export interface GanttNodeData {
  * move and delete, and its contents stay individually editable underneath.
  * Membership is derived from groupId, never stored.
  */
+/**
+ * Rendered snapshot of a diagram, produced by an extension renderer (v0.64+).
+ * A frame carrying one displays the image and owns no member nodes; the
+ * stored `source` remains the editable truth and the export payload.
+ */
+export interface DiagramRenderSnapshot {
+  /** data:image/svg+xml;base64,... or data:image/png;base64,... — never a URL. */
+  src: string;
+  /** CSS px of the rendered artwork (aspect source of truth). */
+  naturalWidth: number;
+  naturalHeight: number;
+  renderer: 'drawio-viewer';
+  /** Upstream version of the renderer asset (drawio release). */
+  rendererVersion: string;
+  /** Epoch ms of the render. */
+  at: number;
+}
+
 export interface DiagramNodeData {
   /** Source text this diagram was built from — PlantUML, Mermaid, SVG or draw.io. */
   source: string;
   /** Title shown on the frame band. */
   title: string;
+  /** Present ⇔ this frame displays a snapshot and has zero member nodes. */
+  render?: DiagramRenderSnapshot;
 }
 
 export type NodeData =
