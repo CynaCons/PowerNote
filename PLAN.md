@@ -1301,6 +1301,9 @@
 - [x] Chunk 4: Agent bridge insert_image (REQ-AGENT-068, T171) — MCP tool + insertImageCmd + tests/agent/171-insert-image.spec.ts [agent: chunk4-insert-image]
 - [x] Chunk 5: read_page images[] + read_image export (REQ-AGENT-069/070, T172) — compact images index in default include, budget trim with imagesTruncated, MCP decode-to-file, never the payload
 - [x] One resize widget per image (user feedback 2026-08-20): a single selected image shall not attach to the generic SelectionTransformer — its own aspect-locked corner handles are the only resize affordance; shapes/text/multi-select unchanged (REQ-IMAGE-024, T173)
+### v0.63.1 — Fix the reload-broadcast test flake behind the failed v0.63.0 release
+**Goal:** Two v0.63.0 release attempts failed on different tests (T151, then T82) with one signature: "Execution context was destroyed by a navigation". Reproduced with a cold vite cache: tests write notebook .html fixtures into tests/ mid-run, vite's watcher full-reloads EVERY connected page on any .html change, and whichever unrelated test is mid-evaluate dies. server.watch.ignored now excludes tests/, test-results/ and playwright-report/. Verified cold-cache: 705/705 with zero reload broadcasts (six before the fix). This flake was invisible since v0.55 because v0.56-v0.61 CI runs hung in playwright install (now fenced by the 25-minute job timeout) and never reached the tests.
+- [x] vite.config.ts server.watch.ignored for tests/, test-results/, playwright-report/ — cold-cache full suite 705/705 with zero page-reload broadcasts
 ## Future (Backlog)
 > Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 

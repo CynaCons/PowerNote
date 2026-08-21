@@ -26,4 +26,14 @@ export default defineConfig({
   resolve: {
     dedupe: ['react', 'react-dom', 'react-reconciler'],
   },
+  server: {
+    watch: {
+      // Playwright tests write notebook .html fixtures into tests/ mid-run.
+      // Vite full-reloads EVERY connected page on any watched .html change,
+      // which kills whichever unrelated test is mid-evaluate ("Execution
+      // context was destroyed") — the T82/T151 CI flakes. Serving these
+      // paths is unaffected; only the watcher ignores them.
+      ignored: ['**/tests/**', '**/test-results/**', '**/playwright-report/**'],
+    },
+  },
 })
