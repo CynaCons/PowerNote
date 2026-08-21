@@ -429,6 +429,7 @@ Two additions to `ShapeNodeData` are required before the notation above can be r
 | T178 | REQ-DIAG-151 |
 | T179 | REQ-DIAG-152 |
 | T180 | REQ-DIAG-130, 153 |
+| T185 | REQ-DIAG-155 |
 | T125 | REQ-DIAG-070..076 |
 | T126 | REQ-DIAG-090..098 |
 | test:bridge | REQ-DIAG-099 |

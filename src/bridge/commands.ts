@@ -49,7 +49,7 @@ import {
 } from '../diagram/canvasOps';
 import { renderDrawioSnapshot } from '../diagram/drawioRender';
 import { sniffFormat, normalizeDrawioSource } from '../diagram';
-import { A4_WIDTH } from '../utils/pageLayout';
+import { A4_WIDTH, columnWidth } from '../utils/pageLayout';
 import { contentBelongsToScroll, pageUsesColumnFlow, scrollById, strokeBelongsToScrollBand } from '../utils/scrolls';
 import {
   applyDisplacements,
@@ -95,6 +95,7 @@ import type {
   RenameNotebookResult,
   RenamePageResult,
   RenameScrollResult,
+  ResizeScrollResult,
   RunUpdateResult,
   SaveNotebookResult,
   ScrollSummary,
@@ -231,6 +232,7 @@ function summariseScrolls(page: import('../types/data').Page): ScrollSummary[] {
       scrollId: scroll.id,
       title: scroll.title,
       column: scroll.column,
+      width: columnWidth(scroll.column, page.scrolls),
       blockCount: page.nodes.filter(
         (n) =>
           isContentBlock(n, diagramFrameIds(page.nodes)) &&
@@ -1449,6 +1451,44 @@ async function moveScrollCmd(params: Record<string, unknown>): Promise<MoveScrol
   );
 }
 
+async function resizeScrollCmd(params: Record<string, unknown>): Promise<ResizeScrollResult> {
+  flush();
+  const scrollId = requireString(params, 'scrollId');
+  const requestedWidth = params.width;
+  if (typeof requestedWidth !== 'number' || !Number.isFinite(requestedWidth)) {
+    throw new BridgeCommandError('BAD_PARAMS', '"width" must be a finite number');
+  }
+
+  const { workspace } = useWorkspaceStore.getState();
+  for (const section of workspace.sections) {
+    for (const page of section.pages) {
+      const scroll = scrollById(page.scrolls, scrollId);
+      if (!scroll) continue;
+
+      navigateToPage(section.id, page.id);
+      const { resizeScroll } = await import('../utils/scrollOps');
+      const result = resizeScroll(page.id, scrollId, requestedWidth);
+      const activePage = useWorkspaceStore.getState().getActivePage();
+      const liveScroll = activePage?.scrolls?.find((item) => item.id === scrollId);
+      if (!activePage || !liveScroll) {
+        throw new BridgeCommandError('INTERNAL', `Could not resize scroll "${scrollId}"`);
+      }
+      return {
+        scrollId,
+        title: liveScroll.title,
+        requestedWidth,
+        width: result?.width ?? columnWidth(liveScroll.column, activePage.scrolls),
+        delta: result?.delta ?? 0,
+      };
+    }
+  }
+
+  throw new BridgeCommandError(
+    'NOT_FOUND',
+    `No scroll with id "${scrollId}" in this notebook. Call list_scrolls to refresh.`,
+  );
+}
+
 async function updateBlock(params: Record<string, unknown>): Promise<UpdateBlockResult> {
   flush();
   const blockId = requireString(params, 'blockId');
@@ -2384,7 +2424,8 @@ async function createDiagram(params: Record<string, unknown>): Promise<CreateDia
   const warnings = placed.warning ? [placed.warning] : [];
   if (snapshotFailure) {
     warnings.push(
-      `draw.io renderer unavailable (${snapshotFailure}) — rendered with the built-in transpiler instead (renderMode 'nodes').`,
+      `draw.io renderer unavailable (${snapshotFailure}) — rendered with the built-in transpiler ` +
+        "instead (renderMode 'nodes'). The user can install the extension in Settings → Extensions.",
     );
   }
 
@@ -2425,6 +2466,7 @@ const HANDLERS: Record<BridgeCommandName, Handler> = {
   create_scroll: createScrollCmd,
   rename_scroll: renameScrollCmd,
   move_scroll: moveScrollCmd,
+  resize_scroll: resizeScrollCmd,
   delete_page: deletePageCmd,
   delete_section: deleteSectionCmd,
   delete_scroll: deleteScrollCmd,

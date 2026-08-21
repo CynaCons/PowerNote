@@ -1,8 +1,8 @@
 # SRS: Scrolls
 
 **Project:** PowerNote  
-**Version:** 0.61.1  
-**Date:** 2026-08-13
+**Version:** 0.66.0
+**Date:** 2026-08-21
 
 ## Purpose
 
@@ -59,11 +59,13 @@ is that sequential writes from different workstreams land in different columns.
 | REQ-SCROLL-011 | Exactly one scroll on the active page shall be *active*, set by an explicit click (sidebar entry or canvas header) and defaulting to the leftmost; it shall be marked in both places, and shall reset when the page changes | Must | T108 |
 | REQ-SCROLL-012 | Clicking a scroll in the sidebar shall open its page, make it active, and move the viewport to the top of that scroll | Must | T108 |
 | REQ-SCROLL-030 | Every scroll packs as a column for insert/move/height-change (REQ-DIAG-002..004, REQ-AGENT-067). Guide style (pages / grid / scroll / none) is visual only. Human drag does not reflow. | Must | T110 |
+| REQ-SCROLL-031 | A scroll's effective width shall be persistent per page, clamped to the shared minimum/maximum, and used by cumulative `columnLeft` geometry. Changing it in either direction shall shift all content to the right of the band by the same delta while leaving the resized band's occupants fixed | Must | T186 |
 
 ## Traceability
 
 - T104 — `tests/scroll/104-scroll-identity.spec.ts`
 - T105 — `tests/agent/105-agent-parallel-scrolls.spec.ts`
+- T186 — `tests/scroll/186-resize-scroll.spec.ts`
 
 See also `docs/SRS_AGENT.md` for the bridge transport and the single-connection
 constraint that bounds what "parallel" means here.

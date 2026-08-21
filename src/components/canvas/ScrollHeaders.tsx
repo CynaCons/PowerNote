@@ -13,12 +13,22 @@ import {
   SCROLL_TITLE_PINNED_STRIP_HEIGHT,
   SCROLL_TITLE_PIN_INSET,
   SCROLL_TITLE_ACTIVE_TICK,
+  A4_WIDTH,
+  MAX_SCROLL_WIDTH,
+  MIN_SCROLL_WIDTH,
   columnLeft,
   columnWidth,
   scrollTitleY,
 } from '../../utils/pageLayout';
 import { pageCeiling } from '../../utils/scrollCeiling';
-import { deleteScroll, fitScrollToContent, liveScrollDeleteInfo, moveScroll, renameScroll } from '../../utils/scrollOps';
+import {
+  deleteScroll,
+  fitScrollToContent,
+  liveScrollDeleteInfo,
+  moveScroll,
+  renameScroll,
+  resizeScroll,
+} from '../../utils/scrollOps';
 import { ScrollDeleteChoices } from './ScrollDeleteChoices';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
@@ -32,6 +42,7 @@ interface ScrollHeadersProps {
 }
 
 const TITLE_INSET = 16;
+const RESIZE_HANDLE_WIDTH = 12;
 
 
 /**
@@ -49,6 +60,7 @@ const TITLE_INSET = 16;
  */
 export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [resizePreview, setResizePreview] = useState<{ scrollId: string; width: number } | null>(null);
   const [menu, setMenu] = useState<{
     scrollId: string;
     x: number;
@@ -101,7 +113,12 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
   // column to title, so the record stays but the header is not drawn.
   if (mode !== 'scroll' && mode !== 'pages') return null;
 
-  const orderedScrolls = [...scrolls].sort((a, b) => a.column - b.column);
+  const displayScrolls = resizePreview
+    ? scrolls.map((scroll) => scroll.id === resizePreview.scrollId
+      ? { ...scroll, width: resizePreview.width }
+      : scroll)
+    : scrolls;
+  const orderedScrolls = [...displayScrolls].sort((a, b) => a.column - b.column);
   const menuIndex = menu ? orderedScrolls.findIndex((s) => s.id === menu.scrollId) : -1;
   const menuAtLeft = menuIndex <= 0;
   const menuAtRight = menuIndex < 0 || menuIndex >= orderedScrolls.length - 1;
@@ -132,9 +149,9 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
 
   return (
     <Group>
-      {scrolls.map((scroll) => {
-        const x = columnLeft(scroll.column, scrolls);
-        const bandW = columnWidth(scroll.column, scrolls);
+      {displayScrolls.map((scroll) => {
+        const x = columnLeft(scroll.column, displayScrolls);
+        const bandW = columnWidth(scroll.column, displayScrolls);
         const isEditing = editingId === scroll.id;
 
         const { y: pinnedY, holding: isHolding } = scrollTitleY(viewport, ceiling);
@@ -268,7 +285,7 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
                   setMenu({ scrollId: scroll.id, x: e.clientX, y: e.clientY });
                 }}
                 style={{
-                  width: bandW,
+                  width: bandW - RESIZE_HANDLE_WIDTH,
                   height: stripH,
                   boxSizing: 'border-box',
                   background: SCROLL_TITLE_PINNED_FILL,
@@ -290,6 +307,64 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
                 {scroll.title}
               </div>
             </Html>
+            <Line
+              name="scroll-resize-grip"
+              points={[x + bandW - 3, stripY + 8, x + bandW - 3, stripY + stripH - 8]}
+              stroke={SCROLL_TITLE_HAIRLINE}
+              strokeWidth={2}
+              listening={false}
+            />
+            <Rect
+              name="scroll-resize-handle"
+              x={x + bandW - RESIZE_HANDLE_WIDTH / 2}
+              y={stripY}
+              width={RESIZE_HANDLE_WIDTH}
+              height={stripH}
+              fill="rgba(0,0,0,0.001)"
+              draggable
+              dragBoundFunc={(position) => ({
+                x: Math.max(
+                  x + MIN_SCROLL_WIDTH - RESIZE_HANDLE_WIDTH / 2,
+                  Math.min(x + MAX_SCROLL_WIDTH - RESIZE_HANDLE_WIDTH / 2, position.x),
+                ),
+                y: stripY,
+              })}
+              onMouseEnter={() => { document.body.style.cursor = 'col-resize'; }}
+              onMouseLeave={() => { document.body.style.cursor = ''; }}
+              onDragStart={(event) => {
+                event.cancelBubble = true;
+                setActiveScroll(scroll.id);
+              }}
+              onDragMove={(event) => {
+                event.cancelBubble = true;
+                const width = Math.max(
+                  MIN_SCROLL_WIDTH,
+                  Math.min(MAX_SCROLL_WIDTH, event.target.x() - x + RESIZE_HANDLE_WIDTH / 2),
+                );
+                setResizePreview({ scrollId: scroll.id, width });
+              }}
+              onDragEnd={(event) => {
+                event.cancelBubble = true;
+                const width = Math.max(
+                  MIN_SCROLL_WIDTH,
+                  Math.min(MAX_SCROLL_WIDTH, event.target.x() - x + RESIZE_HANDLE_WIDTH / 2),
+                );
+                setResizePreview(null);
+                document.body.style.cursor = '';
+                resizeScroll(pageId, scroll.id, width);
+              }}
+              onDblClick={(event) => {
+                event.cancelBubble = true;
+                setResizePreview(null);
+                resizeScroll(pageId, scroll.id, undefined);
+              }}
+              onDblTap={(event) => {
+                event.cancelBubble = true;
+                setResizePreview(null);
+                resizeScroll(pageId, scroll.id, undefined);
+              }}
+              aria-label={`Resize ${scroll.title || 'scroll'}; double-click resets to ${A4_WIDTH}px`}
+            />
           </Group>
         );
       })}

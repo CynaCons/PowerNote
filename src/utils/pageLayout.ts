@@ -6,6 +6,10 @@
 /** A4 width at 96 DPI */
 export const A4_WIDTH = 794;
 
+/** User/agent scroll resize bounds. Kept here so every entry point agrees. */
+export const MIN_SCROLL_WIDTH = 320;
+export const MAX_SCROLL_WIDTH = 2400;
+
 /** A4 height at 96 DPI */
 export const A4_HEIGHT = 1123;
 

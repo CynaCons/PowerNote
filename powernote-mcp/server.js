@@ -1234,6 +1234,26 @@ const TOOLS = [
     },
   },
   {
+    name: 'resize_scroll',
+    description:
+      'Resize a scroll band by stable id. The width is clamped to PowerNote\'s shared ' +
+      'limits, persists on that page, and every node or stroke in bands to the right ' +
+      'moves by the same delta. The resized band\'s own content stays fixed. One undo ' +
+      'restores width and positions. list_scrolls reports the effective width.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        scrollId: { type: 'string', description: 'Scroll to resize (from list_scrolls).' },
+        width: {
+          type: 'number',
+          description: 'Requested band width in canvas pixels; clamped by the app.',
+        },
+      },
+      required: ['scrollId', 'width'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'update_block',
     description:
       'Replace the markdown of an existing block, found via read_page. Use this to ' +

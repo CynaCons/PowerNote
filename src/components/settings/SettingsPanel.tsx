@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { BackgroundMode, CanvasBgColor, WorkspaceSettings } from '../../types/data';
 import type { ResolvedPageSettings, SettingsScope } from '../../utils/pageSettings';
 import { APP_VERSION } from '../../version';
@@ -10,6 +10,8 @@ import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
 import { useToolStore } from '../../stores/useToolStore';
 import { useBridgeStore, type BridgeStatus } from '../../stores/useBridgeStore';
+import { useExtensionStore } from '../../stores/useExtensionStore';
+import type { ExtensionStatus } from '../../extensions/types';
 import { DEFAULT_BRIDGE_URL } from '../../bridge/protocol';
 import { showToast } from '../layout/Toast';
 import './SettingsPanel.css';
@@ -54,6 +56,13 @@ const BRIDGE_STATUS_LABEL: Record<BridgeStatus, { text: string; color: string }>
   displaced: { text: 'Another notebook took over', color: '#d97706' },
 };
 
+const EXT_STATUS_COLOR: Record<ExtensionStatus, string> = {
+  'not-installed': '#64748b',
+  installing: '#d97706',
+  installed: '#16a34a',
+  failed: '#dc2626',
+};
+
 export function SettingsPanel({
   resolved,
   notebookDefault,
@@ -79,6 +88,15 @@ export function SettingsPanel({
   const [updateInfo, setUpdateInfo] = useState<{ version: string; url?: string; releaseUrl?: string } | null>(null);
 
   const touchDraw = useToolStore((s) => s.drawOptions.touchDraw);
+
+  const drawioExt = useExtensionStore((s) => s.drawio);
+  const refreshExtensions = useExtensionStore((s) => s.refresh);
+  const installDrawio = useExtensionStore((s) => s.install);
+
+  // The truth lives in IndexedDB / the document — mirror it when the panel opens.
+  useEffect(() => {
+    void refreshExtensions();
+  }, [refreshExtensions]);
 
   const bridgeEnabled = useBridgeStore((s) => s.enabled);
   const bridgeStatus = useBridgeStore((s) => s.status);
@@ -326,6 +344,71 @@ export function SettingsPanel({
         <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 6, display: 'block' }}>
           Off by default. Only enable on your own machine — anything that can reach
           this port can edit the notebook.
+        </span>
+      </div>
+
+      <div className="settings-panel__section" style={{ marginTop: 12, borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
+        <span className="settings-panel__label">Extensions</span>
+
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12 }}>draw.io viewer — exact diagram rendering</span>
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              backgroundColor: EXT_STATUS_COLOR[drawioExt.status],
+              flexShrink: 0,
+            }}
+          />
+          <span
+            style={{ fontSize: 12, color: EXT_STATUS_COLOR[drawioExt.status] }}
+            data-testid="settings-ext-drawio-status"
+            data-status={drawioExt.status}
+          >
+            {drawioExt.status === 'not-installed' && 'Not installed'}
+            {drawioExt.status === 'installing' && 'Installing…'}
+            {drawioExt.status === 'installed' &&
+              `Installed${drawioExt.version ? ` v${drawioExt.version}` : ''}`}
+            {drawioExt.status === 'failed' && 'Install failed'}
+          </span>
+          {(drawioExt.status === 'not-installed' || drawioExt.status === 'failed') && (
+            <button
+              className="settings-panel__btn"
+              onClick={() => void installDrawio()}
+              data-testid="settings-ext-drawio-install"
+            >
+              {drawioExt.status === 'failed' ? 'Retry' : 'Install (~1.1 MB)'}
+            </button>
+          )}
+        </div>
+
+        {drawioExt.status === 'failed' && drawioExt.error && (
+          <span
+            style={{ fontSize: 11, color: '#dc2626', marginTop: 4, display: 'block' }}
+            data-testid="settings-ext-drawio-error"
+          >
+            {drawioExt.error}
+          </span>
+        )}
+
+        {drawioExt.status === 'installed' && (
+          <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, display: 'block' }}>
+            {[
+              drawioExt.embedded ? 'Embedded in this notebook' : null,
+              drawioExt.cached ? 'cached in this browser' : null,
+              !drawioExt.embedded ? 'embedded into the notebook on the next save' : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+            .
+          </span>
+        )}
+
+        <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 6, display: 'block' }}>
+          Without the extension, draw.io diagrams still display — the extension is
+          needed to create or redraw them offline. Renders exactly what
+          diagrams.net shows. Apache-2.0.
         </span>
       </div>
 

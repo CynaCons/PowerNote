@@ -380,6 +380,18 @@ async function main() {
     JSON.stringify(moveFrame),
   );
 
+  check('resize_scroll is offered', tools.includes('resize_scroll'));
+  const resized = await beta.call('resize_scroll', { scrollId: 's1', width: 960 });
+  check('resize_scroll reaches the notebook', !resized.isError, resized.text);
+  const resizeFrame = notebook.frames.filter((f) => f.cmd === 'resize_scroll').pop();
+  check(
+    'resize_scroll routes width to the notebook',
+    !!resizeFrame &&
+      resizeFrame.params.scrollId === 's1' &&
+      resizeFrame.params.width === 960,
+    JSON.stringify(resizeFrame),
+  );
+
   // --- exclusion --------------------------------------------------------
   // beta holds the lease from the write above; alpha must be refused.
   const aWrite = await alpha.call('append_block', { markdown: 'from alpha' });

@@ -14,7 +14,14 @@ import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useCanvasStore, undoBatchStartFull, undoBatchEnd } from '../stores/useCanvasStore';
 import { useDrawStore } from '../stores/useDrawStore';
 import type { CanvasNode, ScrollRecord, Stroke } from '../types/data';
-import { columnAt, columnLeft, columnWidth } from './pageLayout';
+import {
+  A4_WIDTH,
+  MAX_SCROLL_WIDTH,
+  MIN_SCROLL_WIDTH,
+  columnAt,
+  columnLeft,
+  columnWidth,
+} from './pageLayout';
 import { countBandContent } from './scrolls';
 import { FIT_SCROLL_PAD } from '../diagram/fitToScroll';
 
@@ -289,6 +296,87 @@ function isRightOfScroll(
   return columnOfOrigin > scrollColumn;
 }
 
+export interface ResizeScrollResult {
+  delta: number;
+  width: number;
+}
+
+/**
+ * Apply one scroll width and shift every band to its right by the same delta.
+ * `undefined` is the intentional reset representation: default A4 width is
+ * derived, not stored. The active-page restriction keeps the canvas/workspace
+ * snapshots and the single undo entry coherent.
+ */
+export function applyBandWidth(
+  pageId: string,
+  scroll: ScrollRecord,
+  width: number | undefined,
+): ResizeScrollResult | null {
+  flush();
+  const ws = useWorkspaceStore.getState();
+  if (ws.activePageId !== pageId) return null;
+  const page = ws.getActivePage();
+  const scrolls = page?.scrolls;
+  const liveScroll = scrolls?.find((s) => s.id === scroll.id);
+  if (!page || !scrolls || !liveScroll) return null;
+
+  const requested = width === undefined ? A4_WIDTH : width;
+  const effectiveWidth = Math.max(MIN_SCROLL_WIDTH, Math.min(MAX_SCROLL_WIDTH, requested));
+  const storedWidth = width === undefined ? undefined : effectiveWidth;
+  const currentWidth = columnWidth(liveScroll.column, scrolls);
+  const delta = effectiveWidth - currentWidth;
+  const storedChanged = liveScroll.width !== storedWidth;
+  if (Math.abs(delta) <= 0.5 && !storedChanged) return null;
+
+  const nodes = useCanvasStore.getState().nodes;
+  const strokes = useDrawStore.getState().strokes;
+  undoBatchStartFull({ nodes, scrolls, strokes });
+
+  const nextNodes = nodes.map((node) => {
+    if (!isRightOfScroll(
+      columnAt(node.x, scrolls),
+      nodeBelongsToScroll(node, liveScroll, scrolls, nodes),
+      liveScroll.column,
+    )) return node;
+    return { ...node, x: node.x + delta };
+  });
+  const nextStrokes = strokes.map((stroke) => {
+    if (!isRightOfScroll(
+      columnAt(strokeAnchorX(stroke), scrolls),
+      strokeBelongsToScroll(stroke, liveScroll, scrolls, nodes),
+      liveScroll.column,
+    )) return stroke;
+    return {
+      ...stroke,
+      points: stroke.points.map((value, index) => (index % 2 === 0 ? value + delta : value)),
+    };
+  });
+  const nextScrolls = scrolls.map((item) => {
+    if (item.id !== liveScroll.id) return item;
+    if (storedWidth === undefined) {
+      const { width: _removed, ...reset } = item;
+      return reset;
+    }
+    return { ...item, width: storedWidth };
+  });
+
+  useCanvasStore.setState({ nodes: nextNodes });
+  useDrawStore.setState({ strokes: nextStrokes });
+  ws.replacePageScrolls(pageId, nextScrolls);
+  undoBatchEnd();
+  return { delta, width: effectiveWidth };
+}
+
+export function resizeScroll(
+  pageId: string,
+  scrollId: string,
+  width: number | undefined,
+): ResizeScrollResult | null {
+  const page = findPage(pageId);
+  const scroll = page?.scrolls?.find((item) => item.id === scrollId);
+  return scroll ? applyBandWidth(pageId, scroll, width) : null;
+}
+
 /**
  * Widen this scroll to its widest member + padding and shift every scroll
  * to its right (and their members) by the delta. Explicit, never automatic.
@@ -325,37 +413,6 @@ export function fitScrollToContent(pageId: string, scrollId: string): { delta: n
   }
 
   const needed = Math.max(currentWidth, maxRight - left + FIT_SCROLL_PAD);
-  const delta = needed - currentWidth;
-  if (delta <= 0.5) return null;
-
-  undoBatchStartFull({ nodes, scrolls, strokes });
-
-  const nextNodes = nodes.map((node) => {
-    if (!isRightOfScroll(columnAt(node.x, scrolls), nodeBelongsToScroll(node, scroll, scrolls, nodes), scroll.column)) {
-      return node;
-    }
-    return { ...node, x: node.x + delta };
-  });
-  const nextStrokes = strokes.map((stroke) => {
-    if (
-      !isRightOfScroll(
-        columnAt(strokeAnchorX(stroke), scrolls),
-        strokeBelongsToScroll(stroke, scroll, scrolls, nodes),
-        scroll.column,
-      )
-    ) {
-      return stroke;
-    }
-    return {
-      ...stroke,
-      points: stroke.points.map((v, i) => (i % 2 === 0 ? v + delta : v)),
-    };
-  });
-  const nextScrolls = scrolls.map((s) => (s.id === scroll.id ? { ...s, width: needed } : s));
-
-  useCanvasStore.setState({ nodes: nextNodes });
-  useDrawStore.setState({ strokes: nextStrokes });
-  ws.replacePageScrolls(pageId, nextScrolls);
-  undoBatchEnd();
-  return { delta, width: needed };
+  if (needed - currentWidth <= 0.5) return null;
+  return applyBandWidth(pageId, scroll, needed);
 }

@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { Copy, Trash2, CopyPlus, Layers, Group as GroupIcon, Ungroup, Download, Maximize2 } from 'lucide-react';
+import { Copy, Trash2, CopyPlus, Layers, Group as GroupIcon, Ungroup, Download, Maximize2, Shapes } from 'lucide-react';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useDrawStore } from '../../stores/useDrawStore';
 import { useGroupStore } from '../../stores/useGroupStore';
 import { groupSelection, ungroupSelection } from '../../utils/groupOps';
 import { exportDrawio } from '../../diagram/drawioExport';
-import { fitExistingDiagram } from '../../diagram/canvasOps';
+import { convertSnapshotToNodes, fitExistingDiagram, isSnapshotDiagram } from '../../diagram/canvasOps';
 import { downloadFile } from '../../utils/serialization';
 import { showToast } from '../layout/Toast';
 import type { DiagramNodeData } from '../../types/data';
@@ -183,6 +183,30 @@ export function ContextMenu({ x, y, nodeId, onClose }: ContextMenuProps) {
         >
           <Maximize2 size={14} />
           <span>Fit to scroll width</span>
+        </button>
+      )}
+      {node.type === 'diagram' && isSnapshotDiagram(node) && (
+        <button
+          className="context-menu__item"
+          data-testid="context-convert-nodes"
+          onClick={() => {
+            const outcome = convertSnapshotToNodes(node.id);
+            if (outcome.ok) {
+              showToast(
+                `Converted into ${outcome.memberCount} editable node${outcome.memberCount === 1 ? '' : 's'}` +
+                  (outcome.skipped > 0
+                    ? ` · ${outcome.skipped} cell${outcome.skipped === 1 ? '' : 's'} beyond the converter's subset skipped`
+                    : ''),
+                outcome.skipped > 0 ? 'info' : 'success',
+              );
+            } else {
+              showToast(outcome.message, 'error');
+            }
+            onClose();
+          }}
+        >
+          <Shapes size={14} />
+          <span>Convert to editable nodes</span>
         </button>
       )}
       {exportGroupId && (

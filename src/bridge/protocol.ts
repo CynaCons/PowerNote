@@ -40,6 +40,7 @@ export type BridgeCommandName =
   | 'create_scroll'
   | 'rename_scroll'
   | 'move_scroll'
+  | 'resize_scroll'
   | 'delete_page'
   | 'delete_section'
   | 'delete_scroll'
@@ -184,6 +185,8 @@ export interface ScrollSummary {
   title: string;
   /** 0 = leftmost band. */
   column: number;
+  /** Effective persisted band width in canvas pixels. */
+  width: number;
   blockCount: number;
 }
 
@@ -359,6 +362,14 @@ export interface MoveScrollResult {
   title: string;
   fromColumn: number;
   toColumn: number;
+}
+
+export interface ResizeScrollResult {
+  scrollId: string;
+  title: string;
+  requestedWidth: number;
+  width: number;
+  delta: number;
 }
 
 /** What a delete removed. Deletes are irreversible over the bridge — there is

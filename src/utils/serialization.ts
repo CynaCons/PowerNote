@@ -1,4 +1,6 @@
 import type { WorkspaceData } from '../types/data';
+import { injectExtensionBlocks } from '../extensions/embed';
+import { collectEmbeddedExtensions, harvestEmbeddedExtensions } from '../extensions/drawioViewer';
 
 const DATA_SCRIPT_ID = 'powernote-data';
 const LEGACY_AUTOSAVE_KEY = 'powernote-autosave';
@@ -74,13 +76,21 @@ export async function buildExportHtml(workspace: WorkspaceData): Promise<string>
 
   // Replace existing data script or insert before </head>
   const existingPattern = /<script id="powernote-data" type="application\/json">[\s\S]*?<\/script>/;
+  let out: string;
   if (existingPattern.test(html)) {
-    return html.replace(existingPattern, dataScript);
+    out = html.replace(existingPattern, dataScript);
+  } else {
+    // Ensure we have <!DOCTYPE html> at the start
+    const doctype = html.startsWith('<!') ? '' : '<!DOCTYPE html>\n';
+    out = doctype + html.replace('</head>', `${dataScript}\n</head>`);
   }
 
-  // Ensure we have <!DOCTYPE html> at the start
-  const doctype = html.startsWith('<!') ? '' : '<!DOCTYPE html>\n';
-  return doctype + html.replace('</head>', `${dataScript}\n</head>`);
+  // Installed extensions ride in their own blocks, re-injected from the
+  // runtime accessor EVERY save. Never rely on the block surviving in the
+  // DOM: the dev branch above just refetched a pristine template that has no
+  // block at all, and that branch is what every E2E run exercises.
+  out = injectExtensionBlocks(out, await collectEmbeddedExtensions());
+  return out;
 }
 
 /**
@@ -101,9 +111,16 @@ export function downloadFile(
 }
 
 /**
- * Read an HTML file and extract embedded PowerNote data
+ * Read an HTML file and extract embedded PowerNote data.
+ *
+ * Also harvests any extension blocks the file carries (v0.65) — this is the
+ * one choke point every open path goes through (FSA restore, Open picker,
+ * file input, revert), and a notebook opened WITHOUT its extensions being
+ * remembered would silently lose them on the next save. The harvest is
+ * fire-and-forget and never throws.
  */
 export function extractDataFromHtml(htmlContent: string): WorkspaceData | null {
+  harvestEmbeddedExtensions(htmlContent);
   const match = htmlContent.match(
     /<script id="powernote-data" type="application\/json">([\s\S]*?)<\/script>/
   );

@@ -138,7 +138,9 @@ export function DiagramSourceDialog() {
         {
           line: 0,
           severity: 'ignored',
-          message: `draw.io renderer unavailable (${rendered.reason}) — drawn with the built-in converter.`,
+          message:
+            `draw.io renderer unavailable (${rendered.reason}) — drawn with the built-in converter. ` +
+            'Install the extension in Settings → Extensions for exact rendering.',
         },
       ]);
       return;

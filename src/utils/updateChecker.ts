@@ -1,4 +1,6 @@
 import type { WorkspaceData } from '../types/data';
+import type { EmbeddedExtension } from '../extensions/types';
+import { injectExtensionBlocks } from '../extensions/embed';
 import { isFSASupported, writeToHandle, verifyPermission } from './fileSystemAccess';
 import { getCurrentHandle } from './fileHandleStore';
 
@@ -100,6 +102,9 @@ export interface PerformUpdateDeps {
   isLiveUpdateEnabled?: () => boolean;
   /** Download a safety backup before overwriting the live file. Default: true. */
   downloadBackupBeforeLiveSwap?: boolean;
+  /** Extension blocks to carry into the updated notebook. Default: whatever
+   *  the extension loader holds (memory → document block → IndexedDB). */
+  collectExtensions?: () => Promise<EmbeddedExtension[]>;
 }
 
 declare global {
@@ -216,18 +221,30 @@ export async function checkForUpdate(
 
 /**
  * Inject workspace JSON into a PowerNote HTML template (pure, testable).
+ *
+ * `extensions` (v0.65): installed extension blocks to carry into the NEW
+ * template. The template arrives pristine from the release, so anything not
+ * re-injected here is silently uninstalled by the update — the one trap the
+ * whole extension design has to survive. Omitted/empty leaves the output
+ * byte-identical to the two-argument call.
  */
-export function buildUpdatedHtml(templateHtml: string, workspace: WorkspaceData): string {
+export function buildUpdatedHtml(
+  templateHtml: string,
+  workspace: WorkspaceData,
+  extensions?: EmbeddedExtension[],
+): string {
   const json = JSON.stringify(workspace, null, 2);
   const dataScript = `<script id="powernote-data" type="application/json">\n${json}\n</script>`;
   const existingPattern = /<script id="powernote-data"[^>]*>[\s\S]*?<\/script>/;
+  let out: string;
   if (existingPattern.test(templateHtml)) {
-    return templateHtml.replace(existingPattern, dataScript);
+    out = templateHtml.replace(existingPattern, dataScript);
+  } else if (templateHtml.includes('</head>')) {
+    out = templateHtml.replace('</head>', `${dataScript}\n</head>`);
+  } else {
+    out = dataScript + templateHtml;
   }
-  if (templateHtml.includes('</head>')) {
-    return templateHtml.replace('</head>', `${dataScript}\n</head>`);
-  }
-  return dataScript + templateHtml;
+  return extensions && extensions.length > 0 ? injectExtensionBlocks(out, extensions) : out;
 }
 
 /** Live-update enabled unless explicitly disabled via window flag. */
@@ -389,6 +406,13 @@ export async function performUpdate(
     return buildExportHtml(ws);
   });
 
+  // Dynamic import: the loader module imports GITHUB_REPO from this file, so
+  // a static import here would close a cycle at module-init time.
+  const collectExtensions = deps.collectExtensions ?? (async () => {
+    const { collectEmbeddedExtensions } = await import('../extensions/drawioViewer');
+    return collectEmbeddedExtensions();
+  });
+
   try {
     const safeName = workspace.filename.replace(/[^a-zA-Z0-9_\- ]/g, '_');
 
@@ -420,8 +444,13 @@ export async function performUpdate(
       return { ok: false };
     }
 
-    const finalHtml = buildUpdatedHtml(newHtml, workspace);
-    console.log(`[PowerNote Update] Built updated HTML (${finalHtml.length} bytes)`);
+    // Carry installed extensions into the fresh template — the update must
+    // never uninstall what the notebook carried (REQ-UPDATE-031).
+    const extensions = await collectExtensions().catch(() => [] as EmbeddedExtension[]);
+    const finalHtml = buildUpdatedHtml(newHtml, workspace, extensions);
+    console.log(
+      `[PowerNote Update] Built updated HTML (${finalHtml.length} bytes, ${extensions.length} extension block${extensions.length === 1 ? '' : 's'})`,
+    );
 
     // ── Live-swap path (FSA A/B) ─────────────────────────────
     if (target) {

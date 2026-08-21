@@ -142,7 +142,8 @@ async function ingestDiagramText(
       return;
     }
     showToast(
-      `draw.io renderer unavailable (${rendered.reason}) — rendered with the built-in converter.`,
+      `draw.io renderer unavailable (${rendered.reason}) — rendered with the built-in converter. ` +
+        'Install the extension in Settings → Extensions for exact rendering.',
       'info',
     );
   }

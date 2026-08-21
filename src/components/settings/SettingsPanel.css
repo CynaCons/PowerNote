@@ -9,6 +9,11 @@
   padding: 12px 16px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   z-index: 100;
+  /* Bottom-anchored: without a cap the panel grows upward past the viewport
+     top and its upper controls become unclickable (the Extensions section
+     made it tall enough to prove it, T85/T101/T133). */
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
 }
 
 .settings-panel__title {

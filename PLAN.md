@@ -1314,13 +1314,19 @@
 - [x] Export short-circuit, search title+source, bridge renderMode summaries, MCP descriptions, useTextPlacement undo-batch drive-by fix
 - [x] SRS amendments (REQ-DIAG-124/127/130/147) + new REQ-DIAG-149..156; update existing tests T147/148/151/160/162/166
 - [x] New tests 174-180 (render, ingest, bridge, dialog, fallback, fit, export); full suite green; smoke test; showcase artifact
-### v0.65.0 — draw.io extension — install, embed, carry-through
+### v0.65.0 — draw.io extension — install, embed, carry-through (2026-08-21) (COMPLETE)
 **Goal:** Make the viewer a per-notebook extension like the user proposed: IndexedDB cache + Settings install flow, embed as a text/plain base64 block in the notebook HTML, re-inject on every save (dev refetches the template!) and carry through app updates (buildUpdatedHtml currently strips everything but powernote-data). Plus Convert-to-editable-nodes. Full plan: ~/.claude/plans/idempotent-bubbling-newt.md
-- [ ] extensionStore.ts (IndexedDB powernote-extensions), installDrawioViewer, useExtensionStore; loader tiers memory → DOM block → opened-file HTML → IDB → network; harvest powernote-ext-* blocks on notebook open (extractDataFromHtml callers)
-- [ ] embed.ts injectExtensionBlocks (idempotent replace-by-id, text/plain base64); buildExportHtml re-injects from accessor; buildUpdatedHtml(templateHtml, workspace, extensions?) + performUpdate collectExtensions dep + SettingsPanel update call carries (REQ-UPDATE-031)
-- [ ] SettingsPanel Extensions section (install/installed/failed states, size + license note); update v0.64 fallback copy to point at Settings → Extensions
-- [ ] ContextMenu "Convert to editable nodes" (transpile, delete render, one undo) — REQ-DIAG-155
-- [ ] Tests 181-185 (install flow, embed-save exactly-once, update carry, standalone offline boot, convert) + REQ-SETTINGS-018/019, REQ-UPDATE-031; full suite green; smoke; showcase artifact
+- [x] extensionStore.ts (IndexedDB powernote-extensions), installDrawioViewer, useExtensionStore; loader tiers memory → DOM block → opened-file HTML → IDB → network; harvest powernote-ext-* blocks on notebook open (extractDataFromHtml callers)
+- [x] embed.ts injectExtensionBlocks (idempotent replace-by-id, text/plain base64); buildExportHtml re-injects from accessor; buildUpdatedHtml(templateHtml, workspace, extensions?) + performUpdate collectExtensions dep + SettingsPanel update call carries (REQ-UPDATE-031)
+- [x] SettingsPanel Extensions section (install/installed/failed states, size + license note); update v0.64 fallback copy to point at Settings → Extensions
+- [x] ContextMenu "Convert to editable nodes" (transpile, delete render, one undo) — REQ-DIAG-155
+- [x] Tests 181-185 (install flow, embed-save exactly-once, update carry, standalone offline boot, convert) + REQ-SETTINGS-018/019, REQ-UPDATE-031; full suite green; smoke; showcase artifact
+### v0.66.0 — Resizable scroll width — per page, persistent, user + agent (2026-08-21) (COMPLETE)
+**Goal:** User can resize a scroll's width directly (widths already live per-page in ScrollRecord.width and persist via workspace data); agents get a resize_scroll bridge command + MCP tool. Reuse replacePageScrolls + the existing width-change reflow machinery. SRS impact: new REQ rows in the scroll/hierarchy SRS + settings exposure.
+- [x] Shared applyBandWidth + resizeScroll primitive clamps width and shifts every right-hand node/stroke in one undo
+- [x] Scroll header right-edge drag previews width and commits once; double-click resets to absent/default width
+- [x] resize_scroll bridge + MCP tool; list_scrolls reports effective width
+- [x] T186 + REQ-HIER-024/025, REQ-AGENT-071, REQ-SCROLL-031; 732/732 green on a fresh server; smoke clean; showcase artifact
 ## Future (Backlog)
 > Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 

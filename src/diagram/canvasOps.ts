@@ -348,6 +348,74 @@ export function fitExistingDiagram(frameId: string): FitExistingOutcome {
   };
 }
 
+export type ConvertSnapshotOutcome =
+  | { ok: true; memberCount: number; skipped: number }
+  | { ok: false; message: string };
+
+/**
+ * "Convert to editable nodes": transpile a snapshot frame's stored source
+ * into native members and drop the rendered image. The deliberate reverse of
+ * the v0.64 default — for when someone wants to pull a drawing apart, at the
+ * price of the transpiler's subset (gradients, curves, stencils are lost and
+ * named in diagnostics). One undo restores the snapshot.
+ */
+export function convertSnapshotToNodes(frameId: string): ConvertSnapshotOutcome {
+  const canvas = useCanvasStore.getState();
+  const frame = canvas.nodes.find((n) => n.id === frameId);
+  if (!frame || frame.type !== 'diagram') {
+    return { ok: false, message: `No diagram with id "${frameId}"` };
+  }
+  if (!isSnapshotDiagram(frame)) {
+    return { ok: false, message: 'This diagram already has editable nodes.' };
+  }
+
+  const source = diagramSourceOf(frame);
+  const built = applyDiagramScrollFit(frame, rebuildDiagram(frame, source, 'drawio'));
+  if (built.contents.length === 0) {
+    const first = built.diagnostics.find((d) => d.severity === 'error')?.message;
+    return { ok: false, message: `Nothing could be converted${first ? ` — ${first}` : '.'}` };
+  }
+
+  const oldHeight = frame.height;
+  undoBatchStart(canvas.nodes);
+  for (const content of built.contents) canvas.addNode(content);
+  const { render: _render, ...dataRest } = frame.data as DiagramNodeData;
+  canvas.updateNode(frameId, {
+    width: built.frame.width,
+    height: built.frame.height,
+    data: dataRest,
+  });
+  // Column reflow when the frame height moved — same dance as the source
+  // dialog's redraw, so converting cannot bury the blocks below it.
+  if (Math.abs(built.frame.height - oldHeight) >= 2) {
+    const page = livePageLike();
+    const planned = planHeightChange(
+      {
+        ...page,
+        nodes: page.nodes.map((n) => (n.id === frameId ? { ...n, height: oldHeight } : n)),
+      },
+      frameId,
+      built.frame.height,
+    );
+    if (planned.ok && planned.dy !== 0) {
+      useCanvasStore.setState({
+        nodes: planned.nextNodes.map((n) =>
+          n.id === frameId ? { ...n, height: built.frame.height, width: built.frame.width } : n,
+        ),
+      });
+      useDrawStore.setState({ strokes: planned.nextStrokes });
+    }
+  }
+  useWorkspaceStore.getState().markDirty();
+  undoBatchEnd();
+
+  return {
+    ok: true,
+    memberCount: built.contents.length,
+    skipped: built.diagnostics.filter((d) => d.severity === 'error').length,
+  };
+}
+
 export const STARTER_DIAGRAM = `@startuml
 component "gateway" as gw {
   portin telemetry

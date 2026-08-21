@@ -1,8 +1,8 @@
 # SRS: Agent Bridge
 
 **Project:** PowerNote  
-**Version:** 0.61.1  
-**Date:** 2026-08-17
+**Version:** 0.66.0
+**Date:** 2026-08-21
 
 ## Purpose
 
@@ -117,6 +117,7 @@ Added after the feature was demoed live and before it shipped.
 | REQ-AGENT-068 | An agent shall insert an image (`insert_image`) into a scroll. Source is exactly one of `data` (a base64 data URI) or `path` (a local file the MCP server reads and encodes); both or neither is `BAD_PARAMS`. Placement addressing matches `insert_block` (`scrollId` + `after`/`index`), occupants below shift per REQ-AGENT-067. Optional `alt` and `mini`. The image runs the same downscale/embed pipeline as UI imports (REQ-IMAGE-021) — the persisted `src` is always a data URI. The response is the node id plus final display and natural dims. One undo restores | Must | T171 |
 | REQ-AGENT-069 | `read_page` shall list image nodes in an `images[]` index: `{id, alt, w, h, naturalWidth, naturalHeight, bytes, mini, scrollId}` — never the base64 payload, in any tool response. `include` gains `"images"` (in the default set); `scrollId` filters it. The REQ-AGENT-063 budget invariant holds on pages dense with images; over budget, `images[]` trims at an entry boundary with `imagesTruncated: {at, notice}` | Must | T172 |
 | REQ-AGENT-070 | An agent shall export one image (`read_image`) by node id: the decoded bytes are written to `out_path` (or a temp file the response names) so the agent can view the file directly; the response carries the path, format, byte size and dims — not the payload. Unknown id is `NOT_FOUND`; a non-image id is `UNSUPPORTED` naming the type | Must | T172 |
+| REQ-AGENT-071 | An agent shall resize a scroll by stable id with `resize_scroll`. Width is finite, clamped by the same shared bounds as the UI, persists on that page, shifts every right-hand node/stroke by the delta, and returns the requested/effective width and delta. Unknown ids are `NOT_FOUND`; one undo restores | Must | T186 |
 
 ## Related
 

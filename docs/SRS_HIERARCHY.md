@@ -1,8 +1,8 @@
 # SRS: Hierarchy Panel
 
 **Project:** PowerNote
-**Version:** 0.60.0
-**Date:** 2026-08-17
+**Version:** 0.66.0
+**Date:** 2026-08-21
 
 ## Purpose
 
@@ -35,3 +35,5 @@ Organize the workspace into sections and pages, with a navigable hierarchy panel
 | REQ-HIER-021 | The last scroll on a page shall remain undeletable (the append-target invariant). A plain page is one untitled scroll — untitle it instead of deleting the last one. `delete_scroll` shall say so when it refuses | Must | T157, T109 |
 | REQ-HIER-022 | Column operations that renumber bands (delete-keep, reorder, move) shall use one group-aware membership/shift path: a diagram or group belongs to the band of its FRAME origin and every member and grouped stroke follows that verdict, never split; ungrouped strokes belong to the band of their first point and shift with it. This closes the straddling-diagram tearing class for ALL column operations | Must | T158 |
 | REQ-HIER-023 | The user shall be able to delete a named scroll from the scroll-header context menu and from a hover control in the hierarchy sidebar. An empty band shall delete immediately. A band with content shall offer Keep notes (column goes, neighbours close) or Delete notes too (column and its content go). The last scroll on a page shall not be deletable (REQ-HIER-021). One undo shall restore the band, its nodes and its ink | Must | T167 |
+| REQ-HIER-024 | A titled scroll header shall expose a right-edge column-resize handle. Dragging shall preview the clamped width continuously but commit exactly one width change on pointer-up; the committed change shifts every right-hand node and stroke by the width delta and one undo restores both width and positions | Must | T186 |
+| REQ-HIER-025 | Double-clicking the scroll resize handle shall reset the band to the default A4 width by removing the custom `width` field, preserving the absent-width compatibility contract | Must | T186 |
