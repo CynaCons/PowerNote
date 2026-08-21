@@ -1327,6 +1327,11 @@
 - [x] Scroll header right-edge drag previews width and commits once; double-click resets to absent/default width
 - [x] resize_scroll bridge + MCP tool; list_scrolls reports effective width
 - [x] T186 + REQ-HIER-024/025, REQ-AGENT-071, REQ-SCROLL-031; 732/732 green on a fresh server; smoke clean; showcase artifact
+### v0.66.1 — Release without the full Playwright gate (2026-08-21) (COMPLETE)
+**Goal:** Publishing a requested tag builds and uploads the committed single-file artifact promptly; the full Playwright campaign remains a local pre-tag requirement and a separate main/PR CI signal, not a release blocker.
+- [x] Remove Chromium installation and the full Playwright campaign from release.yml; keep the release artifact build and publication path [agent: codex]
+- [x] Prove a real v0.63.1 notebook can fetch/open v0.66.0 from GitHub with version and content preserved [agent: codex]
+- [x] Document release-gate policy in SRS_UPDATE and verify workflow syntax [agent: codex]
 ## Future (Backlog)
 > Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 

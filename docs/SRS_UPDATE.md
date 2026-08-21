@@ -46,3 +46,10 @@ must download the new build once by hand; from then on updating works.
 | REQ-UPDATE-029 | An explicit check requested by the user or an agent shall bypass the cache | Must | — |
 | REQ-UPDATE-030 | The updated notebook shall embed the canvas AS IT IS at the moment Update is clicked, including edits never explicitly saved. The workspace must be re-read from the store AFTER savePageNodes/savePageStrokes run — zustand states are immutable, so a pre-save snapshot's `.workspace` silently drops those edits (found by the v0.37.5→v0.52.3 end-to-end update test: the output page had zero nodes). Note: notebooks built by v0.37.x–v0.52.3 still carry the old handler, so updating FROM them loses unsaved-at-click edits; saved content is unaffected | Must | T154 |
 | REQ-UPDATE-031 | An app update shall carry the notebook's installed extension blocks into the fresh template: `buildUpdatedHtml` accepts the blocks and `performUpdate` collects them from the extension loader (memory → document block → IndexedDB) before building the final HTML. The template arrives pristine from the release, so anything not re-injected is silently uninstalled — with no extensions held, the output is byte-identical to the pre-v0.65 behaviour | Must | T183 |
+
+## Release publication policy (v0.66.1)
+
+| ID | Description | Priority | Test Ref |
+|----|-------------|----------|----------|
+| REQ-UPDATE-032 | A requested version tag shall build and publish the committed single-file artifact without installing a browser or rerunning the full Playwright campaign. The full campaign remains a required local pre-tag check and an independent `main`/pull-request CI signal, so its duration or an unrelated flake cannot strand an intentional release. | Must | workflow inspection |
+| REQ-UPDATE-033 | Release hardening shall include a real upgrade proof from a previously shipped notebook artifact to the newly published tag, confirming that the new version runs and embedded notebook content survives. | Must | release smoke |
