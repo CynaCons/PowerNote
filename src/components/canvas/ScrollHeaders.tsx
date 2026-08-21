@@ -39,10 +39,14 @@ interface ScrollHeadersProps {
   mode: BackgroundMode;
   scrolls: ScrollRecord[];
   pageId: string;
+  onResizePreviewChange?: (preview: { scrollId: string; width: number } | null) => void;
 }
 
 const TITLE_INSET = 16;
-const RESIZE_HANDLE_WIDTH = 12;
+const RESIZE_HIT_SCREEN_WIDTH = 20;
+const RESIZE_HIT_SCREEN_HEIGHT = 24;
+const RESIZE_BADGE_SCREEN_WIDTH = 68;
+const RESIZE_BADGE_SCREEN_HEIGHT = 24;
 
 
 /**
@@ -58,9 +62,10 @@ const RESIZE_HANDLE_WIDTH = 12;
  * so drawing a placeholder for each would put a header on every page of every
  * existing notebook — a name is something you choose, not something you inherit.
  */
-export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
+export function ScrollHeaders({ mode, scrolls, pageId, onResizePreviewChange }: ScrollHeadersProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [resizePreview, setResizePreview] = useState<{ scrollId: string; width: number } | null>(null);
+  const resizeDrag = useRef<{ scrollId: string; pointerX: number; width: number } | null>(null);
   const [menu, setMenu] = useState<{
     scrollId: string;
     x: number;
@@ -147,15 +152,43 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
     setEditingId(null);
   };
 
+  const setLiveResizePreview = (preview: { scrollId: string; width: number } | null) => {
+    setResizePreview(preview);
+    onResizePreviewChange?.(preview);
+  };
+
+  const dragWidth = (event: { target: { getStage: () => import('konva/lib/Stage').Stage | null } }) => {
+    const drag = resizeDrag.current;
+    const stage = event.target.getStage();
+    const pointerX = stage?.getPointerPosition()?.x;
+    if (!drag || pointerX == null) return null;
+    const scale = stage?.scaleX() || 1;
+    return Math.max(
+      MIN_SCROLL_WIDTH,
+      Math.min(MAX_SCROLL_WIDTH, drag.width + (pointerX - drag.pointerX) / scale),
+    );
+  };
+
+  const setResizeCursor = (
+    event: { target: { getStage: () => import('konva/lib/Stage').Stage | null } },
+    cursor: '' | 'col-resize',
+  ) => {
+    const container = event.target.getStage()?.container();
+    if (container) container.style.cursor = cursor;
+  };
+
   return (
     <Group>
       {displayScrolls.map((scroll) => {
         const x = columnLeft(scroll.column, displayScrolls);
         const bandW = columnWidth(scroll.column, displayScrolls);
         const isEditing = editingId === scroll.id;
+        const stripH = SCROLL_TITLE_PINNED_STRIP_HEIGHT;
+        const scale = Math.max(viewport.scale || 1, 0.1);
+        const resizeHitW = RESIZE_HIT_SCREEN_WIDTH / scale;
+        const resizeHitH = Math.max(stripH, RESIZE_HIT_SCREEN_HEIGHT / scale);
 
         const { y: pinnedY, holding: isHolding } = scrollTitleY(viewport, ceiling);
-        const stripH = SCROLL_TITLE_PINNED_STRIP_HEIGHT;
         // At rest the bar TOP is the ceiling row itself (T150) — including a
         // negative ceiling over legacy content, which a clamp-to-0 would bury.
         // Held, the bar rides flush with the viewport top (pinnedY backs out
@@ -285,7 +318,7 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
                   setMenu({ scrollId: scroll.id, x: e.clientX, y: e.clientY });
                 }}
                 style={{
-                  width: bandW - RESIZE_HANDLE_WIDTH,
+                  width: Math.max(0, bandW - resizeHitW / 2),
                   height: stripH,
                   boxSizing: 'border-box',
                   background: SCROLL_TITLE_PINNED_FILL,
@@ -309,62 +342,108 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
             </Html>
             <Line
               name="scroll-resize-grip"
-              points={[x + bandW - 3, stripY + 8, x + bandW - 3, stripY + stripH - 8]}
+              points={[
+                x + bandW - 3 / scale,
+                stripY + stripH / 2 - 6 / scale,
+                x + bandW - 3 / scale,
+                stripY + stripH / 2 + 6 / scale,
+              ]}
               stroke={SCROLL_TITLE_HAIRLINE}
-              strokeWidth={2}
+              strokeWidth={2 / scale}
               listening={false}
             />
             <Rect
               name="scroll-resize-handle"
-              x={x + bandW - RESIZE_HANDLE_WIDTH / 2}
-              y={stripY}
-              width={RESIZE_HANDLE_WIDTH}
-              height={stripH}
+              x={x + bandW - resizeHitW / 2}
+              y={stripY + (stripH - resizeHitH) / 2}
+              width={resizeHitW}
+              height={resizeHitH}
               fill="rgba(0,0,0,0.001)"
               draggable
-              dragBoundFunc={(position) => ({
-                x: Math.max(
-                  x + MIN_SCROLL_WIDTH - RESIZE_HANDLE_WIDTH / 2,
-                  Math.min(x + MAX_SCROLL_WIDTH - RESIZE_HANDLE_WIDTH / 2, position.x),
-                ),
-                y: stripY,
-              })}
-              onMouseEnter={() => { document.body.style.cursor = 'col-resize'; }}
-              onMouseLeave={() => { document.body.style.cursor = ''; }}
+              onMouseEnter={(event) => setResizeCursor(event, 'col-resize')}
+              onMouseLeave={(event) => {
+                if (!resizeDrag.current) setResizeCursor(event, '');
+              }}
+              onMouseDown={(event) => {
+                const stage = event.target.getStage();
+                const pointerX = stage?.getPointerPosition()?.x;
+                if (pointerX != null) {
+                  resizeDrag.current = { scrollId: scroll.id, pointerX, width: bandW };
+                }
+              }}
+              onTouchStart={(event) => {
+                const stage = event.target.getStage();
+                const pointerX = stage?.getPointerPosition()?.x;
+                if (pointerX != null) {
+                  resizeDrag.current = { scrollId: scroll.id, pointerX, width: bandW };
+                }
+              }}
               onDragStart={(event) => {
                 event.cancelBubble = true;
                 setActiveScroll(scroll.id);
+                setResizeCursor(event, 'col-resize');
               }}
               onDragMove={(event) => {
                 event.cancelBubble = true;
-                const width = Math.max(
-                  MIN_SCROLL_WIDTH,
-                  Math.min(MAX_SCROLL_WIDTH, event.target.x() - x + RESIZE_HANDLE_WIDTH / 2),
-                );
-                setResizePreview({ scrollId: scroll.id, width });
+                const width = dragWidth(event);
+                if (width != null) setLiveResizePreview({ scrollId: scroll.id, width });
               }}
               onDragEnd={(event) => {
                 event.cancelBubble = true;
-                const width = Math.max(
-                  MIN_SCROLL_WIDTH,
-                  Math.min(MAX_SCROLL_WIDTH, event.target.x() - x + RESIZE_HANDLE_WIDTH / 2),
-                );
-                setResizePreview(null);
-                document.body.style.cursor = '';
-                resizeScroll(pageId, scroll.id, width);
+                const width = dragWidth(event);
+                resizeDrag.current = null;
+                setLiveResizePreview(null);
+                setResizeCursor(event, '');
+                if (width != null) resizeScroll(pageId, scroll.id, width);
               }}
               onDblClick={(event) => {
                 event.cancelBubble = true;
-                setResizePreview(null);
+                resizeDrag.current = null;
+                setLiveResizePreview(null);
                 resizeScroll(pageId, scroll.id, undefined);
               }}
               onDblTap={(event) => {
                 event.cancelBubble = true;
-                setResizePreview(null);
+                resizeDrag.current = null;
+                setLiveResizePreview(null);
                 resizeScroll(pageId, scroll.id, undefined);
               }}
               aria-label={`Resize ${scroll.title || 'scroll'}; double-click resets to ${A4_WIDTH}px`}
             />
+            {resizePreview?.scrollId === scroll.id && (
+              <>
+                <Line
+                  name="scroll-resize-preview-line"
+                  points={[x + bandW, -100000, x + bandW, 100000]}
+                  stroke={SCROLL_TITLE_INK}
+                  strokeWidth={1.5 / scale}
+                  dash={[6 / scale, 4 / scale]}
+                  listening={false}
+                />
+                <Rect
+                  name="scroll-resize-width-badge"
+                  x={x + bandW - RESIZE_BADGE_SCREEN_WIDTH / scale}
+                  y={stripY + stripH + 6 / scale}
+                  width={RESIZE_BADGE_SCREEN_WIDTH / scale}
+                  height={RESIZE_BADGE_SCREEN_HEIGHT / scale}
+                  fill={SCROLL_TITLE_INK}
+                  cornerRadius={4 / scale}
+                  listening={false}
+                />
+                <Text
+                  name="scroll-resize-width-text"
+                  x={x + bandW - RESIZE_BADGE_SCREEN_WIDTH / scale}
+                  y={stripY + stripH + 12 / scale}
+                  width={RESIZE_BADGE_SCREEN_WIDTH / scale}
+                  text={`${Math.round(bandW)} px`}
+                  align="center"
+                  fontSize={12 / scale}
+                  fontFamily="Inter, system-ui, sans-serif"
+                  fill={SCROLL_TITLE_PINNED_FILL}
+                  listening={false}
+                />
+              </>
+            )}
           </Group>
         );
       })}

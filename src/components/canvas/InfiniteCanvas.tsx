@@ -45,6 +45,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
 
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [snapLines, setSnapLines] = useState<SnapLine[]>([]);
+  const [scrollResizePreview, setScrollResizePreview] = useState<{ scrollId: string; width: number } | null>(null);
 
   const drawStrokes = useDrawStore((s) => s.strokes);
   const selectedStrokeIds = useDrawStore((s) => s.selectedStrokeIds);
@@ -68,6 +69,13 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
         .find((sec) => sec.id === s.activeSectionId)
         ?.pages.find((p) => p.id === s.activePageId)?.scrolls ?? EMPTY_SCROLLS,
   );
+  const previewScrolls = scrollResizePreview
+    ? activeScrolls.map((scroll) => scroll.id === scrollResizePreview.scrollId
+      ? { ...scroll, width: scrollResizePreview.width }
+      : scroll)
+    : activeScrolls;
+
+  useEffect(() => setScrollResizePreview(null), [activePageId]);
 
   // ── Extracted hooks ─────────────────────────────────────────
   const {
@@ -370,7 +378,7 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
           onTouchEnd={handleTouchEnd}
         >
           <Layer>
-            <PageGuides mode={backgroundMode} nodes={nodes} scrolls={activeScrolls} />
+            <PageGuides mode={backgroundMode} nodes={nodes} scrolls={previewScrolls} />
           </Layer>
           <Layer>
             {/* Shape preview ghost while dragging — uses same coordinate system as ShapeNode */}
@@ -420,7 +428,12 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
               top of the viewport, content scrolls underneath it, so drawing it
               in the guide layer would let blocks pass over the header. */}
           <Layer>
-            <ScrollHeaders mode={backgroundMode} scrolls={activeScrolls} pageId={activePageId} />
+            <ScrollHeaders
+              mode={backgroundMode}
+              scrolls={activeScrolls}
+              pageId={activePageId}
+              onResizePreviewChange={setScrollResizePreview}
+            />
           </Layer>
           {/* Drawings render above nodes (REQ-DRAW-009) so pen strokes
               annotate over images/text/shapes. listening={false} keeps

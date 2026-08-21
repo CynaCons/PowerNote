@@ -1,7 +1,7 @@
 # SRS: Hierarchy Panel
 
 **Project:** PowerNote
-**Version:** 0.66.0
+**Version:** 0.66.2
 **Date:** 2026-08-21
 
 ## Purpose
@@ -37,3 +37,4 @@ Organize the workspace into sections and pages, with a navigable hierarchy panel
 | REQ-HIER-023 | The user shall be able to delete a named scroll from the scroll-header context menu and from a hover control in the hierarchy sidebar. An empty band shall delete immediately. A band with content shall offer Keep notes (column goes, neighbours close) or Delete notes too (column and its content go). The last scroll on a page shall not be deletable (REQ-HIER-021). One undo shall restore the band, its nodes and its ink | Must | T167 |
 | REQ-HIER-024 | A titled scroll header shall expose a right-edge column-resize handle. Dragging shall preview the clamped width continuously but commit exactly one width change on pointer-up; the committed change shifts every right-hand node and stroke by the width delta and one undo restores both width and positions | Must | T186 |
 | REQ-HIER-025 | Double-clicking the scroll resize handle shall reset the band to the default A4 width by removing the custom `width` field, preserving the absent-width compatibility contract | Must | T186 |
+| REQ-HIER-026 | Scroll-resize drag shall be invariant under canvas pan and zoom: screen movement divided by the active zoom is the canvas-width delta from the drag-start width. The hit target shall remain at least 20 screen pixels wide, and the affected band guide plus an explicit width readout shall follow the pointer before the single pointer-up commit | Must | T186 |

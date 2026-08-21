@@ -77,6 +77,7 @@ function renderPages(nodes: CanvasNode[], scrolls?: ScrollRecord[]) {
     elements.push(
       <Rect
         key={`page-bg-${key}`}
+        name="page-sheet"
         x={x}
         y={y}
         width={w}

@@ -1,6 +1,6 @@
 /**
  * Test 186: scroll widths are user/agent resizable, persistent and undoable.
- * Covers: REQ-HIER-024, REQ-HIER-025, REQ-SCROLL-031, REQ-AGENT-071
+ * Covers: REQ-HIER-024..026, REQ-SCROLL-031/032, REQ-AGENT-071
  */
 import { test, expect, type Page } from '@playwright/test';
 import { runBridge, runBridgeExpectingError, stubBridgeUrl, waitForBridgeReady, waitForCanvasReady } from '../helpers';
@@ -45,7 +45,7 @@ async function dragFirstResizeHandle(page: Page, delta: number) {
   await page.mouse.up();
 }
 
-test.describe('186 - Resize scroll width (REQ-HIER-024/025, REQ-SCROLL-031, REQ-AGENT-071)', () => {
+test.describe('186 - Resize scroll width (REQ-HIER-024..026, REQ-SCROLL-031/032, REQ-AGENT-071)', () => {
   test.beforeEach(async ({ page }) => {
     await stubBridgeUrl(page);
     await page.goto('/');
@@ -88,6 +88,82 @@ test.describe('186 - Resize scroll width (REQ-HIER-024/025, REQ-SCROLL-031, REQ-
     expect(restored.storedWidth).toBeNull();
     expect(restored.rightX).toBeCloseTo(seeded.rightX, 5);
     expect(restored.columnLeft).toBeCloseTo(seeded.rightX, 5);
+  });
+
+  test('drag follows screen movement under pan/zoom and previews before the one commit', async ({ page }) => {
+    const seeded = await seedTwoScrolls(page);
+    const scale = 0.3;
+    const edgeScreenX = 100;
+    await page.waitForFunction(() => (window as any).Konva.stages[0].find('.scroll-resize-handle').length === 2);
+    await page.evaluate(({ scale, edgeScreenX }) => {
+      const stores = (window as any).__POWERNOTE_STORES__;
+      const stage = (window as any).Konva.stages[0];
+      const handle = stage.find('.scroll-resize-handle')[0];
+      const edgeWorldX = handle.x() + handle.width() / 2;
+      stores.canvas.getState().setViewport({ x: edgeScreenX - edgeWorldX * scale, y: 0, scale });
+    }, { scale, edgeScreenX });
+
+    const point = await page.evaluate(() => {
+      const stage = (window as any).Konva.stages[0];
+      const handle = stage.find('.scroll-resize-handle')[0];
+      const rect = handle.getClientRect();
+      const box = stage.container().getBoundingClientRect();
+      return {
+        x: box.left + rect.x + rect.width / 2,
+        y: box.top + rect.y + rect.height / 2,
+        hitWidth: rect.width,
+      };
+    });
+    expect(point.hitWidth).toBeCloseTo(20, 1);
+
+    await page.mouse.move(point.x, point.y);
+    await page.mouse.down();
+    await page.mouse.move(point.x + 20, point.y, { steps: 4 });
+
+    const expectedWidth = seeded.defaultWidth + 20 / scale;
+    const preview = await page.evaluate(({ firstId }) => {
+      const stage = (window as any).Konva.stages[0];
+      const stores = (window as any).__POWERNOTE_STORES__;
+      const scroll = stores.workspace.getState().getActivePage().scrolls.find((s: any) => s.id === firstId);
+      const line = stage.find('.scroll-resize-preview-line')[0];
+      return {
+        storedWidth: scroll.width ?? null,
+        guideWidth: stage.find('.page-sheet')[0].width(),
+        label: stage.find('.scroll-resize-width-text')[0].text(),
+        lineScreenX: stage.x() + line.points()[0] * stage.scaleX(),
+      };
+    }, seeded);
+    expect(preview.storedWidth).toBeNull();
+    expect(preview.guideWidth).toBeCloseTo(expectedWidth, 4);
+    expect(preview.label).toBe(`${Math.round(expectedWidth)} px`);
+    expect(preview.lineScreenX).toBeCloseTo(edgeScreenX + 20, 1);
+
+    await page.mouse.up();
+    const committedWidth = await page.evaluate(({ firstId }) => {
+      const ws = (window as any).__POWERNOTE_STORES__.workspace.getState();
+      return ws.getActivePage().scrolls.find((s: any) => s.id === firstId).width;
+    }, seeded);
+    expect(committedWidth).toBeCloseTo(expectedWidth, 4);
+  });
+
+  test('a small drag at 20% zoom does not explode to the maximum width', async ({ page }) => {
+    const seeded = await seedTwoScrolls(page);
+    const scale = 0.2;
+    await page.waitForFunction(() => (window as any).Konva.stages[0].find('.scroll-resize-handle').length === 2);
+    await page.evaluate(({ scale }) => {
+      const stores = (window as any).__POWERNOTE_STORES__;
+      const stage = (window as any).Konva.stages[0];
+      const handle = stage.find('.scroll-resize-handle')[0];
+      const edgeWorldX = handle.x() + handle.width() / 2;
+      stores.canvas.getState().setViewport({ x: 50 - edgeWorldX * scale, y: 0, scale });
+    }, { scale });
+
+    await dragFirstResizeHandle(page, 20);
+    const width = await page.evaluate(({ firstId }) => {
+      const ws = (window as any).__POWERNOTE_STORES__.workspace.getState();
+      return ws.getActivePage().scrolls.find((s: any) => s.id === firstId).width;
+    }, seeded);
+    expect(width).toBeCloseTo(seeded.defaultWidth + 20 / scale, 4);
   });
 
   test('double-clicking the handle resets to an absent default width', async ({ page }) => {

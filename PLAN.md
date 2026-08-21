@@ -1332,6 +1332,12 @@
 - [x] Remove Chromium installation and the full Playwright campaign from release.yml; keep the release artifact build and publication path [agent: codex]
 - [x] Prove a real v0.63.1 notebook can fetch/open v0.66.0 from GitHub with version and content preserved [agent: codex]
 - [x] Document release-gate policy in SRS_UPDATE and verify workflow syntax [agent: codex]
+### v0.66.2 — Scroll resize follows the pointer (2026-08-21) (COMPLETE)
+**Goal:** Make manual scroll resizing controllable at every canvas pan and zoom: screen movement maps exactly to canvas-width change, the handle remains easy to acquire, and live feedback shows the band boundary before one atomic commit.
+- [x] Replace mixed absolute/world drag math with drag-start screen delta divided by zoom, clamped in the shared width domain [agent: codex]
+- [x] Keep a screen-sized resize hit target and show live guide/width feedback while dragging [agent: codex]
+- [x] Extend T186 across pan/zoom and preview-before-commit; update SRS requirements [agent: codex]
+- [x] Run focused and full verification, smoke, showcase, then prepare the hotfix release [agent: codex]
 ## Future (Backlog)
 > Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 

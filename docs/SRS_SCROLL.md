@@ -1,7 +1,7 @@
 # SRS: Scrolls
 
 **Project:** PowerNote  
-**Version:** 0.66.0
+**Version:** 0.66.2
 **Date:** 2026-08-21
 
 ## Purpose
@@ -60,6 +60,7 @@ is that sequential writes from different workstreams land in different columns.
 | REQ-SCROLL-012 | Clicking a scroll in the sidebar shall open its page, make it active, and move the viewport to the top of that scroll | Must | T108 |
 | REQ-SCROLL-030 | Every scroll packs as a column for insert/move/height-change (REQ-DIAG-002..004, REQ-AGENT-067). Guide style (pages / grid / scroll / none) is visual only. Human drag does not reflow. | Must | T110 |
 | REQ-SCROLL-031 | A scroll's effective width shall be persistent per page, clamped to the shared minimum/maximum, and used by cumulative `columnLeft` geometry. Changing it in either direction shall shift all content to the right of the band by the same delta while leaving the resized band's occupants fixed | Must | T186 |
+| REQ-SCROLL-032 | Manual resize preview and commit shall use one drag-start snapshot and the viewport scale, never mix absolute screen coordinates with canvas coordinates. Previewing shall not write workspace history; pointer-up shall commit exactly once | Must | T186 |
 
 ## Traceability
 
