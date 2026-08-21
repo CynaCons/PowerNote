@@ -16,6 +16,7 @@ import type {
   CanvasBgColor,
   CanvasNode,
   DiagramNodeData,
+  ImageNodeData,
   ScrollRecord,
   Stroke,
   TextNodeData,
@@ -33,6 +34,7 @@ import {
   diagramFrameIds,
   isContentBlock,
   orderedDiagramFrames,
+  orderedImageNodes,
   orderedTextNodes,
   nextBlockY,
 } from './blocks';
@@ -74,7 +76,9 @@ import type {
   DiagramSummary,
   FitDiagramResult,
   GetBlockResult,
+  ImageSummary,
   InsertBlockResult,
+  InsertImageResult,
   ListPagesResult,
   ListScrollsResult,
   MarkdownTruncation,
@@ -84,6 +88,7 @@ import type {
   MovePageResult,
   MoveScrollResult,
   PageContent,
+  ReadImageResult,
   RenameNotebookResult,
   RenamePageResult,
   RenameScrollResult,
@@ -97,6 +102,14 @@ import { APP_VERSION } from '../version';
 import { checkForUpdate, performUpdate } from '../utils/updateChecker';
 import { isFSASupported } from '../utils/fileSystemAccess';
 import { getCurrentHandle } from '../utils/fileHandleStore';
+import {
+  dataUriDecodedBytes,
+  dataUriImageFormat,
+  embedImage,
+  imageNodeFromEmbed,
+  type ImageEmbed,
+} from '../utils/imageEmbed';
+import { imageMiniTogglePatch } from '../utils/imageMini';
 
 export class BridgeCommandError extends Error {
   code: BridgeErrorCode;
@@ -310,24 +323,51 @@ function summariseDiagram(
   };
 }
 
-const INCLUDE_FIELDS = ['blocks', 'diagrams', 'strokes-summary'] as const;
+function summariseImage(
+  page: import('../types/data').Page,
+  node: CanvasNode,
+): ImageSummary {
+  const data = node.data as ImageNodeData;
+  const src = typeof data.src === 'string' ? data.src : '';
+  const column = columnOf(node, page.scrolls);
+  return {
+    id: node.id,
+    alt: typeof data.alt === 'string' ? data.alt : '',
+    x: node.x,
+    y: node.y,
+    w: node.width,
+    h: node.height,
+    naturalWidth: data.naturalWidth,
+    naturalHeight: data.naturalHeight,
+    bytes: dataUriDecodedBytes(src),
+    mini: !!data.mini,
+    scrollId: scrollIdForColumn(page, column),
+  };
+}
+
+const INCLUDE_FIELDS = ['blocks', 'diagrams', 'images', 'strokes-summary'] as const;
 type IncludeField = (typeof INCLUDE_FIELDS)[number];
+const DEFAULT_INCLUDE: IncludeField[] = ['blocks', 'diagrams', 'images'];
+
+function isIncludeField(item: unknown): item is IncludeField {
+  return typeof item === 'string' && (INCLUDE_FIELDS as readonly string[]).includes(item);
+}
 
 function parseInclude(params: Record<string, unknown>): Set<IncludeField> {
   const raw = params.include;
-  if (raw === undefined || raw === null) return new Set(['blocks', 'diagrams']);
+  if (raw === undefined || raw === null) return new Set(DEFAULT_INCLUDE);
   if (!Array.isArray(raw)) {
     throw new BridgeCommandError(
       'BAD_PARAMS',
-      '"include" must be an array of "blocks", "diagrams", and/or "strokes-summary"',
+      '"include" must be an array of "blocks", "diagrams", "images", and/or "strokes-summary"',
     );
   }
   const set = new Set<IncludeField>();
   for (const item of raw) {
-    if (item !== 'blocks' && item !== 'diagrams' && item !== 'strokes-summary') {
+    if (!isIncludeField(item)) {
       throw new BridgeCommandError(
         'BAD_PARAMS',
-        `"${String(item)}" is not an include field. Valid values: blocks, diagrams, strokes-summary.`,
+        `"${String(item)}" is not an include field. Valid values: ${INCLUDE_FIELDS.join(', ')}.`,
       );
     }
     set.add(item);
@@ -503,40 +543,51 @@ function applyResponseBudget(result: PageContent, moreAfterWindow: boolean): Pag
   const diagramNotice =
     `Response exceeded the ${READ_PAGE_RESPONSE_BUDGET}-character budget. ` +
     'Diagrams after this one were omitted.';
+  const imageNotice =
+    `Response exceeded the ${READ_PAGE_RESPONSE_BUDGET}-character budget. ` +
+    'Images after this one were omitted. Use read_image on images[].id to inspect one.';
 
   const pack = (
     blocks: BlockSummary[],
     diagrams: DiagramSummary[],
+    images: ImageSummary[],
     more: boolean,
     truncatedAt?: string,
     diagramsTruncatedAt?: string,
+    imagesTruncatedAt?: string,
   ): PageContent => {
     const last = blocks[blocks.length - 1];
     return {
       ...result,
       blocks,
       diagrams,
+      images,
       ...(more && last ? { nextCursor: last.blockId } : {}),
       ...(truncatedAt ? { truncated: { at: truncatedAt, notice: blockNotice } } : {}),
       ...(diagramsTruncatedAt
         ? { diagramsTruncated: { at: diagramsTruncatedAt, notice: diagramNotice } }
+        : {}),
+      ...(imagesTruncatedAt
+        ? { imagesTruncated: { at: imagesTruncatedAt, notice: imageNotice } }
         : {}),
     };
   };
 
   let blocks = result.blocks;
   let diagrams = result.diagrams;
+  let images = result.images;
   let more = moreAfterWindow;
   let truncatedAt: string | undefined;
   let diagramsTruncatedAt: string | undefined;
+  let imagesTruncatedAt: string | undefined;
 
-  let out = pack(blocks, diagrams, more);
+  let out = pack(blocks, diagrams, images, more);
 
   // 1. Trim blocks at a block boundary, always keeping one when any exist.
   if (serializedLength(out) > READ_PAGE_RESPONSE_BUDGET && blocks.length > 0) {
     const kept: BlockSummary[] = [];
     for (const block of blocks) {
-      const trial = pack([...kept, block], diagrams, true, block.blockId);
+      const trial = pack([...kept, block], diagrams, images, true, block.blockId);
       if (serializedLength(trial) > READ_PAGE_RESPONSE_BUDGET && kept.length > 0) break;
       kept.push(block);
     }
@@ -545,20 +596,20 @@ function applyResponseBudget(result: PageContent, moreAfterWindow: boolean): Pag
     more = moreAfterWindow || kept.length < blocks.length;
     truncatedAt = last.blockId;
     blocks = kept;
-    out = pack(blocks, diagrams, more, truncatedAt);
+    out = pack(blocks, diagrams, images, more, truncatedAt);
   }
 
   // 2. Drop per-diagram source fields (replaced with sourceOmitted).
   if (serializedLength(out) > READ_PAGE_RESPONSE_BUDGET) {
     diagrams = omitDiagramSources(diagrams);
-    out = pack(blocks, diagrams, more, truncatedAt);
+    out = pack(blocks, diagrams, images, more, truncatedAt);
   }
 
   // 3. Trim diagrams[] at an entry boundary.
   if (serializedLength(out) > READ_PAGE_RESPONSE_BUDGET && diagrams.length > 0) {
     const kept: DiagramSummary[] = [];
     for (const diagram of diagrams) {
-      const trial = pack(blocks, [...kept, diagram], more, truncatedAt, diagram.id);
+      const trial = pack(blocks, [...kept, diagram], images, more, truncatedAt, diagram.id);
       if (serializedLength(trial) > READ_PAGE_RESPONSE_BUDGET && kept.length > 0) break;
       kept.push(diagram);
     }
@@ -566,11 +617,34 @@ function applyResponseBudget(result: PageContent, moreAfterWindow: boolean): Pag
     diagrams = kept;
     const last = kept[kept.length - 1];
     diagramsTruncatedAt = dropped && last ? last.id : undefined;
-    out = pack(blocks, diagrams, more, truncatedAt, diagramsTruncatedAt);
+    out = pack(blocks, diagrams, images, more, truncatedAt, diagramsTruncatedAt);
   }
 
-  // 4. A single block larger than the budget: keep it, cut its markdown
-  // against the full page payload (envelope + diagrams + scrolls count).
+  // 4. Trim images[] at an entry boundary (sits with diagrams in the ladder).
+  if (serializedLength(out) > READ_PAGE_RESPONSE_BUDGET && images.length > 0) {
+    const kept: ImageSummary[] = [];
+    for (const image of images) {
+      const trial = pack(
+        blocks,
+        diagrams,
+        [...kept, image],
+        more,
+        truncatedAt,
+        diagramsTruncatedAt,
+        image.id,
+      );
+      if (serializedLength(trial) > READ_PAGE_RESPONSE_BUDGET && kept.length > 0) break;
+      kept.push(image);
+    }
+    const dropped = kept.length < images.length;
+    images = kept;
+    const last = kept[kept.length - 1];
+    imagesTruncatedAt = dropped && last ? last.id : undefined;
+    out = pack(blocks, diagrams, images, more, truncatedAt, diagramsTruncatedAt, imagesTruncatedAt);
+  }
+
+  // 5. A single block larger than the budget: keep it, cut its markdown
+  // against the full page payload (envelope + diagrams + images + scrolls).
   if (serializedLength(out) > READ_PAGE_RESPONSE_BUDGET && out.blocks.length > 0) {
     for (let i = 0; i < out.blocks.length; i++) {
       if (serializedLength(out) <= READ_PAGE_RESPONSE_BUDGET) break;
@@ -702,7 +776,7 @@ function missingScrollMessage(scrollId: string): string {
  */
 function parseBlockAnchor(
   params: Record<string, unknown>,
-  verb: 'insert_block' | 'move_block',
+  verb: 'insert_block' | 'move_block' | 'insert_image',
 ): { after: string } | { index: number } {
   const hasAfter = params.after !== undefined && params.after !== null;
   const hasIndex = params.index !== undefined && params.index !== null;
@@ -840,12 +914,23 @@ function readPage(params: Record<string, unknown>): PageContent {
       .map((frame) => summariseDiagram(page.nodes, frame, withSource));
   }
 
+  let images: ImageSummary[] = [];
+  if (include.has('images')) {
+    images = orderedImageNodes(page.nodes)
+      .filter((node) => {
+        if (!scrollId) return true;
+        return scrollIdForColumn(page, columnOf(node, page.scrolls)) === scrollId;
+      })
+      .map((node) => summariseImage(page, node));
+  }
+
   const result: PageContent = {
     sectionId: section.id,
     pageId: page.id,
     title: page.title,
     blocks: windowed.blocks,
     diagrams,
+    images,
     scrolls: summariseScrolls(page),
   };
 
@@ -986,6 +1071,200 @@ async function insertBlock(params: Record<string, unknown>): Promise<InsertBlock
   return {
     ...toBlockSummary(node, { scrolls: live.scrolls as import('../types/data').ScrollRecord[] }),
     displacedCount: plan.displaced.length,
+  };
+}
+
+const DATA_IMAGE_URI = /^data:image\/[a-zA-Z0-9.+-]+;base64,/;
+
+function presentParam(value: unknown): boolean {
+  return value !== undefined && value !== null && value !== '';
+}
+
+/** App-side source: a data URI. `path` is MCP-server-only. */
+function parseImageDataParam(params: Record<string, unknown>): string {
+  const hasData = presentParam(params.data);
+  const hasPath = presentParam(params.path);
+  if (hasData && hasPath) {
+    throw new BridgeCommandError(
+      'BAD_PARAMS',
+      'Pass data (a base64 data URI) or path, not both. path is resolved by the MCP server.',
+    );
+  }
+  if (!hasData && !hasPath) {
+    throw new BridgeCommandError(
+      'BAD_PARAMS',
+      'insert_image needs exactly one of data (a base64 data URI) or path (a local file the MCP server reads).',
+    );
+  }
+  if (hasPath) {
+    throw new BridgeCommandError(
+      'BAD_PARAMS',
+      'path is resolved by the MCP server; pass data (a data:image/...;base64, URI).',
+    );
+  }
+  if (typeof params.data !== 'string') {
+    throw new BridgeCommandError('BAD_PARAMS', '"data" must be a data:image/...;base64, URI');
+  }
+  if (!DATA_IMAGE_URI.test(params.data)) {
+    throw new BridgeCommandError(
+      'BAD_PARAMS',
+      '"data" must be a data:image/...;base64, URI',
+    );
+  }
+  return params.data;
+}
+
+function dataUriToBlob(data: string): Blob {
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]*)$/.exec(data);
+  if (!match) {
+    throw new BridgeCommandError('BAD_PARAMS', '"data" must be a data:image/...;base64, URI');
+  }
+  let binary: string;
+  try {
+    binary = atob(match[2]);
+  } catch {
+    throw new BridgeCommandError('BAD_PARAMS', 'Could not decode image data URI (invalid base64)');
+  }
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: match[1] });
+}
+
+async function embedFromDataUri(data: string): Promise<ImageEmbed> {
+  let blob: Blob;
+  try {
+    blob = dataUriToBlob(data);
+  } catch (err) {
+    if (err instanceof BridgeCommandError) throw err;
+    throw new BridgeCommandError(
+      'BAD_PARAMS',
+      err instanceof Error ? err.message : 'Could not decode image data URI',
+    );
+  }
+  try {
+    return await embedImage(blob);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : 'Could not decode image';
+    throw new BridgeCommandError('BAD_PARAMS', reason);
+  }
+}
+
+async function insertImage(params: Record<string, unknown>): Promise<InsertImageResult> {
+  flush();
+  const data = parseImageDataParam(params);
+  const scrollId = requireString(params, 'scrollId');
+  const anchor = parseBlockAnchor(params, 'insert_image');
+  const alt = optionalString(params, 'alt') || 'image';
+  const mini = optionalBool(params, 'mini');
+
+  const located = locateScroll(scrollId);
+  if (!located) {
+    throw new BridgeCommandError('NOT_FOUND', missingScrollMessage(scrollId));
+  }
+  const { section, page, scroll } = located;
+
+  if ('after' in anchor) {
+    const found = findNodeInNotebook(anchor.after);
+    if (!found) {
+      throw new BridgeCommandError('NOT_FOUND', `No block with id "${anchor.after}"`);
+    }
+    const liveCheck = livePageLike(page);
+    if (
+      found.page.id !== page.id ||
+      !isFlowItem(found.node, diagramFrameIds(found.page.nodes), !!liveCheck.columnFlow) ||
+      columnOf(found.node, found.page.scrolls) !== scroll.column
+    ) {
+      const col = columnOf(found.node, found.page.scrolls);
+      const owner = scrollIdForColumn(found.page, col);
+      throw new BridgeCommandError(
+        'BAD_PARAMS',
+        `"after" block "${anchor.after}" is not in scroll "${scrollId}" ` +
+          `(it sits in ${owner ? `scroll "${owner}"` : `column ${col}`}). ` +
+          'Pass a block from that scroll, or use index.',
+      );
+    }
+  }
+
+  // Embed before any store write so a decode failure adds nothing and has no undo.
+  const embed = await embedFromDataUri(data);
+
+  navigateToPage(section.id, page.id);
+
+  const live = livePageLike(page);
+  const node = imageNodeFromEmbed(embed, { x: 0, y: 0, alt });
+  if (mini) {
+    const patch = imageMiniTogglePatch(node);
+    if (patch) {
+      if (patch.width !== undefined) node.width = patch.width;
+      if (patch.height !== undefined) node.height = patch.height;
+      if (patch.data) node.data = patch.data;
+    }
+  }
+
+  const plan = insertBlockAt(
+    live,
+    scrollId,
+    'after' in anchor ? anchor.after : anchor.index,
+    node,
+    liveCeiling(),
+  );
+  if (!plan.ok) throwReflow(plan);
+
+  node.x = plan.x;
+  node.y = plan.y;
+  const nextNodes = [...applyDisplacements(live.nodes, plan.displaced), node];
+  applyFlowInOneUndo(nextNodes, applyStrokeDisplacements(live.strokes ?? [], plan.displaced));
+  flush();
+
+  const image = node.data as ImageNodeData;
+  return {
+    id: node.id,
+    x: node.x,
+    y: node.y,
+    width: node.width,
+    height: node.height,
+    naturalWidth: image.naturalWidth,
+    naturalHeight: image.naturalHeight,
+    mini: !!image.mini,
+    displacedCount: plan.displaced.length,
+  };
+}
+
+/**
+ * Internal: return the data URI so the MCP server can write a local file.
+ * The agent never sees this payload — the server strips `src` after decode.
+ * This frame is allowed to exceed READ_PAGE_RESPONSE_BUDGET (no ws frame cap
+ * below the `ws` 100 MiB default; images are already long-edge capped).
+ */
+function readImage(params: Record<string, unknown>): ReadImageResult {
+  flush();
+  const id = requireString(params, 'id');
+  const found = findNodeInNotebook(id);
+  if (!found) {
+    throw new BridgeCommandError('NOT_FOUND', `No image with id "${id}"`);
+  }
+  if (found.node.type !== 'image') {
+    throw new BridgeCommandError(
+      'UNSUPPORTED',
+      `"${id}" is a ${found.node.type} node, not an image.`,
+    );
+  }
+  const data = found.node.data as ImageNodeData;
+  const src = typeof data.src === 'string' ? data.src : '';
+  if (!src.startsWith('data:image/')) {
+    throw new BridgeCommandError(
+      'PRECONDITION',
+      `"${id}" has no embedded image payload.`,
+    );
+  }
+  return {
+    id: found.node.id,
+    src,
+    format: dataUriImageFormat(src),
+    bytes: dataUriDecodedBytes(src),
+    naturalWidth: data.naturalWidth,
+    naturalHeight: data.naturalHeight,
+    alt: typeof data.alt === 'string' ? data.alt : '',
   };
 }
 
@@ -2094,10 +2373,12 @@ const HANDLERS: Record<BridgeCommandName, Handler> = {
   list_pages: listPages,
   read_page: readPage,
   read_diagram: readDiagramCmd,
+  read_image: readImage,
   create_section: createSection,
   create_page: createPage,
   append_block: appendBlock,
   insert_block: insertBlock,
+  insert_image: insertImage,
   move_block: moveBlock,
   create_diagram: createDiagram,
   fit_diagram: fitDiagramCmd,

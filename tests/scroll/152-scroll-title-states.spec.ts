@@ -2,9 +2,8 @@
  * Test 152: Scroll title resting vs pinned visual states
  * Covers: REQ-HIER-019
  *
- * One title, two treatments. At the top of the scroll it is a heading on
- * the ceiling row. Past the existing v0.35 pin threshold it shrinks into a
- * compact wayfinding strip. Untitled scrolls still draw nothing.
+ * One TINT bar, rest and pin. Type size does not change. Untitled scrolls
+ * still draw nothing.
  */
 import { test, expect } from '@playwright/test';
 import { waitForCanvasReady } from '../helpers';
@@ -95,7 +94,7 @@ test.describe('152 - Scroll title resting vs pinned (REQ-HIER-019)', () => {
     await waitForCanvasReady(page);
   });
 
-  test('at rest the title is heading-sized with no background strip', async ({ page }) => {
+  test('at rest the title is the TINT bar with a hairline', async ({ page }) => {
     await titleScroll(page, 'Project notes');
     await waitForTitle(page, 'Project notes');
     const metrics = await titleMetrics(page);
@@ -103,15 +102,20 @@ test.describe('152 - Scroll title resting vs pinned (REQ-HIER-019)', () => {
 
     expect(snap).not.toBeNull();
     expect(snap!.fontSize).toBe(metrics.resting);
+    expect(snap!.fontSize).toBe(metrics.pinned);
     expect(snap!.fontStyle).toBe(metrics.style);
     expect(snap!.fill).toBe(metrics.ink);
-    expect(snap!.backing).toBeNull();
-    expect(snap!.hairline).toBe(false);
+    expect(snap!.backing).not.toBeNull();
+    expect(snap!.backing!.fill).toBe(metrics.fill);
+    expect(snap!.backing!.opacity).toBeCloseTo(metrics.opacity, 5);
+    expect(snap!.backing!.height).toBe(metrics.strip);
+    expect(snap!.hairline).toBe(true);
   });
 
-  test('scrolled past the pin threshold: compact type on a 0.92-white strip', async ({ page }) => {
+  test('scrolled past the pin threshold: same bar, same type size, held over content', async ({ page }) => {
     await titleScroll(page, 'Project notes');
     await waitForTitle(page, 'Project notes');
+    const atRest = await snapTitle(page, 'Project notes');
     await setCameraY(page, -600);
     await page.waitForTimeout(50);
 
@@ -120,6 +124,7 @@ test.describe('152 - Scroll title resting vs pinned (REQ-HIER-019)', () => {
 
     expect(snap).not.toBeNull();
     expect(snap!.fontSize).toBe(metrics.pinned);
+    expect(snap!.fontSize).toBe(atRest!.fontSize);
     expect(snap!.backing).not.toBeNull();
     expect(snap!.backing!.opacity).toBeCloseTo(metrics.opacity, 5);
     expect(snap!.backing!.height).toBe(metrics.strip);
@@ -127,7 +132,7 @@ test.describe('152 - Scroll title resting vs pinned (REQ-HIER-019)', () => {
     expect(snap!.hairline).toBe(true);
   });
 
-  test('scrolling back to the top restores the resting treatment', async ({ page }) => {
+  test('scrolling back to the top keeps the same bar treatment', async ({ page }) => {
     await titleScroll(page, 'Project notes');
     await waitForTitle(page, 'Project notes');
     await setCameraY(page, -600);
@@ -140,8 +145,8 @@ test.describe('152 - Scroll title resting vs pinned (REQ-HIER-019)', () => {
     const metrics = await titleMetrics(page);
     const rest = await snapTitle(page, 'Project notes');
     expect(rest!.fontSize).toBe(metrics.resting);
-    expect(rest!.backing).toBeNull();
-    expect(rest!.hairline).toBe(false);
+    expect(rest!.backing).not.toBeNull();
+    expect(rest!.hairline).toBe(true);
   });
 
   test('double-click opens the rename input in both states', async ({ page }) => {

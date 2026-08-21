@@ -18,13 +18,21 @@ export interface ImageCrop {
 }
 
 export interface ImageNodeData {
-  src: string; // base64 data URI or URL
+  src: string; // base64 data URI only (offline-complete; never a URL)
   alt: string;
   naturalWidth: number;
   naturalHeight: number;
   crop?: ImageCrop; // PowerPoint-style non-destructive crop
   note?: string; // Optional caption/legend text
   rotation?: number; // Degrees (0, 90, 180, 270)
+  /** Thumbnail display state. Node width/height always match the current display size. */
+  mini?: boolean;
+  /** Remembered mini display width (canvas px). Clamped to [48, 480]. */
+  miniWidth?: number;
+  /** Stashed full-size display width while mini is on. */
+  fullWidth?: number;
+  /** Stashed full-size display height while mini is on. */
+  fullHeight?: number;
 }
 
 /**

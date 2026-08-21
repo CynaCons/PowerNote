@@ -168,6 +168,11 @@
   transition: all 0.15s ease;
 }
 
+.text-toolbar__btn--wide {
+  width: auto;
+  padding: 0 8px;
+}
+
 .text-toolbar__btn:hover {
   background: var(--color-hover);
   color: var(--color-text);
@@ -252,6 +257,28 @@
   height: 4px;
   accent-color: var(--color-primary);
   cursor: pointer;
+}
+
+.image-toolbar__url {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.image-toolbar__url-input {
+  width: 200px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  font-size: 12px;
+  color: var(--color-text);
+  outline: none;
+}
+
+.image-toolbar__url-input:focus {
+  border-color: var(--color-primary);
 }
 
 /* ── Draw Toolbar ─────────────────────────────── */

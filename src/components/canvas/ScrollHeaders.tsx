@@ -3,7 +3,6 @@ import { Group, Line, Rect, Text } from 'react-konva';
 import { Html } from 'react-konva-utils';
 import type { BackgroundMode, ScrollRecord } from '../../types/data';
 import {
-  SCROLL_HEADER_HEIGHT,
   SCROLL_TITLE_FONT_STYLE,
   SCROLL_TITLE_HAIRLINE,
   SCROLL_TITLE_HAIRLINE_WIDTH,
@@ -13,7 +12,7 @@ import {
   SCROLL_TITLE_PINNED_OPACITY,
   SCROLL_TITLE_PINNED_STRIP_HEIGHT,
   SCROLL_TITLE_PIN_INSET,
-  SCROLL_TITLE_RESTING_FONT_SIZE,
+  SCROLL_TITLE_ACTIVE_TICK,
   columnLeft,
   columnWidth,
   scrollTitleY,
@@ -58,6 +57,7 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
   } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const setActiveScroll = useWorkspaceStore((s) => s.setActiveScroll);
+  const activeScrollId = useWorkspaceStore((s) => s.activeScrollId);
   // Pinning is a function of where the viewport is, so the header has to follow
   // it rather than sit at a fixed canvas y.
   const viewport = useCanvasStore((s) => s.viewport);
@@ -138,19 +138,22 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
         const isEditing = editingId === scroll.id;
 
         const { y: pinnedY, holding: isHolding } = scrollTitleY(viewport, ceiling);
-        const stripY = pinnedY - SCROLL_TITLE_PIN_INSET;
-        const stripH = isHolding ? SCROLL_TITLE_PINNED_STRIP_HEIGHT : SCROLL_HEADER_HEIGHT;
-        const fontSize = isHolding ? SCROLL_TITLE_PINNED_FONT_SIZE : SCROLL_TITLE_RESTING_FONT_SIZE;
-        // Resting text stays at the ceiling y (T150). Pinned text is centred
-        // in the compact strip so the overlay reads as a 22px wayfinding bar.
-        const textY = isHolding ? stripY + (stripH - fontSize) / 2 : pinnedY;
+        const stripH = SCROLL_TITLE_PINNED_STRIP_HEIGHT;
+        // At rest the bar TOP is the ceiling row itself (T150) — including a
+        // negative ceiling over legacy content, which a clamp-to-0 would bury.
+        // Held, the bar rides flush with the viewport top (pinnedY backs out
+        // the inset scrollTitleY added).
+        const stripY = isHolding ? pinnedY - SCROLL_TITLE_PIN_INSET : pinnedY;
+        const fontSize = SCROLL_TITLE_PINNED_FONT_SIZE;
+        const textY = stripY + (stripH - fontSize) / 2;
+        const isActive = activeScrollId === scroll.id;
 
         if (isEditing) {
           return (
             <Html
               key={`scroll-edit-${scroll.id}`}
               groupProps={{ x: x + TITLE_INSET, y: textY }}
-              divProps={{ style: { pointerEvents: 'auto' } }}
+              divProps={{ style: { pointerEvents: 'auto', zIndex: 6 } }}
             >
               <input
                 ref={inputRef}
@@ -196,27 +199,34 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
             {/* No id() on these nodes: useTextPlacement treats an unidentified
                 target as background, so a single click still places text or
                 clears selection straight through the header. */}
-            {/* Backing so a held title reads over the content passing beneath.
-                Only while holding — at rest the canvas already provides it.
-                Konva nodes stay the test/hit contract (T152). Markdown blocks
-                render as Html on top of the Stage, so the visible strip is a
-                matching Html overlay — otherwise body text paints through. */}
-            {isHolding && (
+            {/* Opaque TINT bar in both states. Markdown Html paints over the
+                Stage, so the visible name is an Html overlay; Konva nodes
+                stay the T152 hit/test contract (text is hidden). */}
+            <Rect
+              name="scroll-title-backing"
+              x={x}
+              y={stripY}
+              width={bandW}
+              height={stripH}
+              fill={SCROLL_TITLE_PINNED_FILL}
+              opacity={SCROLL_TITLE_PINNED_OPACITY}
+              listening={false}
+            />
+            {isActive && (
               <Rect
-                name="scroll-title-backing"
+                name="scroll-title-active-tick"
                 x={x}
                 y={stripY}
-                width={bandW}
+                width={SCROLL_TITLE_ACTIVE_TICK}
                 height={stripH}
-                fill={SCROLL_TITLE_PINNED_FILL}
-                opacity={SCROLL_TITLE_PINNED_OPACITY}
+                fill={SCROLL_TITLE_INK}
                 listening={false}
               />
             )}
             <Rect
               name="scroll-title-hit"
               x={x}
-              y={isHolding ? stripY : pinnedY - SCROLL_TITLE_PIN_INSET}
+              y={stripY}
               width={bandW}
               height={stripH}
               fill="transparent"
@@ -233,55 +243,53 @@ export function ScrollHeaders({ mode, scrolls, pageId }: ScrollHeadersProps) {
               fill={SCROLL_TITLE_INK}
               ellipsis
               wrap="none"
-              opacity={isHolding ? 0 : 1}
+              opacity={0}
             />
-            {isHolding && (
-              <Line
-                name="scroll-title-hairline"
-                points={[x, stripY + stripH, x + bandW, stripY + stripH]}
-                stroke={SCROLL_TITLE_HAIRLINE}
-                strokeWidth={SCROLL_TITLE_HAIRLINE_WIDTH}
-                listening={false}
-              />
-            )}
-            {isHolding && (
-              <Html
-                groupProps={{ x, y: stripY }}
-                divProps={{ style: { pointerEvents: 'auto' } }}
+            <Line
+              name="scroll-title-hairline"
+              points={[x, stripY + stripH, x + bandW, stripY + stripH]}
+              stroke={SCROLL_TITLE_HAIRLINE}
+              strokeWidth={SCROLL_TITLE_HAIRLINE_WIDTH}
+              listening={false}
+            />
+            <Html
+              groupProps={{ x, y: stripY }}
+              divProps={{ style: { pointerEvents: 'auto', zIndex: 6 } }}
+            >
+              <div
+                className="scroll-title-strip"
+                data-testid="scroll-title-strip"
+                onDoubleClick={() => setEditingId(scroll.id)}
+                onClick={() => setActiveScroll(scroll.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setActiveScroll(scroll.id);
+                  setMenu({ scrollId: scroll.id, x: e.clientX, y: e.clientY });
+                }}
+                style={{
+                  width: bandW,
+                  height: stripH,
+                  boxSizing: 'border-box',
+                  background: SCROLL_TITLE_PINNED_FILL,
+                  borderBottom: `${SCROLL_TITLE_HAIRLINE_WIDTH}px solid ${SCROLL_TITLE_HAIRLINE}`,
+                  borderLeft: isActive ? `${SCROLL_TITLE_ACTIVE_TICK}px solid ${SCROLL_TITLE_INK}` : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: `0 ${TITLE_INSET}px`,
+                  fontSize,
+                  fontWeight: 600,
+                  fontFamily: 'Inter, system-ui, sans-serif',
+                  color: SCROLL_TITLE_INK,
+                  overflow: 'hidden',
+                  whiteSpace: 'nowrap',
+                  textOverflow: 'ellipsis',
+                  lineHeight: 1,
+                }}
               >
-                <div
-                  data-testid="scroll-title-strip"
-                  onDoubleClick={() => setEditingId(scroll.id)}
-                  onClick={() => setActiveScroll(scroll.id)}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setActiveScroll(scroll.id);
-                    setMenu({ scrollId: scroll.id, x: e.clientX, y: e.clientY });
-                  }}
-                  style={{
-                    width: bandW,
-                    height: stripH,
-                    boxSizing: 'border-box',
-                    background: `rgba(255, 255, 255, ${SCROLL_TITLE_PINNED_OPACITY})`,
-                    borderBottom: `${SCROLL_TITLE_HAIRLINE_WIDTH}px solid ${SCROLL_TITLE_HAIRLINE}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: `0 ${TITLE_INSET}px`,
-                    fontSize,
-                    fontWeight: 600,
-                    fontFamily: 'Inter, system-ui, sans-serif',
-                    color: SCROLL_TITLE_INK,
-                    overflow: 'hidden',
-                    whiteSpace: 'nowrap',
-                    textOverflow: 'ellipsis',
-                    lineHeight: 1,
-                  }}
-                >
-                  {scroll.title}
-                </div>
-              </Html>
-            )}
+                {scroll.title}
+              </div>
+            </Html>
           </Group>
         );
       })}

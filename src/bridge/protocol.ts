@@ -23,10 +23,12 @@ export type BridgeCommandName =
   | 'list_pages'
   | 'read_page'
   | 'read_diagram'
+  | 'read_image'
   | 'create_section'
   | 'create_page'
   | 'append_block'
   | 'insert_block'
+  | 'insert_image'
   | 'move_block'
   | 'create_diagram'
   | 'fit_diagram'
@@ -53,11 +55,18 @@ export type BridgeCommandName =
 /**
  * Hard cap on a serialized read payload, in characters.
  *
- * Applies to every read tool (`read_page`, `read_diagram`, `get_block`).
- * Chosen so a typical agent context is not blown by one call. When the
- * serialized response would exceed this, the tool trims at a documented
- * boundary and sets a notice — it never fails the call for size. A
- * response that still overflows after those steps is an INTERNAL bug.
+ * Applies to every agent-visible read (`read_page`, `read_diagram`,
+ * `get_block`, and the MCP-side `read_image` file result). Chosen so a
+ * typical agent context is not blown by one call. When the serialized
+ * response would exceed this, the tool trims at a documented boundary
+ * and sets a notice — it never fails the call for size. A response that
+ * still overflows after those steps is an INTERNAL bug.
+ *
+ * The app→MCP `read_image` frame carries the data URI and is allowed to
+ * exceed this cap: the budget is on what the agent sees, not the
+ * websocket. The `ws` default maxPayload is 100 MiB and there is no
+ * tighter frame cap in the app client; images are already downscaled
+ * (2048 long edge) so they sit well under it.
  */
 export const READ_PAGE_RESPONSE_BUDGET = 20_000;
 
@@ -251,9 +260,25 @@ export interface StrokesSummary {
 }
 
 export interface PageTruncation {
-  /** Last item (block, member, or diagram) that made it into this response. */
+  /** Last item (block, member, diagram, or image) that made it into this response. */
   at: string;
   notice: string;
+}
+
+/** Compact index entry for one top-level image. Never includes `src`. */
+export interface ImageSummary {
+  id: string;
+  alt: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  naturalWidth: number;
+  naturalHeight: number;
+  /** Decoded byte size of the embedded payload, from the base64 length. */
+  bytes: number;
+  mini: boolean;
+  scrollId?: string;
 }
 
 export interface PageContent {
@@ -262,6 +287,7 @@ export interface PageContent {
   title: string;
   blocks: BlockSummary[];
   diagrams: DiagramSummary[];
+  images: ImageSummary[];
   scrolls: ScrollSummary[];
   strokesSummary?: StrokesSummary;
   /**
@@ -274,6 +300,8 @@ export interface PageContent {
   truncated?: PageTruncation;
   /** Set when the size cap dropped diagrams; `at` is the last diagram kept. */
   diagramsTruncated?: PageTruncation;
+  /** Set when the size cap dropped images; `at` is the last image kept. */
+  imagesTruncated?: PageTruncation;
 }
 
 export interface GetBlockResult extends BlockSummary {
@@ -403,6 +431,48 @@ export interface InsertBlockResult extends BlockSummary {
 }
 
 export type MoveBlockResult = InsertBlockResult;
+
+/**
+ * App → MCP `read_image`. Carries the data URI so the server can write a
+ * file. May exceed `READ_PAGE_RESPONSE_BUDGET` — that cap is on the
+ * agent-visible `{path, format, bytes, …}` result, which never includes `src`.
+ */
+export interface ReadImageResult {
+  id: string;
+  src: string;
+  format: string;
+  bytes: number;
+  naturalWidth: number;
+  naturalHeight: number;
+  alt: string;
+}
+
+/** MCP → agent `read_image`. Path to the decoded file; never the payload. */
+export interface ReadImageFileResult {
+  path: string;
+  format: string;
+  bytes: number;
+  naturalWidth: number;
+  naturalHeight: number;
+  alt: string;
+}
+
+/**
+ * `insert_image`: display + natural dims of the landed node. Never includes
+ * `src` / the base64 payload.
+ */
+export interface InsertImageResult {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  naturalWidth: number;
+  naturalHeight: number;
+  mini: boolean;
+  /** Occupants whose y changed (the inserted image itself is not counted). */
+  displacedCount: number;
+}
 
 /**
  * Language a diagram source is written in.

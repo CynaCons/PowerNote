@@ -11,6 +11,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # v0.60/v0.61.1 runs hung 6h in "playwright install --with-deps" (apt).
+    # Fail fast instead; green runs take ~7 minutes.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 

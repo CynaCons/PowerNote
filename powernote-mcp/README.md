@@ -43,14 +43,16 @@ socket on their machine.
 | Tool | What it does |
 |------|--------------|
 | `list_pages` | Every section and page, with block counts and which is open. Call first to get ids. |
-| `read_page` | A page as ordered markdown blocks plus a diagrams[] index. Labels no longer leak. Supports include, scrollId, limit/cursor, and a hard 20k size cap (blocks, then sources, then diagrams, then markdown). |
+| `read_page` | A page as ordered markdown blocks plus diagrams[] and images[] indexes. Labels no longer leak; image payloads never appear. Supports include (default `blocks,diagrams,images`), scrollId, limit/cursor, and a hard 20k size cap (blocks, then sources, then diagrams, then images, then markdown). Flow: `images[].id` → `read_image`. |
 | `read_diagram` | One diagram (source + a page of members). `member_limit`/`member_cursor` page members; source that alone blows the 20k cap is truncated. Ids come from read_page diagrams[]. |
+| `read_image` | Export one image by id to a local file (`out_path` or a temp file). Response is path + format + bytes + dims + alt — never the base64. Then open the file. |
 | `get_block` | One markdown block by id. Cheap re-fetch after a capped read_page. Oversized markdown is truncated to the 20k cap. |
 | `fit_diagram` | Refit a diagram to its scroll band in both directions (grow or shrink). |
 | `create_section` | New section (sidebar tab), with an initial empty page. |
 | `create_page` | New titled page, opened. Also writes an `# Title` block unless `withHeading: false`. |
 | `append_block` | Append a markdown block to the bottom of a page. The main way to write. |
 | `insert_block` | Insert a block after an id (preferred) or at an index, shifting occupants below (including diagrams). |
+| `insert_image` | Insert an image into a scroll. Exactly one of `data` (a `data:image/...;base64,` URI) or `path` (local png/jpg/jpeg/gif/webp — this server reads and encodes it). Placement matches `insert_block`. Optional `alt` and `mini`. Returns id + dims, never the payload. One undo. |
 | `move_block` | Move a block or diagram frame within or across scrolls. Id-relative `after`. One undo. |
 | `update_block` | Replace an existing block's markdown, by id. Occupants below reflow. |
 | `create_diagram_plantuml` | Draw a UML diagram from PlantUML source, as native canvas shapes. See [Diagrams](#diagrams). |

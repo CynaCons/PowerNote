@@ -10,9 +10,16 @@
  * Run: npm run test:bridge
  */
 import { spawn } from 'node:child_process';
+import { existsSync, readFileSync, rmSync, writeFileSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { WebSocket } from 'ws';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+
+const PNG_1X1 = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==',
+  'base64',
+);
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SERVER = path.join(HERE, 'server.js');
@@ -120,7 +127,19 @@ function fakeNotebook() {
     // A slow command, so the test can observe a lease being held across one.
     const delay = msg.cmd === 'save_notebook' ? 900 : 10;
     setTimeout(() => {
-      ws.send(JSON.stringify({ v: 1, id: msg.id, ok: true, result: { ran: msg.cmd } }));
+      let result = { ran: msg.cmd };
+      if (msg.cmd === 'read_image') {
+        result = {
+          id: msg.params?.id ?? 'img-1',
+          src: `data:image/png;base64,${PNG_1X1.toString('base64')}`,
+          format: 'png',
+          bytes: PNG_1X1.length,
+          naturalWidth: 1,
+          naturalHeight: 1,
+          alt: 'stub',
+        };
+      }
+      ws.send(JSON.stringify({ v: 1, id: msg.id, ok: true, result }));
     }, delay);
   });
   return { ws, seen, frames, close: () => ws.close() };
@@ -243,6 +262,111 @@ async function main() {
     JSON.stringify(moveBlockFrame),
   );
 
+  check('insert_image is offered', tools.includes('insert_image'));
+  const bothSources = await beta.call('insert_image', {
+    scrollId: 's1',
+    index: 0,
+    data: 'data:image/png;base64,aaa',
+    path: 'C:\\\\nope.png',
+  });
+  check(
+    'insert_image both data+path is BAD_PARAMS',
+    bothSources.isError && /BAD_PARAMS/.test(bothSources.text),
+    bothSources.text,
+  );
+  const neitherSource = await beta.call('insert_image', { scrollId: 's1', index: 0 });
+  check(
+    'insert_image neither data nor path is BAD_PARAMS',
+    neitherSource.isError && /BAD_PARAMS/.test(neitherSource.text),
+    neitherSource.text,
+  );
+  const pngPath = path.join(tmpdir(), `powernote-insert-image-${Date.now()}.png`);
+  writeFileSync(pngPath, PNG_1X1);
+  try {
+    const fromPath = await beta.call('insert_image', {
+      scrollId: 's1',
+      index: 0,
+      path: pngPath,
+      alt: 'from-path',
+    });
+    check('insert_image path variant reaches the notebook', !fromPath.isError, fromPath.text);
+    const imgFrame = notebook.frames.filter((f) => f.cmd === 'insert_image').pop();
+    check(
+      'insert_image path is encoded server-side; app sees data not path',
+      !!imgFrame &&
+        imgFrame.cmd === 'insert_image' &&
+        imgFrame.params.scrollId === 's1' &&
+        imgFrame.params.index === 0 &&
+        typeof imgFrame.params.data === 'string' &&
+        imgFrame.params.data.startsWith('data:image/png;base64,') &&
+        imgFrame.params.path === undefined &&
+        imgFrame.params.alt === 'from-path',
+      JSON.stringify(imgFrame),
+    );
+  } finally {
+    try {
+      unlinkSync(pngPath);
+    } catch {
+      // ignored
+    }
+  }
+
+  check('read_image is offered', tools.includes('read_image'));
+  const readOutDir = path.join(tmpdir(), `powernote-read-image-${Date.now()}`);
+  const readOutPath = path.join(readOutDir, 'exported.png');
+  const fromRead = await beta.call('read_image', { id: 'img-1', out_path: readOutPath });
+  check('read_image reaches the notebook', !fromRead.isError, fromRead.text);
+  let readParsed = {};
+  try {
+    readParsed = JSON.parse(fromRead.text);
+  } catch {
+    readParsed = {};
+  }
+  const readFrame = notebook.frames.filter((f) => f.cmd === 'read_image').pop();
+  check(
+    'read_image routes id to the notebook and keeps out_path server-side',
+    !!readFrame &&
+      readFrame.cmd === 'read_image' &&
+      readFrame.params.id === 'img-1' &&
+      readFrame.params.out_path === undefined,
+    JSON.stringify(readFrame),
+  );
+  check(
+    'read_image agent response has no payload',
+    !fromRead.text.includes('data:image') &&
+      readParsed.path === readOutPath &&
+      readParsed.format === 'png' &&
+      readParsed.bytes === PNG_1X1.length,
+    fromRead.text,
+  );
+  check(
+    'read_image writes the decoded file at out_path (parent dirs created)',
+    existsSync(readOutPath) && readFileSync(readOutPath).equals(PNG_1X1),
+    readOutPath,
+  );
+  const tmpRead = await beta.call('read_image', { id: 'img-1' });
+  let tmpParsed = {};
+  try {
+    tmpParsed = JSON.parse(tmpRead.text);
+  } catch {
+    tmpParsed = {};
+  }
+  check(
+    'read_image without out_path lands under os.tmpdir()/powernote-images',
+    !tmpRead.isError &&
+      typeof tmpParsed.path === 'string' &&
+      tmpParsed.path.includes('powernote-images') &&
+      existsSync(tmpParsed.path) &&
+      readFileSync(tmpParsed.path).length === PNG_1X1.length,
+    tmpRead.text,
+  );
+  try {
+    rmSync(readOutDir, { recursive: true, force: true });
+    if (tmpParsed.path) unlinkSync(tmpParsed.path);
+  } catch {
+    // ignored
+  }
+
   check('move_scroll is offered', tools.includes('move_scroll'));
   const moved = await beta.call('move_scroll', { scrollId: 's1', direction: 'left' });
   check('move_scroll reaches the notebook', !moved.isError, moved.text);
@@ -304,7 +428,8 @@ async function main() {
   notebook.close();
   beta.stop();
 
-  console.log(failures === 0 ? '\nall passed' : `\n${failures} failed`);
+  const summary = failures === 0 ? '\nall passed\n' : `\n${failures} failed\n`;
+  await new Promise((resolve) => process.stdout.write(summary, () => resolve()));
   process.exit(failures === 0 ? 0 : 1);
 }
 

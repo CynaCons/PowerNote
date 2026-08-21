@@ -52,6 +52,18 @@ export function SelectionTransformer({ selectedNodeIds, stageRef }: SelectionTra
       return;
     }
 
+    // A single image draws its own aspect-locked corner handles; attaching the
+    // free-resize transformer as well gave two contradictory resize widgets
+    // (REQ-IMAGE-024). Multi-selections keep the transformer group border.
+    if (selectedNodeIds.length === 1) {
+      const only = nodes.find((n) => n.id === selectedNodeIds[0]);
+      if (only?.type === 'image') {
+        transformer.nodes([]);
+        transformer.getLayer()?.batchDraw();
+        return;
+      }
+    }
+
     const selectedKonvaNodes: Konva.Node[] = [];
     for (const nodeId of selectedNodeIds) {
       // Skip arrows/lines — they use custom vertex handles in ShapeNode
@@ -74,6 +86,17 @@ export function SelectionTransformer({ selectedNodeIds, stageRef }: SelectionTra
 
     transformer.nodes(selectedKonvaNodes);
     transformer.getLayer()?.batchDraw();
+    // The box is cached against transformer-initiated changes only; a store
+    // write that resizes a node from outside (Mini toggle, undo of a resize)
+    // leaves it stale. It cannot be recomputed here either: this effect can
+    // commit before react-konva applies the node's new size (measured — the
+    // group still reports the old clientRect at this point), so recompute on
+    // the next frame, when Konva props are guaranteed applied.
+    const raf = requestAnimationFrame(() => {
+      transformer.forceUpdate();
+      transformer.getLayer()?.batchDraw();
+    });
+    return () => cancelAnimationFrame(raf);
   }, [selectedNodeIds, stageRef, nodes]);
 
   // Handle resize end — update node dimensions in store

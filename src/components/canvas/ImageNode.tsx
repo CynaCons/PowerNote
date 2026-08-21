@@ -80,6 +80,18 @@ export function ImageNode({ node, isSelected, onSelect, stageScale, onSnapChange
     if (tool === 'select' || tool === 'text' || tool === 'image') {
       const additive = e.evt.ctrlKey || e.evt.metaKey;
       onSelect(node.id, additive);
+      // Konva only fires click when no drag occurred (REQ-IMAGE-019).
+      if (data.mini) {
+        useCanvasStore.getState().openLightbox(node.id);
+      }
+    }
+  };
+
+  const handleDblClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    e.cancelBubble = true;
+    const tool = useToolStore.getState().activeTool;
+    if (tool === 'select' || tool === 'text' || tool === 'image') {
+      useCanvasStore.getState().openLightbox(node.id);
     }
   };
 
@@ -125,6 +137,8 @@ export function ImageNode({ node, isSelected, onSelect, stageScale, onSnapChange
         fill="transparent"
         onClick={handleClick}
         onTap={handleClick}
+        onDblClick={handleDblClick}
+        onDblTap={handleDblClick}
       />
 
       {/* The actual image with optional crop */}

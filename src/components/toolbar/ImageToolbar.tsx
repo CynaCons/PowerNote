@@ -1,8 +1,11 @@
-import { useRef, useState } from 'react';
-import { Plus, Crop, RotateCw, RotateCcw, Type } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Plus, Crop, RotateCw, RotateCcw, Type, Minimize2, Link, Check } from 'lucide-react';
 import type { CanvasNode, ImageNodeData, ImageCrop } from '../../types/data';
-import { useCanvasStore } from '../../stores/useCanvasStore';
-import { generateId } from '../../utils/ids';
+import { useCanvasStore, undoBatchStart, undoBatchEnd } from '../../stores/useCanvasStore';
+import { imageMiniTogglePatch } from '../../utils/imageMini';
+import { embedImage, embedImageFromUrl, imageNodeFromEmbed } from '../../utils/imageEmbed';
+import { currentViewportCentre } from '../../hooks/useCanvasDragDrop';
+import { showToast } from '../layout/Toast';
 import './BottomToolbar.css';
 
 interface ImageToolbarProps {
@@ -12,11 +15,21 @@ interface ImageToolbarProps {
 export function ImageToolbar({ node }: ImageToolbarProps) {
   const data = node ? (node.data as ImageNodeData) : null;
   const updateNode = useCanvasStore((s) => s.updateNode);
+  const selectedNodeIds = useCanvasStore((s) => s.selectedNodeIds);
+  const nodes = useCanvasStore((s) => s.nodes);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const urlInputRef = useRef<HTMLInputElement>(null);
   const [cropMode, setCropMode] = useState(false);
   const [cropValues, setCropValues] = useState<ImageCrop>(
     data?.crop || { x: 0, y: 0, width: 1, height: 1 },
   );
+  const [urlOpen, setUrlOpen] = useState(false);
+  const [urlValue, setUrlValue] = useState('');
+  const [urlBusy, setUrlBusy] = useState(false);
+
+  useEffect(() => {
+    if (urlOpen) urlInputRef.current?.focus();
+  }, [urlOpen]);
 
   const handleImport = () => {
     fileInputRef.current?.click();
@@ -29,39 +42,57 @@ export function ImageToolbar({ node }: ImageToolbarProps) {
     let offsetY = 0;
     Array.from(files).forEach((file) => {
       if (!file.type.startsWith('image/')) return;
-      const reader = new FileReader();
       const yPos = 200 + offsetY;
       offsetY += 20;
-      reader.onload = () => {
-        const src = reader.result as string;
-        const img = new Image();
-        img.onload = () => {
-          const maxW = 600;
-          let w = img.naturalWidth;
-          let h = img.naturalHeight;
-          if (w > maxW) {
-            h = h * (maxW / w);
-            w = maxW;
-          }
-          useCanvasStore.getState().addNode({
-            id: generateId(),
-            type: 'image',
-            x: 200, y: yPos,
-            width: w, height: h,
-            layer: 3,
-            data: {
-              src,
-              alt: file.name || 'image',
-              naturalWidth: img.naturalWidth,
-              naturalHeight: img.naturalHeight,
-            } as ImageNodeData,
-          });
-        };
-        img.src = src;
-      };
-      reader.readAsDataURL(file);
+      void (async () => {
+        try {
+          const embed = await embedImage(file);
+          useCanvasStore.getState().addNode(
+            imageNodeFromEmbed(embed, { x: 200, y: yPos, alt: file.name || 'image' }),
+          );
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : 'Could not embed image';
+          showToast(reason, 'error');
+        }
+      })();
     });
     e.target.value = '';
+  };
+
+  const closeUrlPrompt = () => {
+    setUrlOpen(false);
+    setUrlValue('');
+    setUrlBusy(false);
+  };
+
+  const submitUrl = async () => {
+    const url = urlValue.trim();
+    if (!url || urlBusy) return;
+    setUrlBusy(true);
+    try {
+      const embed = await embedImageFromUrl(url);
+      const { x, y } = currentViewportCentre();
+      useCanvasStore.getState().addNode(
+        imageNodeFromEmbed(embed, { x, y, alt: embed.alt }),
+      );
+      closeUrlPrompt();
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : 'Could not embed image from URL';
+      showToast(reason, 'error');
+      setUrlBusy(false);
+    }
+  };
+
+  const handleUrlKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      void submitUrl();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      closeUrlPrompt();
+    }
   };
 
   const handleCropToggle = () => {
@@ -113,6 +144,33 @@ export function ImageToolbar({ node }: ImageToolbarProps) {
     }
   };
 
+  const selectedImages = nodes.filter(
+    (n) => selectedNodeIds.includes(n.id) && n.type === 'image',
+  );
+  const miniTargets = selectedImages.length > 0
+    ? selectedImages
+    : (node && node.type === 'image' ? [node] : []);
+  const showMini = miniTargets.length > 0;
+  const miniActive = showMini && miniTargets.every((n) => (n.data as ImageNodeData).mini);
+
+  const handleMiniToggle = () => {
+    if (miniTargets.length === 0) return;
+    if (miniTargets.length === 1) {
+      const patch = imageMiniTogglePatch(miniTargets[0]);
+      if (patch) updateNode(miniTargets[0].id, patch);
+      return;
+    }
+    undoBatchStart(useCanvasStore.getState().nodes);
+    try {
+      for (const target of miniTargets) {
+        const patch = imageMiniTogglePatch(target);
+        if (patch) updateNode(target.id, patch);
+      }
+    } finally {
+      undoBatchEnd();
+    }
+  };
+
   return (
     <div className="text-toolbar" data-testid="image-toolbar">
       {/* Import button — always visible */}
@@ -135,6 +193,60 @@ export function ImageToolbar({ node }: ImageToolbarProps) {
         onChange={handleFileSelected}
         data-testid="image-file-input"
       />
+
+      {!node && !showMini && (
+        urlOpen ? (
+          <div className="image-toolbar__url">
+            <input
+              ref={urlInputRef}
+              className="image-toolbar__url-input"
+              data-testid="image-url-input"
+              type="text"
+              placeholder="https://…"
+              value={urlValue}
+              onChange={(e) => setUrlValue(e.target.value)}
+              onKeyDown={handleUrlKeyDown}
+              disabled={urlBusy}
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <button
+              className="text-toolbar__btn"
+              data-testid="image-url-submit"
+              onClick={() => void submitUrl()}
+              disabled={urlBusy || !urlValue.trim()}
+              title="Embed image from URL"
+            >
+              <Check size={16} />
+            </button>
+          </div>
+        ) : (
+          <button
+            className="text-toolbar__btn text-toolbar__btn--wide"
+            onClick={() => setUrlOpen(true)}
+            title="Insert image from URL"
+            data-testid="image-url-button"
+          >
+            <Link size={16} />
+            <span style={{ fontSize: 11, marginLeft: 4 }}>From URL</span>
+          </button>
+        )
+      )}
+
+      {/* Mini only — multi-select of images (crop/rotate stay single-node) */}
+      {!node && showMini && (
+        <>
+          <div className="text-toolbar__divider" />
+          <button
+            className={`text-toolbar__btn ${miniActive ? 'text-toolbar__btn--active' : ''}`}
+            onClick={handleMiniToggle}
+            title={miniActive ? 'Exit Mini' : 'Mini'}
+            data-testid="image-mini-toggle"
+          >
+            <Minimize2 size={16} />
+          </button>
+        </>
+      )}
 
       {/* Selected image controls */}
       {node && data && (
@@ -180,6 +292,18 @@ export function ImageToolbar({ node }: ImageToolbarProps) {
             data-testid="rotate-cw-btn"
           >
             <RotateCw size={16} />
+          </button>
+
+          <div className="text-toolbar__divider" />
+
+          {/* Mini */}
+          <button
+            className={`text-toolbar__btn ${miniActive ? 'text-toolbar__btn--active' : ''}`}
+            onClick={handleMiniToggle}
+            title={miniActive ? 'Exit Mini' : 'Mini'}
+            data-testid="image-mini-toggle"
+          >
+            <Minimize2 size={16} />
           </button>
 
           <div className="text-toolbar__divider" />

@@ -914,7 +914,7 @@
 
 ---
 
-**Last updated:** 2026-08-19 (shipping v0.61.1 — insert/move/update reflow diagrams)
+**Last updated:** 2026-08-20 (v0.62.0 scroll title chrome prototype)
 
 ### v0.28.0 — Agent bridge — MCP writes notes into the live app (COMPLETE)
 **Goal:** Let an external agent create pages and fill them with markdown blocks (bullets, checklists, headings) in the running PowerNote app, via an MCP server that hosts a WebSocket the app dials out to.
@@ -1282,6 +1282,25 @@
 - [x] delete_diagram closes the gap below the frame (same planner as delete_block)
 - [x] T110: chained update+insert with no wait; insert after frame id; delete_diagram packs
 - [x] Bump APP_VERSION 0.61.1, rebuild dist-template, full suite, commit, tag, push
+### v0.62.0 — Scroll title chrome (current) (ACTIVE)
+> Visual prototype of the scroll header, rendered in the real canvas (not a mock).
+**Goal:** One TINT bar for rest and pin: 16px INK, RULE hairline, opaque strip tall enough that body text cannot collide. Rename uses INK/RULE. Active scroll is a left tick, not ACCENT.
+- [x] One TINT bar rest+pin, 16px INK, RULE hairline, 32px strip, left tick for active
+- [x] Rename input uses INK/RULE/TINT; T152 + REQ-HIER-019
+### v0.63.0 — Images: Mini state, lightbox, embed guarantee, agent bridge
+**Goal:** Images become first-class for both hands and agents. A Mini toggle shrinks any image to a small aspect-locked thumbnail (its own remembered size, resizable); a single click on a mini — or a double-click on a full-size image — opens the full image in a lightbox overlay (dimmed backdrop, Escape/backdrop/X to leave), Gmail-style. Every import route (paste, drag-drop, file picker, new insert-from-URL, new agent insert_image) funnels through one embed pipeline: bytes land in the notebook as a base64 data URI, downscaled above a 2048px long edge (JPEG q0.85; PNG kept when alpha matters), so the notebook stays offline-complete and small. The bridge learns images: insert_image (base64 or local file path), compact image records in read_page (id/alt/dims/bytes/mini — never the payload, the 20k budget invariant holds), and read_image to decode an image to a local file so an agent can look at it. Decisions confirmed 2026-08-20: single-click-on-mini expands; images insert full-size with Mini as a toggle; all extras in scope because agents are first-class users of this feature.
+- [x] Data model + Mini toggle: ImageNodeData gains mini?: boolean and miniWidth?: number; ImageToolbar Mini toggle on selected image; transformer resize while mini writes miniWidth (aspect-locked); full-size dims preserved across toggles; round-trips save/load (REQ-IMAGE-017/018, T168)
+- [x] Lightbox overlay: single click (no drag) on a mini opens it; double-click opens it for full-size images; dimmed backdrop, image fit-to-viewport capped at natural size, crop respected; closes on Escape / backdrop / X; canvas selection and viewport untouched (REQ-IMAGE-019/020, T169) [agent: chunk2-lightbox]
+- [x] One embed pipeline for every route: paste / drag-drop / file picker / insert-from-URL all produce a base64 data URI, downscaled above 2048px long edge (JPEG q0.85, PNG kept when alpha); URL fetch failures surfaced, never persisted as a URL reference; no persisted image src may be a non-data URI (REQ-IMAGE-021/022/023, T170) [agent: chunk3-embed]
+- [x] Agent bridge — insert_image MCP tool: source is a base64 data URI or a local file path the MCP server reads; targets a scroll like insert_block; optional alt + mini; runs the same downscale/embed pipeline; returns node id + final dims; one undo restores (REQ-AGENT-068, T171) [agent: chunk4-insert-image]
+- [x] Agent bridge — images visible but bounded: read_page emits compact image records {id, alt, w, h, bytes, mini} (image nodes are invisible to agents today), never the base64 payload; the 20k READ_PAGE_RESPONSE_BUDGET invariant holds with images present; read_image decodes a node's image to a local file (out_path) so an agent can view it (REQ-AGENT-069/070, T172)
+- [x] Gates + docs: SRS_IMAGE 017-023 and SRS_AGENT 068-070 tables updated with test refs; typecheck clean; full Playwright suite green (log file + explicit exit code); smoke test npm run dev
+- [x] Chunk 1: Image Mini state + toolbar toggle (REQ-IMAGE-017/018, T168) — data fields, toggle via updateNode, ImageToolbar Mini button, clamp [48,480], T168
+- [x] Chunk 2: Image lightbox overlay (REQ-IMAGE-019/020, T169) — store lightboxNodeId, ImageLightbox overlay, click/dblclick wiring, T169 [agent: chunk2-lightbox]
+- [x] Chunk 3: One embed pipeline + insert-from-URL (REQ-IMAGE-021/022/023, T170) — imageEmbed.ts, rewire paste/drop/picker, From URL UI, T170 [agent: chunk3-embed]
+- [x] Chunk 4: Agent bridge insert_image (REQ-AGENT-068, T171) — MCP tool + insertImageCmd + tests/agent/171-insert-image.spec.ts [agent: chunk4-insert-image]
+- [x] Chunk 5: read_page images[] + read_image export (REQ-AGENT-069/070, T172) — compact images index in default include, budget trim with imagesTruncated, MCP decode-to-file, never the payload
+- [x] One resize widget per image (user feedback 2026-08-20): a single selected image shall not attach to the generic SelectionTransformer — its own aspect-locked corner handles are the only resize affordance; shapes/text/multi-select unchanged (REQ-IMAGE-024, T173)
 ## Future (Backlog)
 > Not yet planned — will be prioritized when earlier iterations are complete. Paid tier moved to `docs/VISION.md`.
 

@@ -110,10 +110,12 @@ export const SCROLL_TITLE_RESTING_Y = 12;
 /** Gap kept between a held title and the top of the viewport. */
 export const SCROLL_TITLE_PIN_INSET = 10;
 
-/** Resting title — heading size on the ceiling row (v0.52). */
-export const SCROLL_TITLE_RESTING_FONT_SIZE = 20;
-/** Pinned title — compact wayfinding size (v0.52). */
-export const SCROLL_TITLE_PINNED_FONT_SIZE = 12;
+/**
+ * One bar, rest and pin (v0.62). Same type size so pinning is a hold, not a
+ * costume change. Opaque TINT so body Html cannot collide with the name.
+ */
+export const SCROLL_TITLE_RESTING_FONT_SIZE = 16;
+export const SCROLL_TITLE_PINNED_FONT_SIZE = 16;
 /**
  * Konva Text `fontStyle`. This codebase already passes numeric weights
  * (DiagramNode uses `"600"`); the canvas font string accepts them as weight.
@@ -121,12 +123,14 @@ export const SCROLL_TITLE_PINNED_FONT_SIZE = 12;
 export const SCROLL_TITLE_FONT_STYLE = '600';
 /** Written-title ink at rest; same ink when pinned so the name does not change colour. */
 export const SCROLL_TITLE_INK = '#14181A';
-export const SCROLL_TITLE_PINNED_FILL = '#ffffff';
-export const SCROLL_TITLE_PINNED_OPACITY = 0.92;
-/** Vertically tight strip while the title is held over content. */
-export const SCROLL_TITLE_PINNED_STRIP_HEIGHT = 22;
+export const SCROLL_TITLE_PINNED_FILL = '#EEF1F0';
+export const SCROLL_TITLE_PINNED_OPACITY = 1;
+/** Tall enough that a line of body cannot share pixels with the name. */
+export const SCROLL_TITLE_PINNED_STRIP_HEIGHT = 32;
 export const SCROLL_TITLE_HAIRLINE = '#C3CBC9';
 export const SCROLL_TITLE_HAIRLINE_WIDTH = 1;
+/** Active-scroll mark on the bar. INK, never ACCENT. */
+export const SCROLL_TITLE_ACTIVE_TICK = 2;
 
 /**
  * Where a scroll title should draw, given where the viewport is (v0.35).

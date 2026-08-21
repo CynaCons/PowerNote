@@ -43,3 +43,16 @@ Many shipped requirements also lack dedicated E2E coverage and are tracked in th
 | REQ-IMAGE-014 | File picker accepts multiple images at once | Must | Shipped | — (needs test) |
 | REQ-IMAGE-015 | Multiple images auto-arranged in grid layout (no overlap) | Should | **Planned** (currently linear Y-stagger) | — |
 | REQ-IMAGE-016 | Drag-drop multiple files from OS file explorer | Must | Shipped | — (needs test) |
+
+## Mini, Lightbox and the Embed Guarantee (v0.63.0)
+
+| ID | Requirement | Priority | Status | Test |
+|----|------------|----------|--------|------|
+| REQ-IMAGE-017 | A selected image shall be toggleable to a Mini state: a small aspect-locked thumbnail with its own remembered width (`miniWidth`); toggling back restores the prior full-size display dims. Both states round-trip through save/load | Must | Shipped | T168 |
+| REQ-IMAGE-018 | While mini, the transformer shall resize the thumbnail (writing `miniWidth`, aspect-locked); the full-size dims are untouched by mini resizing | Must | Shipped | T168 |
+| REQ-IMAGE-019 | A single click (pointerup without drag) on a mini image shall open the lightbox; a double-click opens it for a full-size image. Dragging still moves the node in both states | Must | Shipped | T169 |
+| REQ-IMAGE-020 | The lightbox shall show the image (crop respected) fit to the viewport, capped at natural size, over a dimmed backdrop; it closes on Escape, backdrop click, or an X control, leaving canvas selection and viewport untouched | Must | Shipped | T169 |
+| REQ-IMAGE-021 | Every import route (paste, drag-drop, file picker, URL, agent bridge) shall run one embed pipeline: images with a long edge above 2048px are downscaled to 2048px and re-encoded (JPEG q0.85; PNG kept when alpha is present) | Must | Shipped | T170 |
+| REQ-IMAGE-022 | The user shall be able to insert an image by URL; the app fetches and embeds the bytes. A failed fetch is surfaced as an error and persists nothing — a URL-referencing image node is never written | Must | Shipped | T170 |
+| REQ-IMAGE-023 | Every persisted image `src` shall be a base64 data URI — the notebook is offline-complete; no external image references survive save | Must | Shipped | T170 |
+| REQ-IMAGE-024 | A single selected image shall present exactly one resize affordance: its own aspect-locked corner handles. The generic selection transformer shall not attach to it (previously both rendered, with contradictory ratio behavior). Shapes, text and multi-selections keep the transformer unchanged | Must | Shipped | T173 |

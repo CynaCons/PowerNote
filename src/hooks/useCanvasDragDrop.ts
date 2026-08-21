@@ -1,13 +1,12 @@
 import { useEffect } from 'react';
 import type Konva from 'konva';
 import { useCanvasStore } from '../stores/useCanvasStore';
-import { generateId } from '../utils/ids';
 import { clampCanvasY, liveCeiling } from '../utils/scrollCeiling';
-import type { CanvasNode as CanvasNodeType, ImageNodeData } from '../types/data';
 import { sniffFormat, normalizeDrawioSource, type DiagramFormat } from '../diagram';
 import { placeDiagramOnCanvas } from '../diagram/canvasOps';
 import { showToast } from '../components/layout/Toast';
 import { useDiagramStore } from '../stores/useDiagramStore';
+import { embedImage, imageNodeFromEmbed } from '../utils/imageEmbed';
 
 function fileExt(name: string): string {
   const i = name.lastIndexOf('.');
@@ -37,8 +36,15 @@ function isXmlFile(file: File): boolean {
   return fileExt(file.name) === 'xml';
 }
 
-function viewportCentre(
-  stage: Konva.Stage | null,
+type StageLike = {
+  x: () => number;
+  y: () => number;
+  scaleX: () => number;
+  scaleY: () => number;
+} | null;
+
+export function viewportCentre(
+  stage: StageLike,
   dimensions: { width: number; height: number },
 ): { x: number; y: number } {
   const ceiling = liveCeiling();
@@ -49,6 +55,22 @@ function viewportCentre(
       ceiling,
     ),
   };
+}
+
+/** Viewport centre from the live canvas container + stored viewport (no Stage ref). */
+export function currentViewportCentre(): { x: number; y: number } {
+  const el = document.querySelector('[data-testid="canvas-container"]') as HTMLElement | null;
+  const vp = useCanvasStore.getState().viewport;
+  if (!el) return viewportCentre(null, { width: 0, height: 0 });
+  return viewportCentre(
+    {
+      x: () => vp.x,
+      y: () => vp.y,
+      scaleX: () => vp.scale,
+      scaleY: () => vp.scale,
+    },
+    { width: el.clientWidth, height: el.clientHeight },
+  );
 }
 
 function dropPoint(
@@ -114,41 +136,18 @@ async function ingestDiagramText(
   }
 }
 
-/** Read a File (image) as a base64 data URI, then add it to the canvas */
-function addImageFromFile(file: File, x: number, y: number) {
+/** Embed a File through the shared pipeline, then add it to the canvas. */
+async function addImageFromFile(file: File, x: number, y: number) {
   if (!file.type.startsWith('image/')) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    const src = reader.result as string;
-    const img = new Image();
-    img.onload = () => {
-      // Scale down if too large (max 600px wide)
-      const maxW = 600;
-      let w = img.naturalWidth;
-      let h = img.naturalHeight;
-      if (w > maxW) {
-        h = h * (maxW / w);
-        w = maxW;
-      }
-      const node: CanvasNodeType = {
-        id: generateId(),
-        type: 'image',
-        x, y,
-        width: w,
-        height: h,
-        layer: 3,
-        data: {
-          src,
-          alt: file.name || 'image',
-          naturalWidth: img.naturalWidth,
-          naturalHeight: img.naturalHeight,
-        } as ImageNodeData,
-      };
-      useCanvasStore.getState().addNode(node);
-    };
-    img.src = src;
-  };
-  reader.readAsDataURL(file);
+  try {
+    const embed = await embedImage(file);
+    useCanvasStore.getState().addNode(
+      imageNodeFromEmbed(embed, { x, y, alt: file.name || 'image' }),
+    );
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : 'Could not embed image';
+    showToast(reason, 'error');
+  }
 }
 
 async function ingestDroppedFiles(files: File[], x: number, y: number): Promise<void> {
@@ -177,7 +176,7 @@ async function ingestDroppedFiles(files: File[], x: number, y: number): Promise<
       continue;
     }
     if (file.type.startsWith('image/')) {
-      addImageFromFile(file, x, y);
+      await addImageFromFile(file, x, y);
     }
   }
 }
@@ -207,7 +206,7 @@ export function useCanvasDragDrop(
           const file = item.getAsFile();
           if (file) {
             const { x, y } = viewportCentre(stageRef.current, dimensions);
-            addImageFromFile(file, x, y);
+            void addImageFromFile(file, x, y);
           }
           return;
         }

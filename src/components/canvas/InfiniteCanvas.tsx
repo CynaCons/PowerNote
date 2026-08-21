@@ -15,6 +15,7 @@ import { ScrollHeaders } from './ScrollHeaders';
 import { DrawingLayer } from './DrawingLayer';
 import { TrashButton } from './TrashButton';
 import { DiagramSourceDialog } from './DiagramSourceDialog';
+import { ImageLightbox } from './ImageLightbox';
 import { useShapeCreation } from '../../hooks/useShapeCreation';
 import { useTextPlacement, consumeAutoEditNodeId } from '../../hooks/useTextPlacement';
 import { useCanvasKeyboard } from '../../hooks/useCanvasKeyboard';
@@ -452,6 +453,8 @@ export function InfiniteCanvas({ backgroundMode = 'pages', bgColor = '#ffffff' }
       )}
       {/* PlantUML behind a diagram. DOM, outside the Stage on purpose. */}
       <DiagramSourceDialog />
+      {/* Image lightbox. DOM overlay, sibling of the Stage (not Konva). */}
+      <ImageLightbox />
       {/* Right-click context menu */}
       {contextMenu && (
         <ContextMenu

@@ -25,6 +25,9 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, extname, isAbsolute, join } from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -53,6 +56,7 @@ const READ_ONLY = new Set([
   'list_pages',
   'read_page',
   'read_diagram',
+  'read_image',
   'get_block',
   'list_scrolls',
   'get_background',
@@ -456,17 +460,22 @@ const TOOLS = [
       'Read a page. DEFAULT CHANGED in v0.54: blocks[] is free-standing markdown ' +
       'only — diagram labels (text nodes with a groupId) no longer leak in as fake ' +
       'content, and diagrams are collapsed to diagrams[] {id, title, format, ' +
-      'memberCount, bounds} with NO members and NO source. Discovery flow: read_page ' +
-      '→ diagrams[].id → read_diagram / delete_diagram / fit_diagram. ' +
-      'include defaults to ["blocks","diagrams"]; pass ["diagrams"] for a diagrams-only ' +
-      'fetch. Optional scrollId filters both lists. limit + cursor page blocks in ' +
-      'column-major reading order (cursor = last block id from the previous page; ' +
-      'stable across appends). Serialized reads are hard-capped at 20000 characters ' +
-      'and never fail for size: blocks drop first (truncated {at, notice}), then ' +
-      'per-diagram source is replaced with sourceOmitted {length, notice: "use read_diagram"}, ' +
-      'then diagrams[] trims at an entry boundary. A single oversized block has its ' +
-      'markdown cut (markdownTruncated {fullLength, notice}). include_diagram_source:true ' +
-      'adds source on each diagrams[] entry. Use get_block(blockId) to re-fetch one block after a cap.',
+      'memberCount, bounds} with NO members and NO source. Images are a compact ' +
+      'images[] index {id, alt, x, y, w, h, naturalWidth, naturalHeight, bytes, mini, scrollId} ' +
+      '— never the base64 payload. Discovery flow: read_page → diagrams[].id → ' +
+      'read_diagram / delete_diagram / fit_diagram; read_page → images[].id → ' +
+      'read_image (writes a local file you open with vision). ' +
+      'include defaults to ["blocks","diagrams","images"]; pass ["images"] for an ' +
+      'images-only fetch or ["diagrams"] for diagrams-only. Optional scrollId filters ' +
+      'all three lists. limit + cursor page blocks in column-major reading order ' +
+      '(cursor = last block id from the previous page; stable across appends). ' +
+      'Serialized reads are hard-capped at 20000 characters and never fail for size: ' +
+      'blocks drop first (truncated {at, notice}), then per-diagram source is replaced ' +
+      'with sourceOmitted {length, notice: "use read_diagram"}, then diagrams[] trims ' +
+      'at an entry boundary, then images[] trims (imagesTruncated {at, notice}). A ' +
+      'single oversized block has its markdown cut (markdownTruncated {fullLength, notice}). ' +
+      'include_diagram_source:true adds source on each diagrams[] entry. Use ' +
+      'get_block(blockId) to re-fetch one block after a cap.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -476,14 +485,14 @@ const TOOLS = [
         },
         include: {
           type: 'array',
-          items: { type: 'string', enum: ['blocks', 'diagrams', 'strokes-summary'] },
+          items: { type: 'string', enum: ['blocks', 'diagrams', 'images', 'strokes-summary'] },
           description:
-            'Which collections to return. Default ["blocks","diagrams"]. ' +
-            '"diagrams" alone is the diagrams-only fetch.',
+            'Which collections to return. Default ["blocks","diagrams","images"]. ' +
+            '"images" alone is the images-only fetch; "diagrams" alone is diagrams-only.',
         },
         scrollId: {
           type: 'string',
-          description: 'Restrict blocks and diagrams to this scroll band.',
+          description: 'Restrict blocks, diagrams and images to this scroll band.',
         },
         limit: {
           type: 'integer',
@@ -542,6 +551,35 @@ const TOOLS = [
     },
   },
   {
+    name: 'read_image',
+    description:
+      'Export one image by node id so you can look at it. Discovers ids from ' +
+      'read_page images[].id. The notebook returns the embedded bytes over the ' +
+      'bridge; this server decodes them and writes a local file. Optional out_path ' +
+      '(absolute) names the destination — parent dirs are created; an existing file ' +
+      'is overwritten. When omitted, the file lands in os.tmpdir()/powernote-images/' +
+      '<id>.<ext>. The response is {path, format, bytes, naturalWidth, naturalHeight, alt} ' +
+      '— NEVER the base64 payload. Unknown id is NOT_FOUND. A non-image id is ' +
+      'UNSUPPORTED naming the type. Then open the file with your vision tools.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'Image node id from read_page images[].id.',
+        },
+        out_path: {
+          type: 'string',
+          description:
+            'Absolute file path to write. Parent directory is created if missing. ' +
+            'Omit to write os.tmpdir()/powernote-images/<id>.<ext>.',
+        },
+      },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'get_block',
     description:
       'Re-fetch a single markdown block by id (BlockSummary plus page location). ' +
@@ -556,7 +594,7 @@ const TOOLS = [
         offset: {
           type: 'number',
           description:
-            'Character offset into the block markdown (from a previous response's nextOffset). Omit to start at 0.',
+            "Character offset into the block markdown (from a previous response's nextOffset). Omit to start at 0.",
         },
       },
       required: ['blockId'],
@@ -695,6 +733,65 @@ const TOOLS = [
         },
       },
       required: ['scrollId', 'markdown'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'insert_image',
+    description:
+      'Insert an image into a scroll at a chosen position, shifting every occupant ' +
+      'below it (text, diagram frames, images, shapes, ungrouped ink) down by the ' +
+      'image\'s display height + 12px. Frame members ride the frame. Source is ' +
+      'exactly one of data (a data:image/...;base64, URI) or path (a local png/jpg/' +
+      'jpeg/gif/webp file this server reads and encodes — the app never sees paths). ' +
+      'Both or neither is an error. Placement matches insert_block: prefer after (an ' +
+      'occupant id); exactly one of after or index. index 0 is the column top ' +
+      '(ceiling-clamped when a titled scroll arms the page ceiling). Optional alt ' +
+      '(defaults to "image") and mini (land as a 160px-wide thumbnail). Oversized ' +
+      'images are downscaled to a 2048px long edge like UI imports. Returns id + ' +
+      'display and natural dims + displacedCount — never the base64 payload. One undo.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        scrollId: {
+          type: 'string',
+          description: 'Scroll to insert into (from list_scrolls). Required.',
+        },
+        data: {
+          type: 'string',
+          description:
+            'Base64 data URI (data:image/...;base64,...). Exactly one of data or path.',
+        },
+        path: {
+          type: 'string',
+          description:
+            'Local file path (png, jpg, jpeg, gif, or webp). This server reads and ' +
+            'encodes it; the app never sees the path. Exactly one of data or path.',
+        },
+        after: {
+          type: 'string',
+          description:
+            'Insert after this occupant id (a markdown block or diagram frame in the same scroll). ' +
+            'Preferred. Do not pass index at the same time.',
+        },
+        index: {
+          type: 'integer',
+          minimum: 0,
+          description:
+            '0-based index in the scroll\'s packed-occupant reading order. 0 = column top. ' +
+            'Do not pass after at the same time. Prefer after.',
+        },
+        alt: {
+          type: 'string',
+          description: 'Alt text. Defaults to "image".',
+        },
+        mini: {
+          type: 'boolean',
+          description:
+            'If true, land as a Mini thumbnail (default width 160). Displacement uses the mini height.',
+        },
+      },
+      required: ['scrollId'],
       additionalProperties: false,
     },
   },
@@ -1439,6 +1536,119 @@ const TOOL_ROUTES = {
   create_diagram: { cmd: 'create_diagram', params: {} },
 };
 
+const IMAGE_EXT_MIME = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+};
+const DATA_IMAGE_URI = /^data:image\/[a-zA-Z0-9.+-]+;base64,/;
+const IMAGE_EXTS = 'png, jpg, jpeg, gif, webp';
+const READ_IMAGE_URI = /^data:image\/([a-zA-Z0-9.+-]+);base64,([\s\S]*)$/;
+
+function isPresentParam(value) {
+  return value !== undefined && value !== null && value !== '';
+}
+
+/**
+ * Resolve insert_image's XOR of data/path. `path` is read and encoded here so
+ * the app only ever receives a data URI.
+ */
+async function prepareInsertImageParams(params) {
+  const hasData = isPresentParam(params.data);
+  const hasPath = isPresentParam(params.path);
+  if (hasData && hasPath) {
+    throw new Error('BAD_PARAMS: Pass data (a base64 data URI) or path, not both.');
+  }
+  if (!hasData && !hasPath) {
+    throw new Error(
+      'BAD_PARAMS: insert_image needs exactly one of data (a base64 data URI) or path (a local file).',
+    );
+  }
+  const next = { ...params };
+  if (hasPath) {
+    if (typeof params.path !== 'string') {
+      throw new Error('BAD_PARAMS: "path" must be a string');
+    }
+    const ext = extname(params.path).toLowerCase();
+    const mime = IMAGE_EXT_MIME[ext];
+    if (!mime) {
+      throw new Error(
+        `BAD_PARAMS: path must be a ${IMAGE_EXTS} file (got "${ext || 'no extension'}").`,
+      );
+    }
+    let bytes;
+    try {
+      bytes = await readFile(params.path);
+    } catch (err) {
+      throw new Error(
+        `BAD_PARAMS: could not read image file "${params.path}": ${err.message}`,
+      );
+    }
+    next.data = `data:${mime};base64,${bytes.toString('base64')}`;
+    delete next.path;
+    return next;
+  }
+  if (typeof params.data !== 'string' || !DATA_IMAGE_URI.test(params.data)) {
+    throw new Error('BAD_PARAMS: "data" must be a data:image/...;base64, URI');
+  }
+  return next;
+}
+
+function extForImageFormat(format) {
+  if (format === 'jpeg' || format === 'jpg') return 'jpg';
+  if (format === 'svg+xml') return 'svg';
+  const clean = String(format).toLowerCase().replace(/[^a-z0-9]/g, '');
+  return clean || 'bin';
+}
+
+/**
+ * Decode the app's read_image data URI and write a local file. Agent-visible
+ * result never includes src.
+ */
+async function writeReadImageFile(result, params) {
+  const src = result && result.src;
+  if (typeof src !== 'string') {
+    throw new Error('INTERNAL: notebook did not return image bytes');
+  }
+  const match = READ_IMAGE_URI.exec(src);
+  if (!match) {
+    throw new Error('INTERNAL: image src is not a base64 data URI');
+  }
+  const format = match[1].toLowerCase() === 'jpg' ? 'jpeg' : match[1].toLowerCase();
+  const ext = extForImageFormat(format);
+  let bytes;
+  try {
+    bytes = Buffer.from(match[2], 'base64');
+  } catch (err) {
+    throw new Error('INTERNAL: could not decode image: ' + err.message);
+  }
+  const id = typeof result.id === 'string' && result.id ? result.id : 'image';
+  let outPath = params && params.out_path;
+  if (outPath !== undefined && outPath !== null && outPath !== '') {
+    if (typeof outPath !== 'string' || !isAbsolute(outPath)) {
+      throw new Error('BAD_PARAMS: "out_path" must be an absolute file path');
+    }
+  } else {
+    outPath = join(tmpdir(), 'powernote-images', `${id}.${ext}`);
+  }
+  try {
+    await mkdir(dirname(outPath), { recursive: true });
+    await writeFile(outPath, bytes);
+  } catch (err) {
+    throw new Error(`Could not write image to "${outPath}": ${err.message}`);
+  }
+  return {
+    path: outPath,
+    format,
+    bytes: bytes.length,
+    naturalWidth: result.naturalWidth,
+    naturalHeight: result.naturalHeight,
+    alt: typeof result.alt === 'string' ? result.alt : '',
+  };
+}
+
 const server = new Server(
   { name: 'powernote-notes', version: '0.33.0' },
   { capabilities: { tools: {} } },
@@ -1482,10 +1692,19 @@ async function runToolAsAgent(name, params, agentId, label) {
 
   const route = TOOL_ROUTES[name];
   const cmd = route ? route.cmd : name;
-  const args = route ? { ...params, ...route.params } : params;
+  let args = route ? { ...params, ...route.params } : params;
+  if (name === 'insert_image') {
+    args = await prepareInsertImageParams(args);
+  }
 
   // Reads never queue: an agent that cannot look also cannot find out why.
   if (READ_ONLY.has(name)) {
+    if (name === 'read_image') {
+      const appArgs = { ...args };
+      delete appArgs.out_path;
+      const response = await callApp(cmd, appArgs);
+      return await writeReadImageFile(unwrap(response), args);
+    }
     const response = await callApp(cmd, args);
     return unwrap(response);
   }

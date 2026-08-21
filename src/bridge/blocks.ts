@@ -165,3 +165,21 @@ export function orderedTextNodes(nodes: CanvasNode[]): CanvasNode[] {
 export function orderedDiagramFrames(nodes: CanvasNode[]): CanvasNode[] {
   return nodes.filter((n) => n.type === 'diagram').sort(compareReadingOrder);
 }
+
+/**
+ * A free-standing image: not a diagram-owned member.
+ *
+ * Same chrome rule as `isContentBlock` — only DIAGRAM-owned images are
+ * hidden (they are frame contents). A user's Ctrl+G group of ordinary
+ * images is still listed.
+ */
+export function isTopLevelImage(node: CanvasNode, diagramIds: Set<string>): boolean {
+  if (node.type !== 'image') return false;
+  return !node.groupId || !diagramIds.has(node.groupId);
+}
+
+/** Top-level images in the same reading order as blocks / diagrams. */
+export function orderedImageNodes(nodes: CanvasNode[]): CanvasNode[] {
+  const diagrams = diagramFrameIds(nodes);
+  return nodes.filter((n) => isTopLevelImage(n, diagrams)).sort(compareReadingOrder);
+}

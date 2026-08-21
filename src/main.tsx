@@ -110,7 +110,8 @@ Promise.all([
   import('./stores/useGroupStore'),
   import('./utils/groupOps'),
   import('./utils/scrollOps'),
-]).then(([{ useToolStore }, { useFileBindingStore }, { useGroupStore }, groupOps, scrollOps]) => {
+  import('./utils/imageEmbed'),
+]).then(([{ useToolStore }, { useFileBindingStore }, { useGroupStore }, groupOps, scrollOps, imageEmbed]) => {
   (window as any).__POWERNOTE_STORES__ = {
     workspace: useWorkspaceStore,
     canvas: useCanvasStore,
@@ -121,6 +122,11 @@ Promise.all([
   };
   (window as any).__POWERNOTE_GROUP_OPS__ = groupOps;
   (window as any).__POWERNOTE_SCROLL_OPS__ = scrollOps;
+  (window as any).__POWERNOTE_UTILS__ = {
+    embedImage: imageEmbed.embedImage,
+    imageNodeFromEmbed: imageEmbed.imageNodeFromEmbed,
+    embedImageFromUrl: imageEmbed.embedImageFromUrl,
+  };
 });
 
 // Agent bridge — dials out to the local MCP server, but only if the user has

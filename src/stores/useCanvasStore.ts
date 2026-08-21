@@ -3,6 +3,7 @@ import type { CanvasNode, ScrollRecord, Stroke, Viewport } from '../types/data';
 import { generateId } from '../utils/ids';
 import { expandSelectionForGroup } from '../utils/groups';
 import { clampStageY, pageCeiling } from '../utils/scrollCeiling';
+import { syncImageMiniOnUpdate } from '../utils/imageMini';
 import { useWorkspaceStore } from './useWorkspaceStore';
 import { useDrawStore } from './useDrawStore';
 import { useGroupStore } from './useGroupStore';
@@ -17,6 +18,14 @@ interface CanvasState {
   nodes: CanvasNode[];
   viewport: Viewport;
   selectedNodeIds: string[];
+
+  /**
+   * Image lightbox overlay (REQ-IMAGE-019/020). Ephemeral UI: not pushed to
+   * undo history and not persisted with the notebook.
+   */
+  lightboxNodeId: string | null;
+  openLightbox: (id: string) => void;
+  closeLightbox: () => void;
 
   // Node CRUD (all push to undo history)
   addNode: (node: CanvasNode) => void;
@@ -216,6 +225,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodes: [],
   viewport: { x: 0, y: 0, scale: 1 },
   selectedNodeIds: [],
+  lightboxNodeId: null,
+
+  openLightbox: (id) => set({ lightboxNodeId: id }),
+  closeLightbox: () => set({ lightboxNodeId: null }),
 
   addNode: (node) =>
     set((state) => {
@@ -233,7 +246,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       useWorkspaceStore.getState().markDirty();
       return {
         nodes: state.nodes.map((n) =>
-          n.id === id ? { ...n, ...updates } : n,
+          n.id === id ? syncImageMiniOnUpdate(n, updates) : n,
         ),
       };
     }),
@@ -256,7 +269,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     // Reset history on page switch
     undoStack = [];
     redoStack = [];
-    set({ nodes, selectedNodeIds: [] });
+    set({ nodes, selectedNodeIds: [], lightboxNodeId: null });
   },
 
   getNodesSnapshot: () => get().nodes,

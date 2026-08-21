@@ -427,6 +427,7 @@ test.describe('150 - Scroll ceiling (REQ-HIER-017, REQ-CANVAS-030)', () => {
 
     const row = await page.evaluate(async () => {
       const { pageCeiling } = await import('/src/utils/scrollCeiling.ts');
+      const layout = await import('/src/utils/pageLayout.ts');
       const S = (window as any).__POWERNOTE_STORES__;
       const ceiling = pageCeiling(
         S.canvas.getState().nodes,
@@ -438,12 +439,25 @@ test.describe('150 - Scroll ceiling (REQ-HIER-017, REQ-CANVAS-030)', () => {
         .find('Text')
         .filter((t: any) => t.text() === 'Alpha' || t.text() === 'Beta')
         .map((t: any) => t.y());
-      return { ceiling, ys };
+      const barYs = stage.find('.scroll-title-backing').map((r: any) => r.y());
+      return {
+        ceiling,
+        ys,
+        barYs,
+        stripH: layout.SCROLL_TITLE_PINNED_STRIP_HEIGHT,
+        fontSize: layout.SCROLL_TITLE_PINNED_FONT_SIZE,
+      };
     });
 
+    // v0.62 chrome: the title bar TOP rests on the ceiling row; the text is
+    // vertically centred inside the opaque strip (REQ-HIER-019), so the text
+    // itself sits (stripH - fontSize)/2 below the ceiling.
+    expect(row.barYs.length).toBe(2);
+    expect(row.barYs[0]).toBeCloseTo(row.barYs[1], 5);
+    expect(row.barYs[0]).toBeCloseTo(row.ceiling!, 5);
     expect(row.ys.length).toBe(2);
     expect(row.ys[0]).toBeCloseTo(row.ys[1], 5);
-    expect(row.ys[0]).toBeCloseTo(row.ceiling!, 5);
+    expect(row.ys[0]).toBeCloseTo(row.ceiling! + (row.stripH - row.fontSize) / 2, 5);
   });
 
   test('clamp is zoom-aware at scale 0.5 and 2.0', async ({ page }) => {

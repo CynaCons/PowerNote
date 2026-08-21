@@ -36,6 +36,11 @@ export function BottomToolbar() {
   const selectedTextNode = selectedNode?.type === 'text' ? selectedNode : null;
   const selectedImageNode = selectedNode?.type === 'image' ? selectedNode : null;
   const selectedShapeNode = selectedNode?.type === 'shape' ? selectedNode : null;
+  const selectedImageCount = nodes.filter(
+    (n) => selectedNodeIds.includes(n.id) && n.type === 'image',
+  ).length;
+  const allSelectedAreImages =
+    selectedNodeIds.length > 1 && selectedImageCount === selectedNodeIds.length;
 
   // In select mode: show toolbar for selected node type, or last creation tool's toolbar
   const effectiveTool = activeTool === 'select' ? lastToolbarTool : activeTool;
@@ -43,7 +48,7 @@ export function BottomToolbar() {
   // Determine context — selected node takes priority
   const isDrawContext = effectiveTool === 'draw';
   const isShapeContext = effectiveTool === 'shape' || !!selectedShapeNode;
-  const isImageContext = effectiveTool === 'image' || !!selectedImageNode;
+  const isImageContext = effectiveTool === 'image' || !!selectedImageNode || allSelectedAreImages;
   const isTextContext = effectiveTool === 'text' || !!selectedTextNode;
 
   // The group segment is deliberately outside the context chain below. A
