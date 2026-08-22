@@ -1,6 +1,6 @@
 # SRS: Shapes
 
-**Project:** PowerNote
+**Project:** PowerScroll (formerly PowerNote)
 **Version:** 0.8.0
 **Date:** 2026-03-22
 

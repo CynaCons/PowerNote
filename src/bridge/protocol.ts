@@ -1,8 +1,9 @@
 /**
- * Wire protocol shared by the PowerNote app and the `powernote-notes` MCP server.
+ * Wire protocol shared by PowerScroll and its MCP server. The legacy
+ * `app: powernote` wire id stays stable for existing notebooks and clients.
  *
  * Direction matters: the MCP server HOSTS the WebSocket and the app dials OUT
- * to it. A browser page cannot listen on a port, and PowerNote ships as a
+ * to it. A browser page cannot listen on a port, and PowerScroll ships as a
  * single static HTML file with no runtime backend, so the app is always the
  * client here.
  *

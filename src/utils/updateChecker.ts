@@ -4,8 +4,8 @@ import { injectExtensionBlocks } from '../extensions/embed';
 import { isFSASupported, writeToHandle, verifyPermission } from './fileSystemAccess';
 import { getCurrentHandle } from './fileHandleStore';
 
-export const GITHUB_REPO = 'CynaCons/PowerNote';
-const ASSET_NAME = 'PowerNote.html';
+export const GITHUB_REPO = 'CynaCons/PowerScroll';
+export const RELEASE_ASSET_NAMES = ['PowerScroll.html', 'PowerNote.html'] as const;
 
 /**
  * How long a check is trusted before asking GitHub again.
@@ -131,7 +131,7 @@ export function compareVersions(a: string, b: string): number {
 }
 
 /**
- * Check GitHub for a newer release of PowerNote.
+ * Check GitHub for a newer release of PowerScroll.
  * Returns null if the check fails (offline, CORS blocked, etc.)
  */
 export async function checkForUpdate(
@@ -143,23 +143,23 @@ export async function checkForUpdate(
   if (!options.force) {
     const cached = readCachedCheck(currentVersion);
     if (cached) {
-      console.log('[PowerNote Update] Using cached check (refreshes every 6h)');
+      console.log('[PowerScroll Update] Using cached check (refreshes every 6h)');
       return cached;
     }
   }
 
-  console.log(`[PowerNote Update] Checking for updates... current version: ${currentVersion}`);
+  console.log(`[PowerScroll Update] Checking for updates... current version: ${currentVersion}`);
   try {
     const url = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
-    console.log(`[PowerNote Update] Fetching: ${url}`);
+    console.log(`[PowerScroll Update] Fetching: ${url}`);
     const resp = await fetch(url, {
       headers: { Accept: 'application/vnd.github.v3+json' },
     });
-    console.log(`[PowerNote Update] Response status: ${resp.status}`);
+    console.log(`[PowerScroll Update] Response status: ${resp.status}`);
     if (!resp.ok) {
       if (resp.status === 403) {
         console.warn(
-          '[PowerNote Update] GitHub API rate limited (403) — falling back to raw.githubusercontent.com, ' +
+          '[PowerScroll Update] GitHub API rate limited (403) — falling back to raw.githubusercontent.com, ' +
           'which has no API quota.',
         );
         const raw = await latestVersionFromRaw();
@@ -172,18 +172,18 @@ export async function checkForUpdate(
           return info;
         }
       } else {
-        console.warn(`[PowerNote Update] GitHub API returned ${resp.status}`);
+        console.warn(`[PowerScroll Update] GitHub API returned ${resp.status}`);
       }
       return null;
     }
 
     const data = await resp.json();
     const latest = (data.tag_name || '').replace(/^v/, '');
-    console.log(`[PowerNote Update] Latest release tag: ${data.tag_name} → version: ${latest}`);
-    console.log(`[PowerNote Update] Assets found: ${data.assets?.length ?? 0}`);
+    console.log(`[PowerScroll Update] Latest release tag: ${data.tag_name} → version: ${latest}`);
+    console.log(`[PowerScroll Update] Assets found: ${data.assets?.length ?? 0}`);
 
     if (!latest) {
-      console.warn('[PowerNote Update] No version found in tag_name');
+      console.warn('[PowerScroll Update] No version found in tag_name');
       return null;
     }
 
@@ -192,17 +192,19 @@ export async function checkForUpdate(
     // "update" and offer to install an older one over it.
     if (compareVersions(latest, currentVersion) <= 0) {
       console.log(
-        `[PowerNote Update] Already up to date (running ${currentVersion}, latest release ${latest})`,
+        `[PowerScroll Update] Already up to date (running ${currentVersion}, latest release ${latest})`,
       );
       const upToDate: UpdateInfo = { available: false, latestVersion: latest };
       writeCachedCheck(currentVersion, upToDate);
       return upToDate;
     }
 
-    const asset = data.assets?.find((a: any) => a.name === ASSET_NAME);
-    console.log(`[PowerNote Update] Asset ID: ${asset?.id ?? 'NOT FOUND'}`);
-    console.log(`[PowerNote Update] browser_download_url: ${asset?.browser_download_url ?? 'NONE'}`);
-    console.log(`[PowerNote Update] Release URL: ${data.html_url}`);
+    const asset = RELEASE_ASSET_NAMES
+      .map((name) => data.assets?.find((a: any) => a.name === name))
+      .find(Boolean);
+    console.log(`[PowerScroll Update] Asset ID: ${asset?.id ?? 'NOT FOUND'}`);
+    console.log(`[PowerScroll Update] browser_download_url: ${asset?.browser_download_url ?? 'NONE'}`);
+    console.log(`[PowerScroll Update] Release URL: ${data.html_url}`);
 
     const info: UpdateInfo = {
       available: true,
@@ -214,13 +216,13 @@ export async function checkForUpdate(
     writeCachedCheck(currentVersion, info);
     return info;
   } catch (err) {
-    console.error('[PowerNote Update] Check failed:', err);
+    console.error('[PowerScroll Update] Check failed:', err);
     return null;
   }
 }
 
 /**
- * Inject workspace JSON into a PowerNote HTML template (pure, testable).
+ * Inject workspace JSON into a PowerScroll HTML template (pure, testable).
  *
  * `extensions` (v0.65): installed extension blocks to carry into the NEW
  * template. The template arrives pristine from the release, so anything not
@@ -254,7 +256,7 @@ export function isLiveUpdateEnabled(): boolean {
 }
 
 /**
- * Try to fetch the PowerNote.html asset using multiple strategies.
+ * Try to fetch the PowerScroll build using multiple strategies.
  * GitHub's download URLs have CORS issues from file:// origins,
  * so we try several approaches in order.
  */
@@ -265,7 +267,7 @@ export function isLiveUpdateEnabled(): boolean {
  * headers on release-asset downloads: `browser_download_url` 302s to
  * objects.githubusercontent.com, and so does the API's octet-stream asset
  * endpoint, and neither response carries `Access-Control-Allow-Origin`. From a
- * page — which is all PowerNote ever is — both fail with a bare "TypeError:
+ * page — which is all PowerScroll ever is — both fail with a bare "TypeError:
  * Failed to fetch". They are kept only as fallbacks in case that ever changes.
  *
  * raw.githubusercontent.com does send `Access-Control-Allow-Origin: *`, and the
@@ -283,44 +285,44 @@ export async function fetchAssetHtml(
   // Strategy 1: the committed build at the release tag. The only CORS-clean route.
   if (tag) {
     const rawUrl = `https://raw.githubusercontent.com/${GITHUB_REPO}/${tag}/dist-template/index.html`;
-    console.log(`[PowerNote Update] Strategy 1: ${rawUrl}`);
+    console.log(`[PowerScroll Update] Strategy 1: ${rawUrl}`);
     try {
       const resp = await fetch(rawUrl);
       if (resp.ok) {
         const text = await resp.text();
         if (looksRight(text)) {
-          console.log(`[PowerNote Update] Strategy 1 succeeded (${text.length} bytes)`);
+          console.log(`[PowerScroll Update] Strategy 1 succeeded (${text.length} bytes)`);
           return text;
         }
-        console.warn('[PowerNote Update] Strategy 1: response is not a PowerNote build');
+        console.warn('[PowerScroll Update] Strategy 1: response is not a PowerScroll build');
       } else {
-        console.warn(`[PowerNote Update] Strategy 1 returned ${resp.status}`);
+        console.warn(`[PowerScroll Update] Strategy 1 returned ${resp.status}`);
       }
     } catch (err) {
-      console.log('[PowerNote Update] Strategy 1 failed:', err);
+      console.log('[PowerScroll Update] Strategy 1 failed:', err);
     }
   }
 
   // Strategy 2: the release asset. Expected to fail on CORS; kept as a fallback.
   if (downloadUrl) {
-    console.log('[PowerNote Update] Strategy 2: direct asset fetch');
+    console.log('[PowerScroll Update] Strategy 2: direct asset fetch');
     try {
       const resp = await fetch(downloadUrl);
       if (resp.ok) {
         const text = await resp.text();
         if (looksRight(text)) {
-          console.log(`[PowerNote Update] Strategy 2 succeeded (${text.length} bytes)`);
+          console.log(`[PowerScroll Update] Strategy 2 succeeded (${text.length} bytes)`);
           return text;
         }
       }
     } catch (err) {
-      console.log('[PowerNote Update] Strategy 2 failed (expected — GitHub sends no CORS header on assets):', err);
+      console.log('[PowerScroll Update] Strategy 2 failed (expected — GitHub sends no CORS header on assets):', err);
     }
   }
 
   // Strategy 3: main. Last resort only — it can be ahead of the newest release,
   // so it may install something that was never released.
-  console.log('[PowerNote Update] Strategy 3: raw.githubusercontent.com @ main');
+  console.log('[PowerScroll Update] Strategy 3: raw.githubusercontent.com @ main');
   try {
     const resp = await fetch(
       `https://raw.githubusercontent.com/${GITHUB_REPO}/main/dist-template/index.html`,
@@ -329,17 +331,17 @@ export async function fetchAssetHtml(
       const text = await resp.text();
       if (looksRight(text)) {
         console.warn(
-          '[PowerNote Update] Strategy 3 succeeded, but this is main rather than the ' +
+          '[PowerScroll Update] Strategy 3 succeeded, but this is main rather than the ' +
           'release — the installed build may be ahead of the version reported.',
         );
         return text;
       }
     }
   } catch (err) {
-    console.log('[PowerNote Update] Strategy 3 failed:', err);
+    console.log('[PowerScroll Update] Strategy 3 failed:', err);
   }
 
-  console.error('[PowerNote Update] All download strategies failed');
+  console.error('[PowerScroll Update] All download strategies failed');
   return null;
 }
 
@@ -389,7 +391,7 @@ export async function performUpdate(
   deps: PerformUpdateDeps = {},
   tag?: string,
 ): Promise<PerformUpdateResult> {
-  console.log(`[PowerNote Update] Starting update ${currentVersion} → ${newVersion}...`);
+  console.log(`[PowerScroll Update] Starting update ${currentVersion} → ${newVersion}...`);
 
   const fetchTemplate = deps.fetchTemplate ?? fetchAssetHtml;
   const getHandle = deps.getHandle ?? getCurrentHandle;
@@ -428,19 +430,19 @@ export async function performUpdate(
     if (liveEnabled() && isFSASupported()) {
       const handle = await getHandle();
       if (!handle) {
-        console.log('[PowerNote Update] No file handle for this notebook — will download instead.');
+        console.log('[PowerScroll Update] No file handle for this notebook — will download instead.');
       } else if (await verifyWrite(handle)) {
         target = handle;
-        console.log('[PowerNote Update] Write permission held — updating this file in place.');
+        console.log('[PowerScroll Update] Write permission held — updating this file in place.');
       } else {
-        console.warn('[PowerNote Update] Write permission denied — will download instead.');
+        console.warn('[PowerScroll Update] Write permission denied — will download instead.');
       }
     }
 
-    console.log('[PowerNote Update] Downloading new version...');
+    console.log('[PowerScroll Update] Downloading new version...');
     const newHtml = await fetchTemplate(downloadUrl, tag ?? `v${newVersion}`);
     if (!newHtml) {
-      console.error('[PowerNote Update] Could not download new version');
+      console.error('[PowerScroll Update] Could not download new version');
       return { ok: false };
     }
 
@@ -449,25 +451,25 @@ export async function performUpdate(
     const extensions = await collectExtensions().catch(() => [] as EmbeddedExtension[]);
     const finalHtml = buildUpdatedHtml(newHtml, workspace, extensions);
     console.log(
-      `[PowerNote Update] Built updated HTML (${finalHtml.length} bytes, ${extensions.length} extension block${extensions.length === 1 ? '' : 's'})`,
+      `[PowerScroll Update] Built updated HTML (${finalHtml.length} bytes, ${extensions.length} extension block${extensions.length === 1 ? '' : 's'})`,
     );
 
     // ── Live-swap path (FSA A/B) ─────────────────────────────
     if (target) {
       if (backupBeforeLive) {
-        console.log('[PowerNote Update] Saving safety backup before live-swap...');
+        console.log('[PowerScroll Update] Saving safety backup before live-swap...');
         const backupHtml = await buildBackup(workspace);
         download(backupHtml, `${safeName} (v${currentVersion}_update-backup).html`);
       }
 
-      console.log('[PowerNote Update] Live-swap: writing to current file handle...');
+      console.log('[PowerScroll Update] Live-swap: writing to current file handle...');
       const written = await writeHandle(target, finalHtml);
       if (written) {
-        console.log('[PowerNote Update] Live-swap write OK — reloading');
+        console.log('[PowerScroll Update] Live-swap write OK — reloading');
         reload();
         return { ok: true, mode: 'live-swap' };
       }
-      console.warn('[PowerNote Update] Live-swap write failed — falling back to download');
+      console.warn('[PowerScroll Update] Live-swap write failed — falling back to download');
     }
 
     // ── Download fallback ────────────────────────────────────
@@ -477,12 +479,12 @@ export async function performUpdate(
     // anyway was worse than redundant: browsers block a second programmatic
     // download from the same gesture, so the backup went through and the actual
     // new notebook was silently dropped, which read as "update does nothing".
-    console.log('[PowerNote Update] Download fallback: your existing file is untouched.');
+    console.log('[PowerScroll Update] Download fallback: your existing file is untouched.');
     download(finalHtml, `${safeName} (v${newVersion}).html`);
-    console.log('[PowerNote Update] Downloaded the new version — open it to continue.');
+    console.log('[PowerScroll Update] Downloaded the new version — open it to continue.');
     return { ok: true, mode: 'download' };
   } catch (err) {
-    console.error('[PowerNote Update] Update failed:', err);
+    console.error('[PowerScroll Update] Update failed:', err);
     return { ok: false };
   }
 }

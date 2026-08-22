@@ -58,7 +58,7 @@ export interface ShapeNodeData {
 // so the notebook file remains fully self-contained.
 export interface GanttNodeData {
   // Stored as `unknown` to avoid pulling the full GanttDocument type into
-  // PowerNote's type system; the renderer validates at mount.
+  // PowerScroll's type system; the renderer validates at mount.
   doc: unknown;
   showCriticalPath?: boolean;
   showBaseline?: boolean;

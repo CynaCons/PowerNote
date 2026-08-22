@@ -1,6 +1,6 @@
 # SRS: Search
 
-**Project:** PowerNote
+**Project:** PowerScroll (formerly PowerNote)
 **Version:** 0.10.4
 **Date:** 2026-03-25
 

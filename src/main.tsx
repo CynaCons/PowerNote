@@ -69,10 +69,10 @@ if (embeddedData) {
       const data = extractDataFromHtml(text);
       if (data) {
         hydrateStores(migrateWorkspace(data));
-        console.log('[PowerNote] Restored last file via FSA handle');
+        console.log('[PowerScroll] Restored last file via FSA handle');
       }
     } catch (err) {
-      console.warn('[PowerNote] FSA restore failed, handle may be stale:', err);
+      console.warn('[PowerScroll] FSA restore failed, handle may be stale:', err);
       await clearCurrentHandle();
     }
   })();
@@ -80,13 +80,13 @@ if (embeddedData) {
 
 // Check for updates (non-blocking, silent on failure)
 checkForUpdate(APP_VERSION).then((result) => {
-  console.log('[PowerNote] Update check result:', result);
+  console.log('[PowerScroll] Update check result:', result);
   if (result?.available && result.latestVersion) {
     (window as any).__POWERNOTE_UPDATE__ = result;
-    console.log(`[PowerNote] Update available: v${result.latestVersion}`);
+    console.log(`[PowerScroll] Update available: v${result.latestVersion}`);
   }
 }).catch((err) => {
-  console.error('[PowerNote] Update check error:', err);
+  console.error('[PowerScroll] Update check error:', err);
 });
 
 // Start auto-save (debounced 1.5s after last edit, max-wait 5s while dirty).

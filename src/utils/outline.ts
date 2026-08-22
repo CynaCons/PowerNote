@@ -1,7 +1,7 @@
 /**
  * Document outline derived from the markdown already on the canvas.
  *
- * Headings are not a separate data type in PowerNote — they are `#` lines
+ * Headings are not a separate data type in PowerScroll — they are `#` lines
  * inside ordinary text blocks. So the outline is computed, never stored: it
  * cannot drift out of sync with the content, and editing a heading updates it
  * on the next render with no bookkeeping.

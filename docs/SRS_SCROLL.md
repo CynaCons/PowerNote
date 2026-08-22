@@ -1,6 +1,6 @@
 # SRS: Scrolls
 
-**Project:** PowerNote  
+**Project:** PowerScroll (formerly PowerNote)
 **Version:** 0.66.2
 **Date:** 2026-08-21
 

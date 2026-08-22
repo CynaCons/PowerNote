@@ -1,35 +1,41 @@
-# powernote-notes MCP
+# PowerScroll MCP
 
-Lets an agent create pages and write markdown content into a **running**
-PowerNote notebook.
+Lets an agent read and edit a **running PowerScroll notebook**. Existing
+PowerNote notebooks use the same compatible bridge protocol.
 
 ## How it connects
 
 ```
-agent  ──MCP/stdio──▶  powernote-mcp/server.js  ──WebSocket──▶  PowerNote (browser)
+agent  ──MCP/stdio──▶  powerscroll-mcp  ──WebSocket──▶  PowerScroll (browser)
                        (hosts ws://127.0.0.1:41777)             (dials out)
 ```
 
 The server hosts the socket and the app dials **out** to it. A browser page
-cannot listen on a port, and PowerNote ships as a single static HTML file with
+cannot listen on a port, and PowerScroll ships as a single static HTML file with
 no runtime backend, so the app is necessarily the client.
 
 Commands mutate the app's live stores, so agent edits flow through the same
 auto-save pipeline as anything you type — there is no separate write path to
 the `.html` file and nothing to reconcile.
 
-## Setup
+## Install
+
+Until the first npm publication, install the release package directly:
 
 ```bash
-npm install --prefix powernote-mcp
+npm install --global https://github.com/CynaCons/PowerScroll/releases/latest/download/powerscroll-mcp.tgz
+powerscroll-mcp
 ```
 
-Already registered in the project's `.mcp.json`. Restart your agent session
-after changing that file so the tools load.
+After npm publication the shorter command is `npx powerscroll-mcp`.
+
+Repository contributors can run `npm install --prefix powernote-mcp`; the
+server is registered in `.mcp.json`. Restart the agent session after changing
+that file so the tools load.
 
 ## Turning it on
 
-1. Open your notebook in PowerNote.
+1. Open your notebook in PowerScroll.
 2. Settings → **Agent bridge** → *"Let a local agent write into this notebook"*.
 3. The status dot goes green when the app reaches the server. Order doesn't
    matter — the app retries with backoff, so either side can start first.
@@ -72,13 +78,13 @@ socket on their machine.
 | `rename_notebook` | Rename the notebook in the app (not the file on disk). |
 | `save_notebook` | Write the notebook back to the file it was opened from. |
 | `bridge_status` | Who else is working in this notebook, and who holds it. Never blocked. |
-| `check_update` | Is a newer PowerNote release available? |
+| `check_update` | Is a newer PowerScroll release available? |
 | `run_update` | Install it. Overwrites the file and reloads the app. |
 
 ### Diagrams
 
 Two tools, named for the language each takes: `create_diagram_plantuml` and
-`create_diagram_mermaid`. What lands is ordinary PowerNote shapes and text
+`create_diagram_mermaid`. What lands is ordinary PowerScroll shapes and text
 inside a diagram frame — **not an image** — so the user can drag any part of it
 afterwards. We take the syntax and throw the renderer away; that is what makes
 the result editable.
@@ -185,7 +191,7 @@ class, state, ER and Gantt families.
   rather than half-drawn — PlantUML would happily render `A[Read sensor]` as an
   entity literally named `A[Read sensor]`.
 - `skinparam`, `!include`, `!theme`, `style`, `classDef` and `%%{init}%%` are
-  **reported back as skipped**, not silently dropped — PowerNote supplies the
+  **reported back as skipped**, not silently dropped — PowerScroll supplies the
   style.
 - `fork`, `split`, `while` and `repeat` are refused with a diagnostic rather
   than drawn wrong.

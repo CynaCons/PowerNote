@@ -3,7 +3,7 @@ name: Build & Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: write
@@ -16,30 +16,45 @@ jobs:
     # committed single-file artifact can be reproduced and uploaded.
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - run: npm ci
 
       - run: npm run build:template
 
+      - run: npm ci --prefix powernote-mcp
+
+      - name: Pack the agent bridge
+        working-directory: powernote-mcp
+        run: npm pack --pack-destination ..
+
       - name: Copy release artifact
-        run: cp dist-template/index.html PowerNote.html
+        run: |
+          cp dist-template/index.html PowerScroll.html
+          cp dist-template/index.html PowerNote.html
+          mv powerscroll-mcp-*.tgz powerscroll-mcp.tgz
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: PowerNote.html
+          files: |
+            PowerScroll.html
+            PowerNote.html
+            powerscroll-mcp.tgz
           generate_release_notes: true
           body: |
-            ## PowerNote ${{ github.ref_name }}
+            ## PowerScroll ${{ github.ref_name }}
 
-            **Download `PowerNote.html`** below — open it in any browser to start taking notes.
+            **Download `PowerScroll.html`** below — open it in a browser to start taking notes.
 
             No install. No account. No server. Just open and write.
 
             Your notes are saved inside the file itself — Ctrl+S to download your personalized copy.
+
+            Existing PowerNote notebooks open directly. `PowerNote.html` is included as a
+            byte-identical compatibility alias for notebooks updating across the rename.

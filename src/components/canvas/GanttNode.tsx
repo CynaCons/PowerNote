@@ -17,7 +17,7 @@ interface GanttNodeProps {
 }
 
 /**
- * Renders a PowerPlanner Gantt chart inside a PowerNote canvas node.
+ * Renders a PowerPlanner Gantt chart inside a PowerScroll canvas node.
  *
  * The chart document lives in `node.data.doc` and is rendered by the
  * vendored read-only renderer. Konva handles selection, drag, and resize;

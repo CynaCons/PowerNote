@@ -1,6 +1,6 @@
 # SRS: Document Outline
 
-**Project:** PowerNote  
+**Project:** PowerScroll (formerly PowerNote)
 **Version:** 0.33.0  
 **Date:** 2026-08-11
 

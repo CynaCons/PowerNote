@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * powernote-notes — MCP server for writing notes into a running PowerNote.
+ * powerscroll-mcp — MCP server for writing notes into a running PowerScroll.
  *
- * Topology: this process hosts a WebSocket on loopback; the PowerNote app dials
- * out to it (a browser page cannot listen on a port, and PowerNote ships as a
+ * Topology: this process hosts a WebSocket on loopback; the PowerScroll app dials
+ * out to it (a browser page cannot listen on a port, and PowerScroll ships as a
  * single static HTML file). Tool calls are forwarded to the connected app,
  * which applies them to its live stores; its normal auto-save then persists
  * them to the notebook file.
@@ -41,7 +41,7 @@ const PORT = Number(process.env.POWERNOTE_BRIDGE_PORT || 41777);
 const HOST = '127.0.0.1';
 const REQUEST_TIMEOUT_MS = Number(process.env.POWERNOTE_BRIDGE_TIMEOUT_MS || 10_000);
 
-const log = (...args) => console.error('[powernote-notes]', ...args);
+const log = (...args) => console.error('[powerscroll-mcp]', ...args);
 
 /** This process's agent identity. Stable for its lifetime. */
 const AGENT_ID = randomUUID().slice(0, 8);
@@ -71,7 +71,7 @@ const LOCK_MAX_HOLD_MS = Number(process.env.POWERNOTE_LOCK_MAX_HOLD_MS || 120_00
 
 // ── App connection ──────────────────────────────────────────
 
-/** The currently connected PowerNote tab, if any. Latest connection wins. */
+/** The currently connected PowerScroll tab, if any. Latest connection wins. */
 let app = null;
 /** Metadata from the app's hello frame. */
 let appInfo = null;
@@ -267,7 +267,7 @@ function adoptApp(socket, msg) {
   // notebook the user is actually looking at.
   app = socket;
   appInfo = { appVersion: msg.appVersion, notebook: msg.notebook };
-  log('Hello from PowerNote v' + msg.appVersion + ' -- notebook "' + msg.notebook + '"');
+  log('Hello from PowerScroll v' + msg.appVersion + ' -- notebook "' + msg.notebook + '"');
 
   if (previous && previous !== socket && previous.readyState === previous.OPEN) {
     log('A second notebook connected; displacing the previous one.');
@@ -424,7 +424,7 @@ function callApp(cmd, params) {
     if (!app || app.readyState !== app.OPEN) {
       reject(
         new BridgeUnavailable(
-          'No PowerNote notebook is connected. Open your notebook, then turn on ' +
+          'No PowerScroll notebook is connected. Open your notebook, then turn on ' +
           'Settings → Agent bridge → "Let a local agent write into this notebook".',
         ),
       );
@@ -560,7 +560,7 @@ const TOOLS = [
       'read_page images[].id. The notebook returns the embedded bytes over the ' +
       'bridge; this server decodes them and writes a local file. Optional out_path ' +
       '(absolute) names the destination — parent dirs are created; an existing file ' +
-      'is overwritten. When omitted, the file lands in os.tmpdir()/powernote-images/' +
+      'is overwritten. When omitted, the file lands in os.tmpdir()/powerscroll-images/' +
       '<id>.<ext>. The response is {path, format, bytes, naturalWidth, naturalHeight, alt} ' +
       '— NEVER the base64 payload. Unknown id is NOT_FOUND. A non-image id is ' +
       'UNSUPPORTED naming the type. Then open the file with your vision tools.',
@@ -575,7 +575,7 @@ const TOOLS = [
           type: 'string',
           description:
             'Absolute file path to write. Parent directory is created if missing. ' +
-            'Omit to write os.tmpdir()/powernote-images/<id>.<ext>.',
+            'Omit to write os.tmpdir()/powerscroll-images/<id>.<ext>.',
         },
       },
       required: ['id'],
@@ -852,12 +852,12 @@ const TOOLS = [
       'are the pseudostates, :action; is a step, and if (cond) then (label) / else ' +
       '(label) / endif adds a decision with guards on the arrows. Steps run top to bottom ' +
       'in source order and the lane fixes the column. ' +
-      'What lands on the canvas is ordinary PowerNote shapes and text inside a diagram ' +
+      'What lands on the canvas is ordinary PowerScroll shapes and text inside a diagram ' +
       'frame, so the user can drag any part of it afterwards - this is NOT an image. ' +
       'Supply semantics only: name the steps or entities and what connects to what. Every ' +
       'coordinate is computed here from real text metrics, and there is no way to position ' +
       'anything yourself. Do NOT include skinparam, !include, !theme or any styling - ' +
-      'PowerNote supplies the style and those lines come back as skipped diagnostics. ' +
+      'PowerScroll supplies the style and those lines come back as skipped diagnostics. ' +
       'fork, split, while and repeat are refused rather than drawn wrong, and activity ' +
       'branches currently render in source order rather than as parallel paths that rejoin. ' +
       'The response carries the diagnostics, so one call is enough to know whether it came out right.',
@@ -915,7 +915,7 @@ const TOOLS = [
       'NOT SUPPORTED, and refused with a diagnostic: subgraphs, dotted (-.->), thick (==>) ' +
       'and circle/cross (--o, --x) links, compound node shapes such as A[[Sub]] or ' +
       'A((Circle)), loop/alt/opt/par/note blocks, and the class, state, ER and Gantt families. ' +
-      'What lands on the canvas is ordinary PowerNote shapes and text inside a diagram frame, ' +
+      'What lands on the canvas is ordinary PowerScroll shapes and text inside a diagram frame, ' +
       'so the user can drag any part of it afterwards - this is NOT an image. Supply semantics ' +
       'only; every coordinate is computed here from real text metrics. The response carries ' +
       'the diagnostics, so one call is enough to know whether it came out right.',
@@ -969,7 +969,7 @@ const TOOLS = [
   {
     name: 'create_diagram_svg',
     description:
-      'Draw an SVG onto the page as native PowerNote shapes. Every element becomes an ' +
+      'Draw an SVG onto the page as native PowerScroll shapes. Every element becomes an ' +
       'ordinary rectangle, circle, line or text run that the user can select and drag ' +
       'afterwards -- it is transpiled, NOT embedded as an image. ' +
       'THIS TOOL IS THE OPPOSITE OF THE OTHER TWO: create_diagram_plantuml and ' +
@@ -1035,7 +1035,7 @@ const TOOLS = [
       '"Export as .drawio" emits it verbatim. Library stencil ICONS (mxgraph.aws4/mscae/' +
       'cisco) are the one gap: they render as their styled box + label, since stencil packs ' +
       'are not bundled. If the viewer extension is unavailable (e.g. offline before it was ' +
-      'installed), the tool FALLS BACK to transpiling the source into native PowerNote ' +
+      'installed), the tool FALLS BACK to transpiling the source into native PowerScroll ' +
       "shapes and says so in warnings. Pass render:'nodes' to force that transpile path " +
       'deliberately, when you WANT individually-selectable member nodes instead of exact ' +
       'paint. Everything below documents the transpiled subset — it applies to ' +
@@ -1062,7 +1062,7 @@ const TOOLS = [
       'to readable XML before transpile; the stored source is always uncompressed. ' +
       'REFUSED, each with a diagnostic naming it: ' +
       'curved=1 is refused — the canvas has no bezier primitive, and a straightened curve misstates the drawing; ' +
-      'startArrow other than none/classic/block/open is refused — PowerNote arrows have one head, at the end of the segment, and this start head has no canvas equivalent; ' +
+      'startArrow other than none/classic/block/open is refused — PowerScroll arrows have one head, at the end of the segment, and this start head has no canvas equivalent; ' +
       'startArrow=classic with an end head is refused — the canvas has no double-headed primitive, and dropping one head would misstate the drawing; ' +
       'custom stencils (mscae/aws/cisco image libraries) are little rendering programs this transpiler does not run; UML module/component/port and box-like mxgraph.uml/basic shapes ARE drawn (as rectangles / tabbed modules); ' +
       'image= is refused — an embedded raster is not a canvas node. Import the picture as an image block instead; ' +
@@ -1236,7 +1236,7 @@ const TOOLS = [
   {
     name: 'resize_scroll',
     description:
-      'Resize a scroll band by stable id. The width is clamped to PowerNote\'s shared ' +
+      'Resize a scroll band by stable id. The width is clamped to PowerScroll\'s shared ' +
       'limits, persists on that page, and every node or stroke in bands to the right ' +
       'moves by the same delta. The resized band\'s own content stays fixed. One undo ' +
       'restores width and positions. list_scrolls reports the effective width.',
@@ -1543,7 +1543,7 @@ const TOOLS = [
   {
     name: 'check_update',
     description:
-      'Check whether a newer PowerNote release exists on GitHub. Reports the running ' +
+      'Check whether a newer PowerScroll release exists on GitHub. Reports the running ' +
       'version and the latest one. Note "checked": when false the API was unreachable ' +
       'or rate limited and the status is unknown — that is not the same as up to date.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
@@ -1551,7 +1551,7 @@ const TOOLS = [
   {
     name: 'run_update',
     description:
-      'Install the latest PowerNote release into the current notebook file. This ' +
+      'Install the latest PowerScroll release into the current notebook file. This ' +
       'rewrites the .html on disk and reloads the app, which drops this bridge ' +
       'connection until the notebook reconnects. Ask the user before calling it, ' +
       'then pass confirm:true. A safety backup is downloaded first where the browser ' +
@@ -1683,7 +1683,7 @@ async function writeReadImageFile(result, params) {
       throw new Error('BAD_PARAMS: "out_path" must be an absolute file path');
     }
   } else {
-    outPath = join(tmpdir(), 'powernote-images', `${id}.${ext}`);
+    outPath = join(tmpdir(), 'powerscroll-images', `${id}.${ext}`);
   }
   try {
     await mkdir(dirname(outPath), { recursive: true });
@@ -1702,7 +1702,7 @@ async function writeReadImageFile(result, params) {
 }
 
 const server = new Server(
-  { name: 'powernote-notes', version: '0.33.0' },
+  { name: 'powerscroll-mcp', version: '0.67.0' },
   { capabilities: { tools: {} } },
 );
 

@@ -1,4 +1,4 @@
-# PowerNote — Implementation Plan
+# PowerScroll — Implementation Plan
 
 **Goal:** Ship a working MVP where a user can open the app, create a page, place text on an infinite canvas, organize notes hierarchically, and edit visually.
 
@@ -1356,3 +1356,13 @@ See `docs/VISION.md` for deferred post-MVP items (cloud sync, collaboration, pai
 - update_diagram bridge tool (redraw an existing diagram's source without the UI dialog) — scoped in v0.34.0, never built, implied by the field-feedback pattern (create-only diagrams); pairs with read_diagram from v0.54
 - draw.io rendering rework: replace transpile-to-native-nodes as the default display with a bundled draw.io viewer render (offline, self-hosted viewer-static.min.js → SVG snapshot in the diagram frame); keep transpiler as optional "convert to editable nodes". Evaluation done 2026-08-21, direction awaiting user decision.
 - Stencil-pack extension: vendor common drawio stencil XMLs (aws4, azure, cisco) so mxStencilRegistry can resolve library icons offline (v0.64 renders them as styled box + label, dynamicLoading=false). Also: math typesetting in drawio labels is disabled offline (DRAW_MATH_URL no-op) — could ship MathJax as an extension later.
+### v0.67.0 — PowerScroll public launch foundation (ACTIVE)
+> Public brand, storefront, trust, onboarding, compatibility, and distribution work prompted by the decision to adopt the PowerScroll name.
+**Goal:** Rename PowerNote to PowerScroll without breaking existing notebooks, make the product immediately understandable and tryable on GitHub Pages, and publish an independently installable agent bridge plus a verified release.
+- [x] Audit public branding and compatibility-sensitive PowerNote identifiers before renaming [agent: Codex]
+- [x] Rename user-facing product, repository metadata, release artifact, documentation, and agent bridge to PowerScroll while preserving legacy notebook compatibility [agent: Codex]
+- [x] Add GitHub Pages storefront, live demo, real screenshots, onboarding samples, and social preview asset [agent: Codex]
+- [ ] Add MIT license, security and contribution docs, issue templates, Discussions, topics, and repository homepage metadata [agent: codex]
+- [ ] Package and publish an independently installable PowerScroll MCP server; prepare official MCP Registry metadata [agent: codex]
+- [x] Verify legacy v0.66.2 migration and update through the repository rename, run local regression/full suite and smoke checks [agent: Codex]
+- [ ] Publish v0.67.0, deploy GitHub Pages, inspect the live product, and document remaining owner-only actions [agent: codex]

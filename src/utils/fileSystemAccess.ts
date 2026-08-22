@@ -33,7 +33,7 @@ export function isFSASupported(): boolean {
 /** Common picker type for .html notebooks. */
 const HTML_PICKER_TYPES = [
   {
-    description: 'PowerNote notebook',
+    description: 'PowerScroll notebook',
     accept: { 'text/html': ['.html'] as string[] },
   },
 ];

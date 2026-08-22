@@ -1,6 +1,6 @@
 # SRS: Bottom Toolbar
 
-**Project:** PowerNote
+**Project:** PowerScroll (formerly PowerNote)
 **Version:** 0.43.0
 **Date:** 2026-08-16
 

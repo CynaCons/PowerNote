@@ -1,6 +1,6 @@
 # SRS — Image Features
 
-**Project:** PowerNote
+**Project:** PowerScroll (formerly PowerNote)
 **Version:** 0.24.1
 **Date:** 2026-04-14
 

@@ -311,6 +311,6 @@ test.describe('100 - Agent notebook management (REQ-AGENT-026..036)', () => {
 
     const err = await runBridgeExpectingError(page, 'run_update', { confirm: true });
     expect(err.code).toBe('PRECONDITION');
-    expect(err.message).toContain('no PowerNote.html asset');
+    expect(err.message).toContain('no PowerScroll.html compatibility asset');
   });
 });

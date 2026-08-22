@@ -1,6 +1,6 @@
 # SRS: Text Blocks
 
-**Project:** PowerNote
+**Project:** PowerScroll (formerly PowerNote)
 **Version:** 0.26.0
 **Date:** 2026-07-20
 

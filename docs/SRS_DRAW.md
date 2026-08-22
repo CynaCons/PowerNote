@@ -1,6 +1,6 @@
 # SRS: Drawing & Eraser
 
-**Project:** PowerNote
+**Project:** PowerScroll (formerly PowerNote)
 **Version:** 0.10.5
 **Date:** 2026-04-23
 

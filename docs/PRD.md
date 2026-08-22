@@ -1,14 +1,14 @@
-# PowerNote — Product Requirements Document (PRD v2)
+# PowerScroll — Product Requirements Document (PRD v3)
 
 ## 1. Overview
 
-PowerNote is an offline-first, file-based visual note-taking application that combines:
+PowerScroll (formerly PowerNote) is an offline-first, file-based visual note-taking application that combines:
 
 - Structured hierarchy (like OneNote)
 - Freeform canvas editing (like PowerPoint)
 - Infinite whiteboard interaction (like Whiteboard)
 
-**Core innovation:** Each file is a fully self-contained, editable application (HTML-based) containing both the data and the editor.
+**Core innovation:** Each file is a fully self-contained, editable application (HTML-based) containing both the data and the editor. Existing PowerNote notebooks remain compatible.
 
 ## 2. Vision
 
@@ -22,7 +22,7 @@ Enable users to:
 
 ## 3. Product Definition
 
-"OneNote + PowerPoint + Whiteboard — but file-based and offline-first."
+"A local-first visual notebook in one editable HTML file—with an MCP bridge for AI agents."
 
 ## 4. Core Principles
 
@@ -180,14 +180,14 @@ The MVP is complete when all of the following are true. Each criterion is binary
 
 ## 13. Positioning
 
-Structured visual notes, fully owned by the user.
+One file. Infinite canvas. Your agents included.
 
 ## 14. Summary
 
-PowerNote introduces: Editable, portable knowledge files combining structure and visual thinking — without requiring the cloud.
+PowerScroll provides editable, portable knowledge files combining structure, visual thinking, and agent collaboration—without requiring the cloud.
 
 ---
 
 **Owner:** Constantin Chabirand
 **Date:** 2026-03-21
-**Status:** v2 (Validated Concept)
+**Status:** v3 (PowerScroll public launch foundation)

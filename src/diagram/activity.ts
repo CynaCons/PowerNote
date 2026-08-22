@@ -80,7 +80,7 @@ export function parseActivity(source: string): { spec: ActivitySpec; diagnostics
       diagnostics.push({
         line,
         severity: 'ignored',
-        message: 'Styling or preprocessor directive skipped — PowerNote supplies the style.',
+        message: 'Styling or preprocessor directive skipped — PowerScroll supplies the style.',
       });
       continue;
     }

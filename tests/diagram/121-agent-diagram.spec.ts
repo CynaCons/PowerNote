@@ -64,7 +64,7 @@ a --> b : Iface
 
     const skipped = result.diagnostics.filter((d: any) => d.severity === 'ignored');
     expect(skipped.length).toBeGreaterThan(0);
-    expect(skipped[0].message).toContain('PowerNote supplies the style');
+    expect(skipped[0].message).toContain('PowerScroll supplies the style');
     // It still drew the diagram it could understand.
     expect(result.elementCount).toBeGreaterThan(0);
   });

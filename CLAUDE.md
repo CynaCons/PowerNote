@@ -1,7 +1,7 @@
-# PowerNote — Claude Instructions
+# PowerScroll — Claude Instructions
 
 ## Project Overview
-PowerNote is an offline-first, file-based visual note-taking app combining OneNote (structure) + PowerPoint (canvas) + Whiteboard (freedom). Built with React 18 + TypeScript + Vite + Konva.js + Zustand.
+PowerScroll (formerly PowerNote) is an offline-first, file-based visual note-taking app combining OneNote structure, a presentation canvas, and whiteboard freedom. Built with React 18 + TypeScript + Vite + Konva.js + Zustand.
 
 ## Tech Stack
 - **Canvas**: Konva.js (react-konva) — MIT license, chosen over tldraw ($6K/year)

@@ -1,20 +1,48 @@
 {
-  "name": "powernote-notes-mcp",
-  "version": "0.33.0",
-  "private": true,
+  "name": "powerscroll-mcp",
+  "version": "0.67.0",
+  "mcpName": "io.github.cynacons/powerscroll",
   "type": "module",
-  "description": "MCP server that lets an agent write notes into a running PowerNote notebook",
+  "description": "MCP server for reading and editing a live PowerScroll visual notebook",
   "main": "server.js",
   "bin": {
-    "powernote-notes-mcp": "server.js"
+    "powerscroll-mcp": "server.js"
   },
   "scripts": {
     "start": "node server.js",
     "test": "node --test \"test/**/*.test.mjs\""
   },
+  "files": [
+    "server.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "notes",
+    "visual-notebook",
+    "local-first",
+    "powerscroll"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CynaCons/PowerScroll.git",
+    "directory": "powernote-mcp"
+  },
+  "homepage": "https://cynacons.github.io/PowerScroll/",
+  "bugs": {
+    "url": "https://github.com/CynaCons/PowerScroll/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
-    "powernote": "file:..",
     "ws": "^8.18.0"
   }
 }

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PowerScroll — one-file visual notebook for you and your AI agents</title>
+    <meta name="description" content="PowerScroll is a free, local-first visual notebook that lives in one editable HTML file. Work offline, own your data, and let local AI agents edit the same canvas." />
+    <link rel="canonical" href="https://cynacons.github.io/PowerScroll/" />
+    <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="PowerScroll — one file, infinite canvas, your agents included" />
+    <meta property="og:description" content="A local-first visual notebook in one editable HTML file, with an MCP bridge for AI agents." />
+    <meta property="og:url" content="https://cynacons.github.io/PowerScroll/" />
+    <meta property="og:image" content="https://cynacons.github.io/PowerScroll/assets/social-preview.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"SoftwareApplication","name":"PowerScroll","applicationCategory":"ProductivityApplication","operatingSystem":"Any modern desktop browser","isAccessibleForFree":true,"license":"https://opensource.org/license/mit","downloadUrl":"https://github.com/CynaCons/PowerScroll/releases/latest/download/PowerScroll.html","codeRepository":"https://github.com/CynaCons/PowerScroll","description":"A local-first visual notebook in one editable HTML file, with an MCP bridge for AI agents."}
+    </script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="PowerScroll home">
+        <img src="./assets/icon-192.png" alt="" width="32" height="32" />
+        <span>PowerScroll</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="#how">How it works</a>
+        <a href="#agents">For agents</a>
+        <a href="https://github.com/CynaCons/PowerScroll">GitHub</a>
+      </nav>
+      <a class="button button-small" href="./app/">Try it</a>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">LOCAL-FIRST · OPEN SOURCE · NO ACCOUNT</p>
+          <h1>One file. Infinite canvas. Your agents included.</h1>
+          <p class="lede">PowerScroll is a visual notebook that you and your AI agents can edit together. The complete application and all your notes live inside one portable HTML file.</p>
+          <div class="actions">
+            <a class="button" href="./app/">Try the live notebook</a>
+            <a class="button button-quiet" href="https://github.com/CynaCons/PowerScroll/releases/latest/download/PowerScroll.html">Download HTML</a>
+          </div>
+          <p class="microcopy">Free under MIT · works offline · Chrome and Edge recommended for direct disk save</p>
+        </div>
+        <div class="hero-visual">
+          <div class="window-band"><span></span><span></span><span></span><b>Architecture.scroll.html</b></div>
+          <img src="./assets/powerscroll-canvas.png" alt="PowerScroll canvas with notebook hierarchy, independent scrolls, markdown, and an editable architecture diagram" />
+        </div>
+      </section>
+
+      <section class="promise" aria-label="Product promises">
+        <article><strong>01</strong><h2>Actually yours</h2><p>No account, cloud database, or proprietary vault. Your notebook is the file on your disk.</p></article>
+        <article><strong>02</strong><h2>Visual and structured</h2><p>Sections and pages outside; markdown, ink, images, shapes, and independent scrolls inside.</p></article>
+        <article><strong>03</strong><h2>Agent-readable</h2><p>A local MCP bridge lets agents work in the visible notebook instead of hiding results in a chat transcript.</p></article>
+      </section>
+
+      <section class="mechanism" id="how">
+        <div>
+          <p class="eyebrow">THE WHOLE MODEL</p>
+          <h2>The editor travels with the notebook.</h2>
+          <p>Press Ctrl+S and PowerScroll writes the current editor, workspace, images, drawings, and extensions into one self-contained HTML file. Reopen it to continue. Send a copy and the recipient receives an editable notebook—not a flattened export.</p>
+        </div>
+        <ol>
+          <li><span>1</span><div><b>Open</b><small>Run the hosted demo or a downloaded file.</small></div></li>
+          <li><span>2</span><div><b>Think visually</b><small>Arrange text, diagrams, ink, images, and scrolls.</small></div></li>
+          <li><span>3</span><div><b>Save one file</b><small>Your data remains embedded, portable, and offline-ready.</small></div></li>
+        </ol>
+      </section>
+
+      <section class="agent-section" id="agents">
+        <div class="agent-shot">
+          <img src="./assets/powerscroll-agent.png" alt="PowerScroll settings showing the local agent bridge beside an editable native diagram" />
+        </div>
+        <div>
+          <p class="eyebrow">A SHARED VISUAL WORKSPACE</p>
+          <h2>Let the agent do the layout work. Keep the canvas in your hands.</h2>
+          <p>Agents can read pages, write markdown, insert images, manage scrolls, and turn PlantUML, Mermaid, SVG, or draw.io into ordinary editable canvas objects.</p>
+          <pre><code>npm install --global \
+https://github.com/CynaCons/PowerScroll/releases/latest/download/powerscroll-mcp.tgz
+powerscroll-mcp</code></pre>
+          <a class="text-link" href="https://github.com/CynaCons/PowerScroll#let-an-agent-work-in-your-notebook">Agent setup and tools →</a>
+        </div>
+      </section>
+
+      <section class="privacy">
+        <p class="eyebrow">PRIVACY BY ARCHITECTURE</p>
+        <h2>No cloud promise to trust. No cloud dependency to begin with.</h2>
+        <p>Normal editing runs in your browser and stores the notebook where you choose. Update checks and optional extensions contact GitHub. The agent bridge is disabled by default and uses a loopback connection on your own machine.</p>
+        <a class="text-link" href="https://github.com/CynaCons/PowerScroll/blob/main/SECURITY.md">Read the security model →</a>
+      </section>
+
+      <section class="faq">
+        <h2>Before you open the file</h2>
+        <details open><summary>Does the live demo upload my notes?</summary><p>No. The hosted build runs in your browser. Download or save your notebook to keep it.</p></details>
+        <details><summary>Can I open an old PowerNote notebook?</summary><p>Yes. PowerScroll preserves the embedded data format, internal links, browser storage, and bridge protocol used by existing PowerNote files.</p></details>
+        <details><summary>Which browser should I use?</summary><p>Chrome and Edge provide direct disk save and autosave through the File System Access API. Firefox and Safari use a download fallback.</p></details>
+        <details><summary>Is it really open source?</summary><p>Yes. PowerScroll is MIT licensed. The source, release tag, committed standalone build, and SHA-256 release digest are public on GitHub.</p></details>
+      </section>
+
+      <section class="final-cta">
+        <p class="eyebrow">NO SIGNUP SCREEN AHEAD</p>
+        <h2>Open a notebook and start thinking.</h2>
+        <div class="actions">
+          <a class="button button-light" href="./app/">Try PowerScroll</a>
+          <a class="button button-outline" href="https://github.com/CynaCons/PowerScroll">View source</a>
+        </div>
+      </section>
+    </main>
+
+    <footer><span>PowerScroll · MIT © 2026 Constantin Chabirand</span><span><a href="https://github.com/CynaCons/PowerScroll/discussions">Discussions</a> · <a href="https://github.com/CynaCons/PowerScroll/issues">Issues</a> · <a href="https://github.com/CynaCons/PowerScroll/releases">Releases</a></span></footer>
+  </body>
+</html>

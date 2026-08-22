@@ -191,7 +191,7 @@ component "gw" as gw {
     await expect(diagnostics).toBeVisible();
     await expect(diagnostics.locator('li')).not.toHaveCount(0);
     // A styling directive is reported as skipped, never silently dropped.
-    await expect(diagnostics).toContainText('PowerNote supplies the style');
+    await expect(diagnostics).toContainText('PowerScroll supplies the style');
   });
 
   test('total garbage leaves the canvas intact', async ({ page }) => {

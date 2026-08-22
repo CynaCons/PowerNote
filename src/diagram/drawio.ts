@@ -109,7 +109,7 @@ const REFUSED: Record<string, string> = {
   router:
     'is refused — the bends live in draw.io\'s router, not in the file. Right-click the edge in draw.io → Edit connection to make waypoints explicit, then import again.',
   startArrow:
-    'is refused — PowerNote arrows have one head, at the end of the segment, and this start head has no canvas equivalent.',
+    'is refused — PowerScroll arrows have one head, at the end of the segment, and this start head has no canvas equivalent.',
   bothArrows:
     'is refused — the canvas has no double-headed primitive, and dropping one head would misstate the drawing.',
 };

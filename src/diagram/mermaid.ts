@@ -1,5 +1,5 @@
 /**
- * A tolerant parser for the Mermaid subset PowerNote understands.
+ * A tolerant parser for the Mermaid subset PowerScroll understands.
  *
  * Mermaid is a third grammar beside the two PlantUML ones, and it earns its
  * place for one reason: agents write it fluently and reach for it first. It
@@ -268,7 +268,7 @@ function parseFlowchart(
         diagnostics.push({
           line,
           severity: 'ignored',
-          message: 'Init directive skipped — PowerNote supplies the style.',
+          message: 'Init directive skipped — PowerScroll supplies the style.',
         });
       }
       continue;
@@ -278,7 +278,7 @@ function parseFlowchart(
       diagnostics.push({
         line,
         severity: 'ignored',
-        message: 'Styling or interaction directive skipped — PowerNote supplies the style.',
+        message: 'Styling or interaction directive skipped — PowerScroll supplies the style.',
       });
       continue;
     }

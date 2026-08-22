@@ -1,86 +1,120 @@
-# PowerNote
+# PowerScroll
 
-**Structured visual notes, fully owned by the user.**
+**A local-first visual notebook in one editable HTML file—with an MCP bridge for AI agents.**
 
-PowerNote combines the hierarchy of OneNote, the freeform canvas of PowerPoint, and the freedom of a whiteboard — in a single HTML file that works offline.
+[Try PowerScroll](https://cynacons.github.io/PowerScroll/app/) ·
+[Download PowerScroll.html](https://github.com/CynaCons/PowerScroll/releases/latest/download/PowerScroll.html) ·
+[Agent setup](#let-an-agent-work-in-your-notebook) ·
+[Report a problem](https://github.com/CynaCons/PowerScroll/issues/new/choose)
 
-## Get Started
+![PowerScroll visual notebook showing structured pages, independent scrolls, markdown and an editable architecture diagram](site/assets/powerscroll-canvas.png)
 
-1. Download **`PowerNote.html`** from the [latest release](https://github.com/CynaCons/PowerNote/releases/latest)
-2. Open it in any browser
-3. Start taking notes
-4. Press **Ctrl+S** to save — your notes are embedded in the file itself
+PowerScroll combines the hierarchy of OneNote, the freeform canvas of a
+whiteboard, and editable diagrams in a notebook you completely own. No account,
+server, proprietary database, or cloud connection is required.
 
-No install. No account. No server. Just open and write.
+## Start in under a minute
 
-## Features
+1. Open the [live demo](https://cynacons.github.io/PowerScroll/app/) or download
+   [`PowerScroll.html`](https://github.com/CynaCons/PowerScroll/releases/latest/download/PowerScroll.html).
+2. Add text, images, drawings, shapes, pages, and independent vertical scrolls.
+3. Press **Ctrl+S**. The application and your notebook data are saved together
+   in one HTML file.
+4. Open that file in a browser whenever you want to continue.
 
-- **Infinite canvas** — pan, zoom, pinch on touch devices; scroll-to-pan, shift+scroll for horizontal
-- **Rich text** — Markdown rendering (headers, bold, italic, lists, tables, code, checkboxes, clickable links)
-- **Math / LaTeX** — inline `$E=mc^2$` and display `$$...$$` via KaTeX
-- **Images** — paste from clipboard, drag-drop, multi-file import, crop, 90° rotate, notes
-- **Freehand drawing** — pen with color/size options, stroke and zone erasers
-- **Shapes** — rectangles, circles, triangles, arrows (two-vertex handles), lines and arcs with fill/stroke/dash/corner-radius styling
-- **Diagrams** — write PlantUML, get native shapes you can drag. UML component and composite structure (ports, ball-and-socket assemblies, delegation, parts) and activity charts with swimlanes. Not an image: every box, arrow and label is an ordinary canvas object
-- **Hierarchy** — sections and pages like OneNote, drag to reorder
-- **Scrolls** — named vertical columns on a page, with titles that pin to the top as you scroll and a magnetic snap to their edges
-- **Search & Replace** — Ctrl+F for current page, Ctrl+Shift+F across notebook, replace mode
-- **Lasso select** — drag-rectangle to select multiple nodes, move as a group
-- **Undo/Redo** — per-page history (Ctrl+Z / Ctrl+Shift+Z)
-- **Duplicate** — Ctrl+Alt+drag to clone nodes
-- **Links** — external URLs and internal page links
-- **Save to disk** — File System Access API (Chrome/Edge) or download fallback
-- **Auto-save** — 1.5s after the last edit (forced by 5s), to the bound file and the notebook library. Not a localStorage snapshot.
-- **Auto-update** — detects new releases on GitHub, in-app update
-- **Self-contained** — every file is both the editor and the data
-- **Offline-first** — works without internet, no cloud dependency
-- **Agent-ready** — an MCP server lets an AI agent read and write the open notebook, including drawing diagrams. See [`powernote-mcp/`](powernote-mcp/README.md)
+The hosted demo does not upload notebook content. Download or save your notebook
+to keep it; your browser file is the source of truth.
 
-## Migrating an old notebook
+## Why PowerScroll is different
 
-A notebook carries its own copy of the app, so a file built before the in-app
-updater was fixed (anything up to v0.36.0) cannot update itself. Move it across
-once, by hand:
+### One file is the product and the data
 
-1. Download `PowerNote.html` from the [latest release](https://github.com/CynaCons/PowerNote/releases/latest) and open it.
-2. Click the **open** icon in the top bar and pick your old notebook.
-3. Press **Ctrl+S**.
+Every notebook contains the complete editor, structured workspace, drawings,
+images, and optional extensions. It opens offline and remains editable. Sharing
+the file shares a working copy rather than an export that needs PowerScroll
+installed elsewhere.
 
-Step 2 loads your old notebook's data into the new build and binds to that file,
-so step 3 writes the new build back over it — sections, pages, nodes and
-drawings intact, and fields added since your old version filled in with
-defaults. From then on in-app updates work.
+### Visual without losing structure
 
-## How It Works
+Sections and pages provide notebook hierarchy. Inside each page, named scrolls
+create independent vertical workstreams on an infinite canvas. Markdown, math,
+images, ink, shapes, PlantUML, Mermaid, SVG, and draw.io content can live beside
+one another.
 
-Each PowerNote file is a standalone HTML application. When you save, your notes are serialized as JSON and embedded inside the HTML file alongside the editor code. Reopen the file to continue editing. Share the file to share your notes — the recipient gets a fully editable copy.
+### Humans and agents share the same canvas
+
+The local MCP bridge lets an agent read pages, add and move blocks, manage
+scrolls, insert images, create native editable diagrams, and save the notebook.
+Agent edits use the same in-memory stores, undo history, and save path as human
+edits—there is no shadow database to reconcile.
+
+![PowerScroll agent bridge and editable native diagram workflow](site/assets/powerscroll-agent.png)
+
+## Let an agent work in your notebook
+
+The bridge is off by default and listens only on your machine. Until the npm
+package is published, install the verified bridge tarball from the latest
+release:
+
+```bash
+npm install --global https://github.com/CynaCons/PowerScroll/releases/latest/download/powerscroll-mcp.tgz
+powerscroll-mcp
+```
+
+Then open a notebook and enable **Settings → Agent bridge → Let a local agent
+write into this notebook**. See the [complete tool and client setup guide](powernote-mcp/README.md).
+
+The package is prepared for `npx powerscroll-mcp` and the official MCP Registry;
+those routes become available after the first npm publication.
+
+## Selected capabilities
+
+- Infinite canvas with pan, zoom, touch, lasso, alignment guides, and undo/redo
+- Markdown, tables, checkboxes, links, syntax blocks, and KaTeX mathematics
+- Images with paste/import, crop, rotate, lightbox, notes, and compact mode
+- Freehand pen and erasers; styled rectangles, circles, triangles, arrows, lines, and arcs
+- Sections, pages, named resizable scrolls, outline, search, and replace
+- Native editable diagrams from PlantUML, Mermaid, SVG, and draw.io
+- Direct disk save and autosave in Chrome/Edge, with browser download fallback
+- In-app updates that preserve notebook content and installed extensions
+- Local multi-agent MCP bridge with a single-writer lease and unblocked reads
+
+## Privacy and security
+
+Normal editing does not require a PowerScroll server or account. Update checks
+and optional extension installation contact GitHub; the local agent bridge makes
+a loopback WebSocket connection only after the user enables it.
+
+A notebook is executable HTML. Open notebooks only from people you trust, just
+as you would any executable document. See [SECURITY.md](SECURITY.md) for the
+threat model and private vulnerability-reporting instructions.
+
+## Migrating a PowerNote notebook
+
+PowerScroll opens existing PowerNote notebooks directly. Legacy embedded ids,
+internal links, storage, and bridge protocol identifiers remain supported.
+
+For a notebook too old to update itself:
+
+1. Open the latest `PowerScroll.html`.
+2. Use the **Open** button to select the old notebook.
+3. Press **Ctrl+S** to write the current PowerScroll editor back with its content.
 
 ## Development
 
 ```bash
 npm install
-git submodule update --init --recursive   # powerplan MCP (PLAN.md tools)
-npm run dev          # Dev server at localhost:5173
-npm run build:template  # Build standalone HTML
-npx playwright test  # Run E2E tests (135 spec files)
+npm install --prefix powernote-mcp
+npm run dev
+npm run build:template
+npx playwright test
+npm run test:bridge
 ```
 
-### powerplan MCP
-
-[`powerplan`](https://github.com/CynaCons/powerplan) is vendored as a git submodule
-(`powerplan/`) and registered in [`.mcp.json`](.mcp.json). Agents use it to read and
-mutate `PLAN.md` (current iteration, complete tasks, lifecycle) instead of freeform
-edits. After clone or MCP config changes, restart the agent session so tools load.
-
-```bash
-# optional global install (also works path-only via powerplan/powerplan_server.py)
-pip install -e ./powerplan
-```
-
-## Tech Stack
-
-React 18 + TypeScript + Vite + Konva.js + Zustand
+PowerScroll is built with React, TypeScript, Vite, Konva, and Zustand. Behavioral
+requirements and their test traceability live in [`docs/`](docs/). Contribution
+expectations are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT
+[MIT](LICENSE) © 2026 Constantin Chabirand

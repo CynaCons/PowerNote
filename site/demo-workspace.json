@@ -1,0 +1,123 @@
+{
+  "version": "1",
+  "filename": "Welcome to PowerScroll",
+  "editorVersion": "0.67.0",
+  "saveRevision": 0,
+  "settings": {
+    "backgroundMode": "scroll",
+    "bgColor": "#f7f5ef"
+  },
+  "sections": [
+    {
+      "id": "welcome-section",
+      "title": "Welcome",
+      "pages": [
+        {
+          "id": "welcome-page",
+          "title": "Start here",
+          "scrolls": [
+            { "id": "human-scroll", "title": "Your canvas", "column": 0 },
+            { "id": "agent-scroll", "title": "Agent workspace", "column": 1 }
+          ],
+          "nodes": [
+            {
+              "id": "welcome-title",
+              "type": "text",
+              "x": 48,
+              "y": 88,
+              "width": 698,
+              "height": 120,
+              "layer": 3,
+              "data": {
+                "text": "# Welcome to PowerScroll\n\nA visual notebook that lives in **one editable HTML file**.",
+                "fontSize": 20,
+                "fontFamily": "Inter, system-ui, sans-serif",
+                "fontStyle": "normal",
+                "fill": "#14181a"
+              }
+            },
+            {
+              "id": "welcome-steps",
+              "type": "text",
+              "x": 48,
+              "y": 250,
+              "width": 698,
+              "height": 260,
+              "layer": 3,
+              "data": {
+                "text": "## Try three things\n\n- Double-click this text to edit Markdown\n- Press **T**, then click the canvas to add a block\n- Drag the right edge of a scroll title to resize its workspace\n\nPress **Ctrl+S** when you want to keep your notebook.",
+                "fontSize": 16,
+                "fontFamily": "Inter, system-ui, sans-serif",
+                "fontStyle": "normal",
+                "fill": "#14181a"
+              }
+            },
+            {
+              "id": "agent-title",
+              "type": "text",
+              "x": 842,
+              "y": 88,
+              "width": 698,
+              "height": 150,
+              "layer": 3,
+              "data": {
+                "text": "# Work with an agent\n\nEnable the local bridge in **Settings → Agent bridge**. Your agent can read this page, add blocks, place images, and draw editable diagrams.",
+                "fontSize": 18,
+                "fontFamily": "Inter, system-ui, sans-serif",
+                "fontStyle": "normal",
+                "fill": "#14181a"
+              }
+            },
+            {
+              "id": "agent-example",
+              "type": "text",
+              "x": 842,
+              "y": 290,
+              "width": 698,
+              "height": 250,
+              "layer": 3,
+              "data": {
+                "text": "## A useful first prompt\n\n```text\nRead the open PowerScroll page. Add a third scroll called Questions, summarize what is here, and draw a small Mermaid flowchart showing how this notebook is saved.\n```\n\nEverything the agent creates remains ordinary canvas content you can move and edit.",
+                "fontSize": 16,
+                "fontFamily": "Inter, system-ui, sans-serif",
+                "fontStyle": "normal",
+                "fill": "#14181a"
+              }
+            }
+          ],
+          "strokes": []
+        }
+      ]
+    },
+    {
+      "id": "examples-section",
+      "title": "Examples",
+      "pages": [
+        {
+          "id": "architecture-page",
+          "title": "Architecture workspace",
+          "scrolls": [{ "id": "architecture-scroll", "title": "System design", "column": 0 }],
+          "nodes": [
+            {
+              "id": "architecture-copy",
+              "type": "text",
+              "x": 48,
+              "y": 88,
+              "width": 698,
+              "height": 210,
+              "layer": 3,
+              "data": {
+                "text": "# Architecture workspace\n\nUse this page for requirements, diagrams, decisions, screenshots, and agent-generated analysis. Add independent scrolls when two workstreams should grow beside each other.",
+                "fontSize": 18,
+                "fontFamily": "Inter, system-ui, sans-serif",
+                "fontStyle": "normal",
+                "fill": "#14181a"
+              }
+            }
+          ],
+          "strokes": []
+        }
+      ]
+    }
+  ]
+}

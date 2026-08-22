@@ -1,6 +1,6 @@
 # SRS: Diagrams
 
-**Project:** PowerNote
+**Project:** PowerScroll (formerly PowerNote)
 **Version:** 0.61.1
 **Date:** 2026-08-17
 

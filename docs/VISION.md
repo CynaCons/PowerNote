@@ -1,4 +1,4 @@
-# PowerNote — Long-Term Vision
+# PowerScroll — Long-Term Vision
 
 **Status:** Post-MVP. Not in active scope. Tracked here so ideas are not lost.
 
@@ -36,6 +36,6 @@ A paid subscription (~€1.99–€4.99 / month) unlocking cloud-backed capabili
 
 ## Relationship to the PRD
 
-- `PRD.md` describes what PowerNote **is**, what it **ships**, and what it does **now**.
+- `PRD.md` describes what PowerScroll **is**, what it **ships**, and what it does **now**.
 - `VISION.md` describes what PowerNote **might become** after the MVP is done and infrastructure exists.
 - When an item from this document is promoted to active work, it moves into `PRD.md` §12 and gets one or more `SRS_*.md` requirements.

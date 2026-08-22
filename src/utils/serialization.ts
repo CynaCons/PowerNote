@@ -28,7 +28,8 @@ export function deserializeWorkspace(json: string): WorkspaceData | null {
 }
 
 /**
- * Check if the current document has embedded PowerNote data
+ * Check if the current document has embedded PowerScroll data. The legacy
+ * `powernote-data` id is intentionally stable so every existing notebook opens.
  */
 export function getEmbeddedData(): WorkspaceData | null {
   const scriptTag = document.getElementById(DATA_SCRIPT_ID);
@@ -111,7 +112,7 @@ export function downloadFile(
 }
 
 /**
- * Read an HTML file and extract embedded PowerNote data.
+ * Read an HTML file and extract embedded PowerScroll data.
  *
  * Also harvests any extension blocks the file carries (v0.65) — this is the
  * one choke point every open path goes through (FSA restore, Open picker,
@@ -194,19 +195,19 @@ export function startAutoSave(
               await writable.write(html);
               await writable.close();
               if (import.meta.env?.DEV) {
-                console.log('[PowerNote] Auto-saved to file via FSA handle');
+                console.log('[PowerScroll] Auto-saved to file via FSA handle');
               }
             }
           }
         }
       } catch (err) {
         if (import.meta.env?.DEV) {
-          console.log('[PowerNote] FSA autosave skipped:', err);
+          console.log('[PowerScroll] FSA autosave skipped:', err);
         }
       }
 
       if (import.meta.env?.DEV) {
-        console.log('[PowerNote] Auto-saved to library');
+        console.log('[PowerScroll] Auto-saved to library');
       }
     } finally {
       saveInFlight = false;

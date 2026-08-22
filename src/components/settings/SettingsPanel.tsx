@@ -413,7 +413,7 @@ export function SettingsPanel({
       </div>
 
       <div className="settings-panel__section" style={{ marginTop: 12, borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
-        <span className="settings-panel__label" data-testid="settings-app-version">PowerNote v{APP_VERSION}</span>
+        <span className="settings-panel__label" data-testid="settings-app-version">PowerScroll v{APP_VERSION}</span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
           {updateStatus === 'idle' && (
             <button

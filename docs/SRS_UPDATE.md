@@ -1,7 +1,7 @@
 # SRS: In-App Update
 
-**Project:** PowerNote
-**Version:** 0.25.0-proto
+**Project:** PowerScroll (formerly PowerNote)
+**Version:** 0.67.0
 **Date:** 2026-07-18
 
 ## Purpose
@@ -53,3 +53,10 @@ must download the new build once by hand; from then on updating works.
 |----|-------------|----------|----------|
 | REQ-UPDATE-032 | A requested version tag shall build and publish the committed single-file artifact without installing a browser or rerunning the full Playwright campaign. The full campaign remains a required local pre-tag check and an independent `main`/pull-request CI signal, so its duration or an unrelated flake cannot strand an intentional release. | Must | workflow inspection |
 | REQ-UPDATE-033 | Release hardening shall include a real upgrade proof from a previously shipped notebook artifact to the newly published tag, confirming that the new version runs and embedded notebook content survives. | Must | release smoke |
+
+## PowerScroll rename compatibility (v0.67.0)
+
+| ID | Description | Priority | Test Ref |
+|----|-------------|----------|----------|
+| REQ-UPDATE-034 | The PowerScroll updater shall query the renamed GitHub repository and prefer `PowerScroll.html`, while accepting the transitional `PowerNote.html` release asset so notebooks and releases spanning the rename remain updateable. | Must | T187 |
+| REQ-UPDATE-035 | The v0.67.0 release shall publish both `PowerScroll.html` and a byte-identical `PowerNote.html` compatibility alias; the committed tag-pinned template route shall remain available after the repository rename. | Must | T187, release smoke |

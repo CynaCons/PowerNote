@@ -1,6 +1,6 @@
 # SRS: Shape & Drawing Groups
 
-**Project:** PowerNote  
+**Project:** PowerScroll (formerly PowerNote)
 **Version:** 0.27.0  
 **Date:** 2026-07-21
 

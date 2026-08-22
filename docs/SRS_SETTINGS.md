@@ -1,6 +1,6 @@
 # SRS: Settings
 
-**Project:** PowerNote
+**Project:** PowerScroll (formerly PowerNote)
 **Version:** 0.40.0
 **Date:** 2026-07-18
 

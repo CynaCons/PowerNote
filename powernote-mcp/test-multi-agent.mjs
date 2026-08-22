@@ -352,10 +352,10 @@ async function main() {
     tmpParsed = {};
   }
   check(
-    'read_image without out_path lands under os.tmpdir()/powernote-images',
+    'read_image without out_path lands under os.tmpdir()/powerscroll-images',
     !tmpRead.isError &&
       typeof tmpParsed.path === 'string' &&
-      tmpParsed.path.includes('powernote-images') &&
+      tmpParsed.path.includes('powerscroll-images') &&
       existsSync(tmpParsed.path) &&
       readFileSync(tmpParsed.path).length === PNG_1X1.length,
     tmpRead.text,

@@ -1,6 +1,6 @@
 # SRS: Math / LaTeX Rendering
 
-**Project:** PowerNote
+**Project:** PowerScroll (formerly PowerNote)
 **Version:** 0.14.0
 **Date:** 2026-04-14
 

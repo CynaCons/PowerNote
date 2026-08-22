@@ -1,6 +1,6 @@
 {
-  "name": "PowerNote",
-  "short_name": "PowerNote",
+  "name": "PowerScroll",
+  "short_name": "PowerScroll",
   "start_url": ".",
   "display": "standalone",
   "theme_color": "#fafafa",

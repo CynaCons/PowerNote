@@ -1,5 +1,5 @@
 /**
- * A tolerant parser for the PlantUML subset PowerNote understands.
+ * A tolerant parser for the PlantUML subset PowerScroll understands.
  *
  * Two rules govern everything here:
  *
@@ -159,7 +159,7 @@ export function parsePlantUml(source: string): ParseResult {
       diagnostics.push({
         line,
         severity: 'ignored',
-        message: 'Styling or preprocessor directive skipped — PowerNote supplies the style.',
+        message: 'Styling or preprocessor directive skipped — PowerScroll supplies the style.',
       });
       continue;
     }

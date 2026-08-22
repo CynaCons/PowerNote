@@ -1,0 +1,40 @@
+name: Bug report
+description: Report a reproducible PowerScroll problem
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve PowerScroll. Remove private notebook content before attaching files or screenshots.
+  - type: input
+    id: version
+    attributes:
+      label: PowerScroll version
+      placeholder: 0.67.0
+    validations:
+      required: true
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options: [Chrome, Edge, Firefox, Safari, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: Tell us exactly what you did and what happened.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Console output, screenshots, or a minimal notebook with private data removed.

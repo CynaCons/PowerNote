@@ -1,6 +1,6 @@
 # SRS: Infinite Canvas
 
-**Project:** PowerNote
+**Project:** PowerScroll (formerly PowerNote)
 **Version:** 0.56.0
 **Date:** 2026-08-17
 

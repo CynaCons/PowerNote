@@ -546,7 +546,7 @@ function pushSegment(
 function emitLine(el: Element, ctx: Ctx, f: Frame, line: number): void {
   if (f.paint.stroke === 'transparent') {
     // A line is painted only by its stroke, so SVG draws nothing here either.
-    report(ctx, line, 'ignored', '<line> has no stroke, so SVG draws nothing for it and neither does PowerNote.');
+    report(ctx, line, 'ignored', '<line> has no stroke, so SVG draws nothing for it and neither does PowerScroll.');
     return;
   }
   const x1 = length(attr(el, 'x1')) ?? 0;
@@ -773,7 +773,7 @@ function walkElement(el: Element, ctx: Ctx, parent: Frame): void {
       emitText(el, ctx, f);
       return;
     default:
-      report(ctx, line, 'error', `<${tag}> is not part of the SVG subset PowerNote understands, so it was skipped.`);
+      report(ctx, line, 'error', `<${tag}> is not part of the SVG subset PowerScroll understands, so it was skipped.`);
   }
 }
 

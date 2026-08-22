@@ -1,7 +1,7 @@
 # SRS: File System (Save/Load)
 
-**Project:** PowerNote
-**Version:** 0.25.2
+**Project:** PowerScroll (formerly PowerNote)
+**Version:** 0.67.0
 **Date:** 2026-07-18
 
 ## Purpose
@@ -35,3 +35,5 @@ Enable users to save their entire notebook as a single self-contained HTML file 
 | REQ-FILE-021 | While a manual Save / Save As is in progress, the TopBar Save control shall show a busy/spinner state, shall be disabled to prevent double-trigger, and shall clear the busy state when the save completes (success or failure). Autosave shall not drive this indicator | Must | T86 |
 | REQ-FILE-022 | The TopBar shall show the best-available identity of the linked HTML file: FSA `handle.name` when a current handle exists; decoded `file://` path when the app was opened as a local file with no handle; otherwise an explicit “Not linked to a file” state. The indicator shall update when the user Opens, Save-As, loads from the notebook library, or clears the current handle | Must | T90 |
 | REQ-FILE-023 | When the app is opened as a local `file://` HTML document with embedded `#powernote-data`, the TopBar path indicator shall show the decoded absolute OS path from `window.location` (not a stale FSA handle name). The app shall clear any persisted current `FileSystemFileHandle` on that boot so Save/autosave cannot target a different previously linked file. After an in-session Open/Save-As that establishes a new handle, the indicator may show that handle’s `name` (browsers do not expose a full folder path for picker handles) | Must | T91 |
+| REQ-FILE-024 | User-facing product, manifest, help, validation, release and download copy shall identify the application as PowerScroll. Existing PowerNote notebooks shall still open and save without conversion or data loss. | Must | T187 |
+| REQ-FILE-025 | Compatibility-sensitive identifiers already embedded in notebooks or browser state (`#powernote-data`, `powernote://`, `powernote-*` storage keys, bridge protocol app id and test globals) shall remain readable after the rename. New builds may expose PowerScroll aliases but shall not invalidate the legacy identifiers. | Must | T187, T131 |

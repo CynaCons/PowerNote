@@ -62,7 +62,7 @@ export async function revertNotebook(
     }
     const ok = applyRevertedText(text);
     if (!ok) {
-      showToast('Revert failed — file is not a valid PowerNote notebook', 'error');
+      showToast('Revert failed — file is not a valid PowerScroll notebook', 'error');
       return;
     }
     showToast(`Reverted to ${handle.name}`, 'info');
@@ -74,7 +74,7 @@ export async function revertNotebook(
 
 /**
  * Apply a saved-file text to the stores: parse, migrate, hydrate,
- * mark clean. Returns false when the text is not a valid PowerNote HTML.
+ * mark clean. Returns false when the text is not a valid PowerScroll notebook.
  * Exported for tests that exercise the hydration path without needing
  * to mock FSA + IDB.
  */

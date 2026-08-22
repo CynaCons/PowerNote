@@ -109,7 +109,7 @@ test.describe('87 - Updated HTML hydrate (REQ-UPDATE-004)', () => {
 
       await page.locator('[data-testid="nav-settings"]').click();
       await expect(page.locator('[data-testid="settings-panel"]')).toBeVisible();
-      await expect(page.locator('[data-testid="settings-app-version"]')).toContainText('PowerNote v');
+      await expect(page.locator('[data-testid="settings-app-version"]')).toContainText('PowerScroll v');
     } finally {
       await page.close();
       server.close();

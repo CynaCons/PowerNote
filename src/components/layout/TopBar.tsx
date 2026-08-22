@@ -128,7 +128,7 @@ export function TopBar() {
           showToast(`Opened ${result.handle.name}`, 'info');
           return;
         }
-        showToast('Not a valid PowerNote file', 'error');
+        showToast('Not a valid PowerScroll notebook', 'error');
         return;
       }
       // User cancelled — do nothing
@@ -164,7 +164,7 @@ export function TopBar() {
         useFileBindingStore.getState().setFromHandle({ name: file.name });
         showToast('Notebook opened', 'info');
       } else {
-        showToast('Not a valid PowerNote file', 'error');
+        showToast('Not a valid PowerScroll notebook', 'error');
       }
     };
     reader.readAsText(file);

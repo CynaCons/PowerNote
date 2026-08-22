@@ -14,7 +14,7 @@
  *      (explicit `mxPoint`s, no source/target) because reconnecting would
  *      re-clip them and break the closure contract.
  *
- * Arc fallback: PowerNote's `arc` is a stroked half-circle (UML socket).
+ * Arc fallback: PowerScroll's `arc` is a stroked half-circle (UML socket).
  * draw.io's stencil sets include `shape=mxgraph.basic.arc` and a mockup
  * `shape=arc`, but those only render when the matching library is loaded — a
  * file that uses them opens as an empty box in a vanilla mxGraph viewer.
@@ -419,7 +419,7 @@ function wrapMxfile(title: string, cells: string[], extent: { w: number; h: numb
   const name = esc(title);
   return (
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<mxfile host="PowerNote" type="device">\n` +
+    `<mxfile host="PowerScroll" type="device">\n` +
     `  <diagram id="export" name="${name}">\n` +
     `    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" page="1" pageWidth="${extent.w}" pageHeight="${extent.h}">\n` +
     `      <root>\n` +

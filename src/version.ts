@@ -1,2 +1,2 @@
-/** Single source of truth for the PowerNote app version */
-export const APP_VERSION = '0.66.2';
+/** Single source of truth for the PowerScroll app version. */
+export const APP_VERSION = '0.67.0';

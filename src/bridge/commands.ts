@@ -2262,7 +2262,7 @@ async function checkUpdate(): Promise<CheckUpdateResult> {
       latestVersion: latest,
       message:
         latest === APP_VERSION
-          ? `PowerNote ${APP_VERSION} is the latest release.`
+          ? `PowerScroll ${APP_VERSION} is the latest release.`
           : `Nothing to install — running ${APP_VERSION}, ahead of the latest release ${latest}.`,
     };
   }
@@ -2273,7 +2273,7 @@ async function checkUpdate(): Promise<CheckUpdateResult> {
     checked: true,
     latestVersion: info.latestVersion,
     releaseUrl: info.releaseUrl,
-    message: `PowerNote ${info.latestVersion} is available (running ${APP_VERSION}).`,
+    message: `PowerScroll ${info.latestVersion} is available (running ${APP_VERSION}).`,
   };
 }
 
@@ -2302,7 +2302,7 @@ async function runUpdate(params: Record<string, unknown>): Promise<RunUpdateResu
   if (!info.downloadUrl) {
     throw new BridgeCommandError(
       'PRECONDITION',
-      `Release ${info.latestVersion} has no PowerNote.html asset to install.`,
+      `Release ${info.latestVersion} has no PowerScroll.html compatibility asset to install.`,
     );
   }
 

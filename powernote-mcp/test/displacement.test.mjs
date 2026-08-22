@@ -34,7 +34,7 @@ before(async () => {
   await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('server did not start')), 10_000);
     proc.stderr.on('data', (d) => {
-      if (d.toString().includes('WebSocket listening')) {
+      if (d.toString().includes('listening on')) {
         clearTimeout(timer);
         resolve();
       }

@@ -131,8 +131,8 @@ test.describe('126 - Mermaid diagrams (REQ-DIAG-090..098)', () => {
     expect(cases.thick.join(' ')).toMatch(/error:.*thick/);
     expect(cases.compound.join(' ')).toMatch(/error:.*compound node shape/);
     expect(cases.subgraph.join(' ')).toMatch(/error:.*Subgraphs are not supported/);
-    // Styling is skipped, not refused — PowerNote supplies the style.
-    expect(cases.styling.join(' ')).toMatch(/ignored:.*PowerNote supplies the style/);
+    // Styling is skipped, not refused — PowerScroll supplies the style.
+    expect(cases.styling.join(' ')).toMatch(/ignored:.*PowerScroll supplies the style/);
     expect(cases.block.join(' ')).toMatch(/error:.*Blocks are not supported/);
   });
 
