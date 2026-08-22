@@ -1,18 +1,18 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.cynacons/powerscroll",
+  "name": "io.github.CynaCons/powerscroll",
   "title": "PowerScroll",
   "description": "Read and edit a live local-first PowerScroll visual notebook.",
   "repository": {
     "url": "https://github.com/CynaCons/PowerScroll",
     "source": "github"
   },
-  "version": "0.67.0",
+  "version": "0.67.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "powerscroll-mcp",
-      "version": "0.67.0",
+      "version": "0.67.1",
       "transport": {
         "type": "stdio"
       }

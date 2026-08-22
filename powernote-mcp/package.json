@@ -1,7 +1,7 @@
 {
   "name": "powerscroll-mcp",
-  "version": "0.67.0",
-  "mcpName": "io.github.cynacons/powerscroll",
+  "version": "0.67.1",
+  "mcpName": "io.github.CynaCons/powerscroll",
   "type": "module",
   "description": "MCP server for reading and editing a live PowerScroll visual notebook",
   "main": "server.js",
