@@ -8,9 +8,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    # v0.60/v0.61.1 runs hung 6h in "playwright install --with-deps" (apt).
-    # Fail fast instead; green runs take ~7 minutes.
-    timeout-minutes: 25
+    # The 738-test Playwright campaign is a local pre-release gate. CI stays
+    # intentionally lean so browser installation and quota cannot delay a push.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
 
@@ -29,14 +29,8 @@ jobs:
 
       - run: npx eslint src --ext .ts,.tsx --max-warnings 9999
 
-      # Built BEFORE the tests, because 131-upgrade-regression loads this exact
-      # artifact. Testing a stale one would gate nothing.
+      # Ensure the committed release artifact can be reproduced.
       - run: npm run build:template
 
-      - run: npx playwright install --with-deps chromium
-
-      - run: npx playwright test
-
-      # The Playwright suite drives the app side of the bridge and never starts
-      # the MCP server, so the hub/peer topology has no coverage there.
+      - run: npm test --prefix powernote-mcp
       - run: npm run test:bridge
