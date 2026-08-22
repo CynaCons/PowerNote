@@ -51,7 +51,7 @@ must download the new build once by hand; from then on updating works.
 
 | ID | Description | Priority | Test Ref |
 |----|-------------|----------|----------|
-| REQ-UPDATE-032 | A requested version tag shall build and publish the committed single-file artifact without installing a browser or rerunning the full Playwright campaign. The full campaign remains a required local pre-tag check and an independent `main`/pull-request CI signal, so its duration or an unrelated flake cannot strand an intentional release. | Must | workflow inspection |
+| REQ-UPDATE-032 | A requested version tag shall build and publish the committed single-file artifact without installing a browser or rerunning the full Playwright campaign. The full campaign remains a required local pre-tag check, so its duration or an unrelated infrastructure failure cannot strand an intentional release. | Must | workflow inspection |
 | REQ-UPDATE-033 | Release hardening shall include a real upgrade proof from a previously shipped notebook artifact to the newly published tag, confirming that the new version runs and embedded notebook content survives. | Must | release smoke |
 
 ## PowerScroll rename compatibility (v0.67.0)
@@ -60,3 +60,4 @@ must download the new build once by hand; from then on updating works.
 |----|-------------|----------|----------|
 | REQ-UPDATE-034 | The PowerScroll updater shall query the renamed GitHub repository and prefer `PowerScroll.html`, while accepting the transitional `PowerNote.html` release asset so notebooks and releases spanning the rename remain updateable. | Must | T187 |
 | REQ-UPDATE-035 | The v0.67.0 release shall publish both `PowerScroll.html` and a byte-identical `PowerNote.html` compatibility alias; the committed tag-pinned template route shall remain available after the repository rename. | Must | T187, release smoke |
+| REQ-UPDATE-036 | GitHub CI on pushes and pull requests shall remain lightweight (install, typecheck, lint, standalone build, and MCP tests) and shall not install a browser or rerun the comprehensive Playwright campaign; maintainers run that campaign locally before a release commit. | Must | workflow inspection |
